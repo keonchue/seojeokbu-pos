@@ -368,6 +368,7 @@
         <div class="stat"><div class="lbl">판매 금액 합계(정가)</div><div class="val" id="sTotal">0원</div></div>
         <div class="stat"><div class="lbl">할인 합계</div><div class="val red" id="sDiscount">0원</div></div>
         <div class="stat"><div class="lbl">실수령액 합계</div><div class="val green" id="sReceived">0원</div></div>
+        <div class="stat"><div class="lbl">환불 금액 합계</div><div class="val red" id="sRefund">0원</div></div>
         <div class="stat"><div class="lbl">차액 합계 (실수령−정가)</div><div class="val red" id="sDiff">0원</div></div>
       </div>
       <table>
@@ -659,10 +660,11 @@ function renderInventory() {
 function renderSales() {
   const body = document.getElementById('salesBody');
   body.innerHTML = '';
-  let total = 0, received = 0, diff = 0, discount = 0;
+  let total = 0, received = 0, diff = 0, discount = 0, refund = 0;
   transactions.forEach(t => {
     total += t.total; received += t.received; diff += t.diff; discount += (t.discount || 0);
     const isReturn = t.type === 'return';
+    if (isReturn) refund += -t.received;   // 환불로 돌려준 금액(양수)
     const dt = new Date(t.time);
     const dstr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
     const desc = (isReturn ? '↩ [반품] ' : '') + t.items.map(i => `${i.title} ×${Math.abs(i.qty)}`).join(', ');
@@ -701,6 +703,7 @@ function renderSales() {
   document.getElementById('sTotal').textContent = won(total);
   document.getElementById('sDiscount').textContent = discount ? '−' + won(discount) : '0원';
   document.getElementById('sReceived').textContent = won(received);
+  document.getElementById('sRefund').textContent = refund ? '−' + won(refund) : '0원';
   document.getElementById('sDiff').textContent = (diff>0?'+':'') + won(diff);
 }
 

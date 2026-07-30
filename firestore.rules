@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// 서적부 POS 보안 규칙
+// - 로그인한 '가게 공용 계정'만 데이터를 읽고 쓸 수 있습니다.
+// - 그 외 아무나 URL을 알아도 재고/매출에 접근할 수 없습니다.
+// - STORE_EMAIL 자리에 실제 가게 계정 이메일을 넣어 배포하세요.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isStore() {
+      return request.auth != null
+        && request.auth.token.email == 'pcl206@naver.com';
+    }
+
+    // 책(재고)
+    match /books/{bookId} {
+      allow read, write: if isStore();
+    }
+
+    // 매출/반품 내역
+    match /transactions/{txId} {
+      allow read, write: if isStore();
+    }
+
+    // 초기 세팅 플래그
+    match /meta/{docId} {
+      allow read, write: if isStore();
+    }
+
+    // 그 외 경로는 전부 차단
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서적부 POS</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --blue: #1f4e8c;
+    --blue-dark: #16386a;
+    --blue-light: #2f6fc4;
+    --green: #1f9d55;
+    --green-dark: #167a41;
+    --red: #d64545;
+    --gray: #eef1f5;
+    --gray-line: #d6dbe3;
+    --text: #1c2530;
+    --muted: #6b7787;
+  }
+  html, body {
+    height: 100%;
+    font-family: "Malgun Gothic", "맑은 고딕", -apple-system, sans-serif;
+    color: var(--text);
+    background: #cdd4dd;
+    -webkit-user-select: none; user-select: none;
+  }
+  body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* ---------- Header ---------- */
+  header {
+    background: var(--blue-dark);
+    color: #fff;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px; height: 56px; flex-shrink: 0;
+  }
+  header .brand { font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+  header .brand span { color: #9ec3f0; font-weight: 500; font-size: 13px; margin-left: 8px; }
+  header .info { font-size: 13px; color: #cfe0f5; display: flex; gap: 18px; align-items: center; }
+  header .info b { color: #fff; }
+  .logout-btn { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .logout-btn:hover { background: rgba(255,255,255,.22); }
+
+  /* ---------- Login screen ---------- */
+  #loginScreen {
+    position: fixed; inset: 0; z-index: 500; background: linear-gradient(160deg, #1f4e8c, #16386a);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-card {
+    background: #fff; border-radius: 16px; padding: 36px 32px; width: 340px; max-width: 90vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35); display: flex; flex-direction: column;
+  }
+  .login-brand { font-size: 24px; font-weight: 800; color: var(--blue-dark); text-align: center; }
+  .login-sub { font-size: 13px; color: var(--muted); text-align: center; margin: 8px 0 22px; }
+  .login-card input {
+    padding: 13px 14px; border: 2px solid var(--gray-line); border-radius: 9px; font-size: 15px; margin-bottom: 12px;
+  }
+  .login-card input:focus { outline: none; border-color: var(--blue-light); }
+  .login-card button {
+    padding: 14px 0; border: none; border-radius: 9px; background: var(--blue); color: #fff;
+    font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 4px;
+  }
+  .login-card button:hover { background: var(--blue-dark); }
+  .login-err { color: var(--red); font-size: 13px; font-weight: 700; text-align: center; min-height: 18px; margin-top: 12px; }
+
+  /* ---------- Tabs ---------- */
+  .tabs { display: flex; background: var(--blue); flex-shrink: 0; }
+  .tabs button {
+    flex: 1; border: none; background: transparent; color: #bcd3f0;
+    font-size: 15px; font-weight: 700; padding: 12px 0; cursor: pointer;
+    border-bottom: 3px solid transparent;
+  }
+  .tabs button.active { color: #fff; background: var(--blue-light); border-bottom-color: #ffd34e; }
+
+  main { flex: 1; overflow: hidden; }
+  .view { display: none; height: 100%; }
+  .view.active { display: flex; }
+
+  /* ---------- POS layout ---------- */
+  #pos { }
+  .cart-pane {
+    width: 40%; min-width: 360px; background: #fff; display: flex; flex-direction: column;
+    border-right: 2px solid var(--gray-line);
+  }
+  .cart-head {
+    display: grid; grid-template-columns: 1fr 70px 110px 44px;
+    background: var(--blue); color: #fff; font-size: 14px; font-weight: 700;
+    padding: 10px 12px; gap: 6px;
+  }
+  .cart-head span:nth-child(2){ text-align:center; }
+  .cart-head span:nth-child(3){ text-align:right; }
+  .cart-items { flex: 1; overflow-y: auto; }
+  .cart-row {
+    display: grid; grid-template-columns: 1fr 70px 110px 44px; gap: 6px;
+    align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--gray-line);
+    font-size: 14px;
+  }
+  .cart-row .title { font-weight: 600; }
+  .cart-row .qty { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .cart-row .qty button {
+    width: 24px; height: 24px; border: 1px solid var(--gray-line); background: var(--gray);
+    border-radius: 5px; cursor: pointer; font-size: 15px; font-weight: 700; line-height: 1;
+  }
+  .cart-row .amt { text-align: right; font-weight: 700; }
+  .cart-row .del { text-align: center; }
+  .cart-row .del button {
+    width: 28px; height: 28px; border: none; background: #fbe3e3; color: var(--red);
+    border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: 700;
+  }
+  .cart-empty { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px; }
+
+  .summary { border-top: 2px solid var(--blue); padding: 12px; background: #f7f9fc; }
+  .sum-row { display: flex; justify-content: space-between; padding: 5px 6px; font-size: 15px; }
+  .sum-row.total { font-size: 20px; font-weight: 800; color: var(--blue-dark); border-top: 1px dashed var(--gray-line); margin-top: 4px; padding-top: 10px; }
+  .sum-row .k { color: var(--muted); }
+  .sum-row.disc { align-items: center; }
+  .sum-row .disc-input { display: flex; align-items: center; gap: 5px; }
+  .sum-row .disc-input input { width: 92px; text-align: right; padding: 6px 8px; border: 2px solid var(--gray-line); border-radius: 6px; font-size: 15px; font-weight: 700; color: var(--red); }
+  .sum-row .disc-input em { font-style: normal; color: var(--muted); font-size: 14px; }
+  .disc-toggle { display: inline-flex; border: 1px solid var(--gray-line); border-radius: 6px; overflow: hidden; }
+  .disc-toggle button { border: none; background: #fff; color: var(--muted); font-size: 13px; font-weight: 700; padding: 6px 10px; cursor: pointer; }
+  .disc-toggle button.on { background: var(--blue); color: #fff; }
+  .sum-row.disc-calc { padding: 0 6px 4px; margin-top: -4px; }
+  .sum-row.disc-calc #discCalc { color: var(--red); font-size: 13px; font-weight: 700; }
+
+  .pay-methods { display: flex; gap: 8px; padding: 0 12px 10px; }
+  .pay-methods button {
+    flex: 1; padding: 12px 0; border: 2px solid var(--gray-line); background: #fff;
+    border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; color: var(--muted);
+  }
+  .pay-methods button.sel { border-color: var(--blue); background: #e8f0fb; color: var(--blue-dark); }
+
+  .received { padding: 0 12px 10px; }
+  .received label { font-size: 13px; color: var(--muted); display:block; margin-bottom:4px; }
+  .received input {
+    width: 100%; padding: 10px 12px; border: 2px solid var(--gray-line); border-radius: 8px;
+    font-size: 16px; text-align: right; font-weight: 700;
+  }
+  .received .hint { font-size: 12px; color: var(--muted); margin-top: 4px; min-height: 16px; }
+  .received .hint.warn { color: var(--red); font-weight: 700; }
+
+  .pay-actions { display: flex; gap: 8px; padding: 0 12px 14px; }
+  .pay-actions .clear {
+    flex: 0 0 30%; padding: 16px 0; border: none; border-radius: 8px; background: #e6e9ee;
+    color: #55606e; font-size: 16px; font-weight: 700; cursor: pointer;
+  }
+  .pay-actions .checkout {
+    flex: 1; padding: 16px 0; border: none; border-radius: 8px; background: var(--green);
+    color: #fff; font-size: 18px; font-weight: 800; cursor: pointer;
+  }
+  .pay-actions .checkout:disabled { background: #b7c2ce; cursor: not-allowed; }
+
+  /* ---------- Product grid ---------- */
+  .product-pane { flex: 1; padding: 16px; overflow-y: auto; }
+  .product-pane h3 { font-size: 14px; color: var(--muted); font-weight: 700; }
+  .product-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .book-btn {
+    background: #fff; border: 1px solid var(--gray-line); border-radius: 10px;
+    padding: 16px 14px; cursor: pointer; text-align: left; position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,.05); transition: transform .05s;
+    display: flex; flex-direction: column; gap: 8px; min-height: 108px;
+  }
+  .book-btn:hover { border-color: var(--blue-light); }
+  .book-btn:active { transform: scale(.97); }
+  .book-btn.out { opacity: .5; cursor: not-allowed; }
+  .book-btn .bt { font-size: 15px; font-weight: 700; line-height: 1.35; }
+  .book-btn .bp { font-size: 17px; font-weight: 800; color: var(--blue-dark); margin-top: auto; }
+  .book-btn .bs {
+    position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: 700;
+    background: var(--gray); color: var(--muted); padding: 3px 8px; border-radius: 20px;
+  }
+  .book-btn .bs.low { background: #fdeecf; color: #a6720c; }
+  .book-btn .bs.zero { background: #fbe3e3; color: var(--red); }
+
+  /* ---------- Inventory / Sales tables ---------- */
+  .panel { flex: 1; padding: 20px; overflow-y: auto; width: 100%; }
+  .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .panel-head h2 { font-size: 20px; }
+  .panel-head .actions { display: flex; gap: 8px; }
+  .btn {
+    padding: 10px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700;
+    cursor: pointer;
+  }
+  .btn.primary { background: var(--blue); color: #fff; }
+  .btn.green { background: var(--green); color: #fff; }
+  .btn.ghost { background: #fff; border: 1px solid var(--gray-line); color: var(--text); }
+  .btn.danger { background: #fff; border: 1px solid #f0c0c0; color: var(--red); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 14px; margin-bottom: 20px; }
+  .stat { background: #fff; border-radius: 12px; padding: 18px; border: 1px solid var(--gray-line); }
+  .stat .lbl { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .stat .val { font-size: 26px; font-weight: 800; color: var(--blue-dark); }
+  .stat .val.green { color: var(--green-dark); }
+  .stat .val.red { color: var(--red); }
+
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid var(--gray-line); }
+  thead th { background: var(--blue); color: #fff; font-size: 13px; padding: 12px 14px; text-align: left; }
+  tbody td { padding: 12px 14px; border-top: 1px solid var(--gray-line); font-size: 14px; }
+  tbody tr:hover { background: #f7f9fc; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .center { text-align: center; }
+  .pill { display:inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .pill.cash { background: #e2f3e8; color: var(--green-dark); }
+  .pill.transfer { background: #e6effb; color: var(--blue-dark); }
+  .pill.diff { background: #fbe3e3; color: var(--red); }
+  .pay-lines { display: inline-flex; flex-direction: column; gap: 4px; align-items: stretch; }
+  .pay-lines .pill { text-align: center; }
+  .mini-btn { padding: 6px 10px; border: 1px solid var(--gray-line); background:#fff; border-radius:6px; cursor:pointer; font-size:13px; font-weight:700; }
+  .mini-btn.plus { color: var(--green-dark); border-color:#bfe3cc; }
+  .empty-row td { text-align:center; color: var(--muted); padding: 30px; }
+
+  /* ---------- Modal ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20,30,45,.5); display: none;
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  .overlay.show { display: flex; }
+  .modal { background: #fff; border-radius: 14px; width: 380px; max-width: 92vw; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .modal h3 { font-size: 18px; margin-bottom: 16px; }
+  .field { margin-bottom: 14px; }
+  .field label { display:block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
+  .field input {
+    width: 100%; padding: 11px 12px; border: 2px solid var(--gray-line); border-radius: 8px; font-size: 15px;
+  }
+  .modal-actions { display:flex; gap: 8px; margin-top: 6px; }
+  .modal-actions .btn { flex: 1; }
+  .ret-list { max-height: 260px; overflow-y: auto; border: 1px solid var(--gray-line); border-radius: 8px; }
+  .ret-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--gray-line); }
+  .ret-row:last-child { border-bottom: none; }
+  .ret-title { font-size: 14px; font-weight: 700; }
+  .ret-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .ret-qty { display: flex; align-items: center; gap: 6px; }
+  .ret-qty button { width: 28px; height: 28px; border: 1px solid var(--gray-line); background: var(--gray); border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 700; line-height: 1; }
+  .ret-qty input { width: 46px; text-align: center; padding: 6px 4px; border: 2px solid var(--gray-line); border-radius: 6px; font-size: 15px; font-weight: 700; }
+  .pick-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--gray-line); }
+  .pick-row:last-child { border-bottom: none; }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--text); color: #fff; padding: 14px 24px; border-radius: 30px; font-size: 15px;
+    font-weight: 700; opacity: 0; transition: all .25s; z-index: 200; pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.good { background: var(--green-dark); }
+  #toast.bad { background: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">📚 서적부 POS <span>Book Store</span></div>
+  <div class="info">
+    <div>영업일자 <b id="today"></b></div>
+    <div>오늘 매출 <b id="hdrRevenue">0원</b></div>
+    <button id="logoutBtn" class="logout-btn">로그아웃</button>
+  </div>
+</header>
+
+<div id="loginScreen">
+  <form id="loginForm" class="login-card">
+    <div class="login-brand">📚 서적부 POS</div>
+    <p class="login-sub">가게 계정으로 로그인하세요</p>
+    <input id="loginEmail" type="email" placeholder="이메일" autocomplete="username" required>
+    <input id="loginPw" type="password" placeholder="비밀번호" autocomplete="current-password" required>
+    <button type="submit" id="loginBtn">로그인</button>
+    <div id="loginError" class="login-err"></div>
+  </form>
+</div>
+
+<div class="tabs">
+  <button class="active" data-view="pos">🛒 판매</button>
+  <button data-view="inventory">📦 재고 관리</button>
+  <button data-view="sales">📊 매출 내역</button>
+</div>
+
+<main>
+  <!-- ============ POS ============ -->
+  <section class="view active" id="pos">
+    <div class="cart-pane">
+      <div class="cart-head">
+        <span>상품명</span><span>수량</span><span>금액</span><span></span>
+      </div>
+      <div class="cart-items" id="cartItems"></div>
+
+      <div class="summary">
+        <div class="sum-row"><span class="k">총 수량</span><span id="sumQty">0권</span></div>
+        <div class="sum-row"><span class="k">합계 금액 (정가)</span><span id="sumTotal">0원</span></div>
+        <div class="sum-row disc"><span class="k">할인</span>
+          <span class="disc-input">
+            <span class="disc-toggle">
+              <button type="button" id="discModeAmt" class="on">원</button>
+              <button type="button" id="discModePct">%</button>
+            </span>
+            <input id="discount" type="text" inputmode="numeric" placeholder="0">
+            <em id="discUnit">원</em>
+          </span>
+        </div>
+        <div class="sum-row disc-calc"><span></span><span id="discCalc"></span></div>
+        <div class="sum-row total"><span>받을 금액</span><span id="sumPayable">0원</span></div>
+      </div>
+
+      <div class="pay-methods">
+        <button data-method="계좌이체" class="sel">💳 계좌이체</button>
+        <button data-method="현금">💵 현금</button>
+      </div>
+
+      <div class="received">
+        <label>실수령액 (실제 받은 금액 · 비워두면 받을 금액과 동일)</label>
+        <input id="received" type="text" inputmode="numeric" placeholder="0">
+        <div class="hint" id="receivedHint"></div>
+      </div>
+
+      <div class="pay-actions">
+        <button class="clear" id="clearCart">비우기</button>
+        <button class="checkout" id="checkout" disabled>결제 완료</button>
+      </div>
+    </div>
+
+    <div class="product-pane">
+      <div class="product-head">
+        <h3>판매할 책을 선택하세요</h3>
+        <button class="btn danger" id="posReturnBtn">↩ 반품하기</button>
+      </div>
+      <div class="grid" id="bookGrid"></div>
+    </div>
+  </section>
+
+  <!-- ============ Inventory ============ -->
+  <section class="view" id="inventory">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>📦 재고 관리</h2>
+        <div class="actions">
+          <button class="btn green" id="addBookBtn">＋ 새 책 등록</button>
+        </div>
+      </div>
+      <div class="cards">
+        <div class="stat"><div class="lbl">등록된 책 종류</div><div class="val" id="statTitles">0</div></div>
+        <div class="stat"><div class="lbl">총 재고 수량</div><div class="val" id="statStock">0권</div></div>
+        <div class="stat"><div class="lbl">재고 자산(정가 기준)</div><div class="val" id="statAsset">0원</div></div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>책 제목</th><th class="num">판매가</th><th class="num">현재 재고</th>
+          <th class="center">결제 방법</th>
+          <th class="num">누적 판매</th><th class="center">입고 / 조정</th><th></th>
+        </tr></thead>
+        <tbody id="invBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ Sales ============ -->
+  <section class="view" id="sales">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>📊 매출 내역 (스프레드시트)</h2>
+        <div class="actions">
+          <button class="btn ghost" id="exportCsv">⬇ CSV 내보내기</button>
+          <button class="btn danger" id="resetAll">전체 초기화</button>
+        </div>
+      </div>
+      <div class="cards">
+        <div class="stat"><div class="lbl">총 판매 건수</div><div class="val" id="sTxCount">0건</div></div>
+        <div class="stat"><div class="lbl">판매 금액 합계(정가)</div><div class="val" id="sTotal">0원</div></div>
+        <div class="stat"><div class="lbl">할인 합계</div><div class="val red" id="sDiscount">0원</div></div>
+        <div class="stat"><div class="lbl">실수령액 합계</div><div class="val green" id="sReceived">0원</div></div>
+        <div class="stat"><div class="lbl">차액 합계 (실수령−정가)</div><div class="val red" id="sDiff">0원</div></div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>일시</th><th>구매 내역</th><th class="num">수량</th>
+          <th class="num">정가 합계</th><th class="num">할인</th><th class="num">실수령액</th>
+          <th class="center">결제수단</th><th class="num">차액</th>
+          <th class="center">관리</th>
+        </tr></thead>
+        <tbody id="salesBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<!-- Add / Restock modal -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+/* ================= Firebase ================= */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs, setDoc,
+  onSnapshot, query, orderBy, writeBatch, increment }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { firebaseConfig, STORE_EMAIL } from "./firebase-config.js";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
+const booksCol = collection(db, 'books');
+const txCol = collection(db, 'transactions');
+
+/* ================= State ================= */
+const DEFAULT_BOOK = { title: '톨스토이 단편선', price: 28000, stock: 100, sold: 0 };
+
+let books = [];
+let transactions = [];
+let cart = [];          // { id, qty }
+let payMethod = '계좌이체';
+
+const won = n => (n||0).toLocaleString('ko-KR') + '원';
+const bookById = id => books.find(b => b.id === id);
+
+// 실시간 리스너 (한 번만 시작)
+let listenersStarted = false;
+function startListeners() {
+  if (listenersStarted) return;
+  listenersStarted = true;
+  onSnapshot(query(booksCol), snap => {
+    books = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                     .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    renderAll();
+  });
+  onSnapshot(query(txCol, orderBy('time', 'desc')), snap => {
+    transactions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAll();
+  });
+}
+
+// 최초 1회: 기본 책 자동 등록 (삭제 후 재생성 방지용 meta 플래그)
+async function seedIfNeeded() {
+  try {
+    const metaRef = doc(db, 'meta', 'init');
+    const m = await getDoc(metaRef);
+    if (!m.exists()) {
+      await addDoc(booksCol, { ...DEFAULT_BOOK, createdAt: Date.now() });
+      await setDoc(metaRef, { seeded: true, at: new Date().toISOString() });
+    }
+  } catch (e) { console.error('seed error', e); }
+}
+
+/* ================= Rendering ================= */
+function renderBookGrid() {
+  const grid = document.getElementById('bookGrid');
+  grid.innerHTML = '';
+  books.forEach(b => {
+    const inCart = cart.find(c => c.id === b.id);
+    const remaining = b.stock - (inCart ? inCart.qty : 0);
+    const out = remaining <= 0;
+    let cls = 'bs', label = `재고 ${remaining}`;
+    if (remaining <= 0) { cls += ' zero'; label = '품절'; }
+    else if (remaining <= 10) cls += ' low';
+    const el = document.createElement('button');
+    el.className = 'book-btn' + (out ? ' out' : '');
+    el.innerHTML = `<span class="${cls}">${label}</span>
+      <div class="bt">${b.title}</div>
+      <div class="bp">${won(b.price)}</div>`;
+    el.onclick = () => addToCart(b.id);
+    grid.appendChild(el);
+  });
+}
+
+function renderCart() {
+  const box = document.getElementById('cartItems');
+  box.innerHTML = '';
+  if (cart.length === 0) {
+    box.innerHTML = '<div class="cart-empty">왼쪽에서 판매할 책을 선택하면<br>여기에 표시됩니다.</div>';
+  }
+  let totalQty = 0, total = 0;
+  cart.forEach(c => {
+    const b = bookById(c.id);
+    const amt = b.price * c.qty;
+    totalQty += c.qty; total += amt;
+    const row = document.createElement('div');
+    row.className = 'cart-row';
+    row.innerHTML = `
+      <div class="title">${b.title}</div>
+      <div class="qty">
+        <button data-a="dec">−</button><span>${c.qty}</span><button data-a="inc">＋</button>
+      </div>
+      <div class="amt">${won(amt)}</div>
+      <div class="del"><button data-a="del">✕</button></div>`;
+    row.querySelector('[data-a=dec]').onclick = () => changeQty(c.id, -1);
+    row.querySelector('[data-a=inc]').onclick = () => changeQty(c.id, 1);
+    row.querySelector('[data-a=del]').onclick = () => removeFromCart(c.id);
+    box.appendChild(row);
+  });
+  document.getElementById('sumQty').textContent = totalQty + '권';
+  document.getElementById('checkout').disabled = cart.length === 0;
+  renderBookGrid();
+  updateTotals();
+}
+
+function cartTotal() {
+  return cart.reduce((s, c) => s + bookById(c.id).price * c.qty, 0);
+}
+let discountMode = 'amount';   // 'amount'(원) | 'percent'(%)
+function discountPct() {
+  if (discountMode !== 'percent') return 0;
+  const raw = document.getElementById('discount').value.replace(/[^\d.]/g, '');
+  let pct = raw === '' ? 0 : (parseFloat(raw) || 0);
+  return Math.min(Math.max(pct, 0), 100);
+}
+function currentDiscount() {
+  const total = cartTotal();
+  let d;
+  if (discountMode === 'percent') {
+    d = Math.round(total * discountPct() / 100);
+  } else {
+    const raw = document.getElementById('discount').value.replace(/[^\d]/g, '');
+    d = raw === '' ? 0 : parseInt(raw, 10);
+  }
+  if (d > total) d = total;   // 할인은 정가를 넘을 수 없음
+  return d;
+}
+function payableAmount() { return cartTotal() - currentDiscount(); }
+
+function updateTotals() {
+  const disc = currentDiscount();
+  document.getElementById('sumTotal').textContent = won(cartTotal());
+  document.getElementById('sumPayable').textContent = won(cartTotal() - disc);
+  const calc = document.getElementById('discCalc');
+  calc.textContent = (discountMode === 'percent' && disc > 0) ? `${discountPct()}% → −${won(disc)}` : '';
+  updateReceivedHint();
+}
+
+function updateReceivedHint() {
+  const inp = document.getElementById('received');
+  const hint = document.getElementById('receivedHint');
+  const raw = inp.value.replace(/[^\d]/g, '');
+  if (raw === '') { hint.textContent = ''; hint.className = 'hint'; return; }
+  const diff = parseInt(raw, 10) - payableAmount();
+  if (diff === 0) { hint.textContent = '받을 금액과 일치합니다.'; hint.className = 'hint'; }
+  else if (diff > 0) { hint.textContent = `받을 금액보다 +${won(diff)} 더 받음`; hint.className = 'hint warn'; }
+  else { hint.textContent = `받을 금액보다 ${won(diff)} 부족 (오차)`; hint.className = 'hint warn'; }
+}
+
+/* ================= Cart actions ================= */
+function addToCart(id) {
+  const b = bookById(id);
+  const inCart = cart.find(c => c.id === id);
+  const used = inCart ? inCart.qty : 0;
+  if (used >= b.stock) { toast('재고가 부족합니다.', 'bad'); return; }
+  if (inCart) inCart.qty++;
+  else cart.push({ id, qty: 1 });
+  renderCart();
+}
+function changeQty(id, d) {
+  const c = cart.find(x => x.id === id); if (!c) return;
+  const b = bookById(id);
+  if (d > 0 && c.qty >= b.stock) { toast('재고가 부족합니다.', 'bad'); return; }
+  c.qty += d;
+  if (c.qty <= 0) cart = cart.filter(x => x.id !== id);
+  renderCart();
+}
+function removeFromCart(id) { cart = cart.filter(c => c.id !== id); renderCart(); }
+function clearCart() {
+  cart = [];
+  document.getElementById('received').value = '';
+  document.getElementById('discount').value = '';
+  renderCart();
+}
+
+/* ================= Checkout ================= */
+function checkout() {
+  if (cart.length === 0) return;
+  const total = cartTotal();
+  const discount = currentDiscount();
+  const discPct = discountMode === 'percent' ? discountPct() : null;
+  const payable = total - discount;
+  const rawRecv = document.getElementById('received').value.replace(/[^\d]/g, '');
+  const received = rawRecv === '' ? payable : parseInt(rawRecv, 10);
+
+  const items = cart.map(c => {
+    const b = bookById(c.id);
+    return { title: b.title, qty: c.qty, price: b.price, amount: b.price * c.qty };
+  });
+
+  // 재고는 증감(atomic)으로, 매출은 새 문서로 → 동시 판매에도 안전
+  const batch = writeBatch(db);
+  cart.forEach(c => {
+    batch.update(doc(booksCol, c.id), { stock: increment(-c.qty), sold: increment(c.qty) });
+  });
+  batch.set(doc(txCol), {
+    time: new Date().toISOString(),
+    items,
+    qty: cart.reduce((s, c) => s + c.qty, 0),
+    total,
+    discount,
+    discountPct: discPct,
+    payable,
+    received,
+    diff: received - payable,
+    method: payMethod
+  });
+  batch.commit().catch(e => { console.error(e); toast('결제 저장 실패 · 연결 확인', 'bad'); });
+
+  toast(`결제 완료 · ${won(received)} (${payMethod})`, 'good');
+  clearCart();
+}
+
+/* ================= Inventory ================= */
+function payBreakdown(title) {
+  let cash = 0, transfer = 0;
+  transactions.forEach(t => {
+    t.items.forEach(i => {
+      if (i.title !== title) return;
+      if (t.method === '현금') cash += i.qty;
+      else transfer += i.qty;
+    });
+  });
+  return { cash, transfer };
+}
+function renderInventory() {
+  const body = document.getElementById('invBody');
+  body.innerHTML = '';
+  let totalStock = 0, asset = 0;
+  books.forEach(b => {
+    totalStock += b.stock; asset += b.stock * b.price;
+    const pay = payBreakdown(b.title);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${b.title}</b></td>
+      <td class="num">${won(b.price)}</td>
+      <td class="num"><b>${b.stock}</b>권</td>
+      <td class="center">
+        <div class="pay-lines">
+          <span class="pill cash">현금 ${pay.cash}권</span>
+          <span class="pill transfer">계좌이체 ${pay.transfer}권</span>
+        </div>
+      </td>
+      <td class="num">${b.sold || 0}권</td>
+      <td class="center">
+        <button class="mini-btn plus" data-a="restock">＋ 입고</button>
+        <button class="mini-btn" data-a="edit">수정</button>
+      </td>
+      <td class="center"><button class="mini-btn" data-a="delete" style="color:#d64545">삭제</button></td>`;
+    tr.querySelector('[data-a=restock]').onclick = () => restockModal(b);
+    tr.querySelector('[data-a=edit]').onclick = () => editBookModal(b);
+    tr.querySelector('[data-a=delete]').onclick = () => deleteBook(b);
+    body.appendChild(tr);
+  });
+  if (books.length === 0) body.innerHTML = '<tr class="empty-row"><td colspan="7">등록된 책이 없습니다. “＋ 새 책 등록”을 눌러 추가하세요.</td></tr>';
+  document.getElementById('statTitles').textContent = books.length;
+  document.getElementById('statStock').textContent = totalStock + '권';
+  document.getElementById('statAsset').textContent = won(asset);
+}
+
+/* ================= Sales ================= */
+function renderSales() {
+  const body = document.getElementById('salesBody');
+  body.innerHTML = '';
+  let total = 0, received = 0, diff = 0, discount = 0;
+  transactions.forEach(t => {
+    total += t.total; received += t.received; diff += t.diff; discount += (t.discount || 0);
+    const isReturn = t.type === 'return';
+    const dt = new Date(t.time);
+    const dstr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    const desc = (isReturn ? '↩ [반품] ' : '') + t.items.map(i => `${i.title} ×${Math.abs(i.qty)}`).join(', ');
+    const methodCls = t.method === '현금' ? 'cash' : 'transfer';
+
+    // management cell
+    let manage;
+    if (isReturn) manage = '<span class="pill diff">반품</span>';
+    else {
+      const remain = remainingReturnable(t);
+      if (remain <= 0) manage = '<span class="pill" style="background:#e6e9ee;color:#8894a3">반품됨</span>';
+      else {
+        const note = remain < t.qty ? '<div style="font-size:11px;color:#a6720c;margin-bottom:3px">일부 반품됨 (잔여 '+remain+'권)</div>' : '';
+        manage = note + '<button class="mini-btn" data-a="return" style="color:#d64545;border-color:#f0c0c0">반품</button>';
+      }
+    }
+
+    const tr = document.createElement('tr');
+    if (isReturn) tr.style.background = '#fdf3f3';
+    tr.innerHTML = `
+      <td>${dstr}</td>
+      <td>${desc}</td>
+      <td class="num">${t.qty}권</td>
+      <td class="num">${won(t.total)}</td>
+      <td class="num">${t.discount ? '−'+won(t.discount) + (t.discountPct ? ` (${t.discountPct}%)` : '') : '-'}</td>
+      <td class="num"><b>${won(t.received)}</b></td>
+      <td class="center"><span class="pill ${methodCls}">${t.method}</span></td>
+      <td class="num">${t.diff===0?'-':(t.diff>0?'+':'')+won(t.diff)}</td>
+      <td class="center">${manage}</td>`;
+    const rbtn = tr.querySelector('[data-a=return]');
+    if (rbtn) rbtn.onclick = () => returnModal(t);
+    body.appendChild(tr);
+  });
+  if (transactions.length === 0) body.innerHTML = '<tr class="empty-row"><td colspan="9">아직 판매 내역이 없습니다.</td></tr>';
+  document.getElementById('sTxCount').textContent = transactions.length + '건';
+  document.getElementById('sTotal').textContent = won(total);
+  document.getElementById('sDiscount').textContent = discount ? '−' + won(discount) : '0원';
+  document.getElementById('sReceived').textContent = won(received);
+  document.getElementById('sDiff').textContent = (diff>0?'+':'') + won(diff);
+}
+
+function todayRevenue() {
+  const t = new Date(); const y=t.getFullYear(), m=t.getMonth(), d=t.getDate();
+  return transactions.filter(tx => {
+    const dt = new Date(tx.time);
+    return dt.getFullYear()===y && dt.getMonth()===m && dt.getDate()===d;
+  }).reduce((s, tx) => s + tx.received, 0);
+}
+
+/* ================= CSV ================= */
+function exportCsv() {
+  if (transactions.length === 0) { toast('내보낼 내역이 없습니다.', 'bad'); return; }
+  const rows = [['일시','책 제목','수량','판매가','정가합계','할인','실수령액','결제수단','차액']];
+  // one row per book line for spreadsheet friendliness
+  [...transactions].reverse().forEach(t => {
+    const dt = new Date(t.time);
+    const dstr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    t.items.forEach((i, idx) => {
+      rows.push([
+        dstr, i.title, i.qty, i.price, i.amount,
+        idx === 0 ? (t.discount || 0) : '', idx === 0 ? t.received : '',
+        idx === 0 ? t.method : '', idx === 0 ? t.diff : ''
+      ]);
+    });
+  });
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `서적부_매출_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV 파일을 저장했습니다.', 'good');
+}
+
+/* ================= Modals ================= */
+const overlay = document.getElementById('overlay');
+const modal = document.getElementById('modal');
+function closeModal() { overlay.classList.remove('show'); }
+overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+function addBookModal() {
+  modal.innerHTML = `
+    <h3>새 책 등록</h3>
+    <div class="field"><label>책 제목</label><input id="mTitle" placeholder="예) 톨스토이 단편선"></div>
+    <div class="field"><label>판매가 (원)</label><input id="mPrice" inputmode="numeric" placeholder="28000"></div>
+    <div class="field"><label>초기 재고 (권)</label><input id="mStock" inputmode="numeric" placeholder="100"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn green" id="mSave">등록</button>
+    </div>`;
+  overlay.classList.add('show');
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const title = document.getElementById('mTitle').value.trim();
+    const price = parseInt(document.getElementById('mPrice').value.replace(/[^\d]/g,''),10);
+    const stock = parseInt(document.getElementById('mStock').value.replace(/[^\d]/g,''),10);
+    if (!title || !price || isNaN(stock)) { toast('모든 항목을 입력하세요.', 'bad'); return; }
+    addDoc(booksCol, { title, price, stock, sold: 0, createdAt: Date.now() })
+      .catch(e => { console.error(e); toast('등록 실패 · 연결 확인', 'bad'); });
+    closeModal(); toast('새 책을 등록했습니다.', 'good');
+  };
+  setTimeout(() => document.getElementById('mTitle').focus(), 50);
+}
+
+function restockModal(b) {
+  modal.innerHTML = `
+    <h3>입고 · ${b.title}</h3>
+    <div class="field"><label>현재 재고: ${b.stock}권 → 추가할 수량</label>
+      <input id="mAdd" inputmode="numeric" placeholder="예) 50"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn green" id="mSave">입고 처리</button>
+    </div>`;
+  overlay.classList.add('show');
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const add = parseInt(document.getElementById('mAdd').value.replace(/[^\d]/g,''),10);
+    if (!add || add <= 0) { toast('수량을 입력하세요.', 'bad'); return; }
+    updateDoc(doc(booksCol, b.id), { stock: increment(add) })
+      .catch(e => { console.error(e); toast('입고 실패 · 연결 확인', 'bad'); });
+    closeModal();
+    toast(`${b.title} ${add}권 입고 완료 (재고 ${b.stock + add}권)`, 'good');
+  };
+  setTimeout(() => document.getElementById('mAdd').focus(), 50);
+}
+
+function editBookModal(b) {
+  modal.innerHTML = `
+    <h3>책 정보 수정</h3>
+    <div class="field"><label>책 제목</label><input id="mTitle" value="${b.title.replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>판매가 (원)</label><input id="mPrice" inputmode="numeric" value="${b.price}"></div>
+    <div class="field"><label>재고 수량 (직접 조정)</label><input id="mStock" inputmode="numeric" value="${b.stock}"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn primary" id="mSave">저장</button>
+    </div>`;
+  overlay.classList.add('show');
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const title = document.getElementById('mTitle').value.trim();
+    const price = parseInt(document.getElementById('mPrice').value.replace(/[^\d]/g,''),10);
+    const stock = parseInt(document.getElementById('mStock').value.replace(/[^\d]/g,''),10);
+    if (!title || !price || isNaN(stock)) { toast('올바르게 입력하세요.', 'bad'); return; }
+    updateDoc(doc(booksCol, b.id), { title, price, stock })
+      .catch(e => { console.error(e); toast('저장 실패 · 연결 확인', 'bad'); });
+    closeModal(); toast('저장했습니다.', 'good');
+  };
+}
+
+function deleteBook(b) {
+  modal.innerHTML = `
+    <h3>책 삭제</h3>
+    <p style="font-size:14px;color:#6b7787;margin-bottom:18px;line-height:1.5">
+      <b>${b.title}</b> 을(를) 목록에서 삭제할까요?<br>이미 기록된 매출 내역은 그대로 유지됩니다.</p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn danger" id="mSave">삭제</button>
+    </div>`;
+  overlay.classList.add('show');
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    cart = cart.filter(c => c.id !== b.id);
+    deleteDoc(doc(booksCol, b.id))
+      .catch(e => { console.error(e); toast('삭제 실패 · 연결 확인', 'bad'); });
+    closeModal(); renderCart(); toast('삭제했습니다.', 'good');
+  };
+}
+
+// how much of each title has already been returned for sale tx t
+function returnedQtyMap(t) {
+  const m = {};
+  transactions.forEach(r => {
+    if (r.type === 'return' && r.refId === t.id) {
+      r.items.forEach(i => { m[i.title] = (m[i.title] || 0) + (-i.qty); });
+    }
+  });
+  return m;
+}
+// remaining returnable quantity for sale tx t
+function remainingReturnable(t) {
+  const done = returnedQtyMap(t);
+  return t.items.reduce((s, i) => s + (i.qty - (done[i.title] || 0)), 0);
+}
+
+// POS tab: pick which past sale to return
+function returnPickerModal() {
+  const returnable = transactions.filter(t => t.type !== 'return' && remainingReturnable(t) > 0);
+  if (returnable.length === 0) { toast('반품할 결제 내역이 없습니다.', 'bad'); return; }
+  const rows = returnable.map(t => {
+    const dt = new Date(t.time);
+    const dstr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    const desc = t.items.map(i => `${i.title} ×${i.qty}`).join(', ');
+    const remain = remainingReturnable(t);
+    const partial = remain < t.qty ? ` <span style="color:#a6720c">(잔여 ${remain}권)</span>` : '';
+    return `<div class="pick-row" data-id="${t.id}">
+      <div>
+        <div class="ret-title">${desc}${partial}</div>
+        <div class="ret-sub">${dstr} · ${won(t.received)} · ${t.method}</div>
+      </div>
+      <button class="mini-btn" data-a="pick" style="color:#d64545;border-color:#f0c0c0">반품</button>
+    </div>`;
+  }).join('');
+  modal.innerHTML = `
+    <h3>반품할 결제 건 선택</h3>
+    <p style="font-size:13px;color:#6b7787;margin-bottom:12px">반품할 결제 내역을 선택하세요. (최근 순)</p>
+    <div class="ret-list">${rows}</div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">닫기</button>
+    </div>`;
+  overlay.classList.add('show');
+  modal.querySelectorAll('.pick-row').forEach(row => {
+    const t = returnable.find(x => x.id === row.dataset.id);
+    row.querySelector('[data-a=pick]').onclick = () => returnModal(t);
+  });
+  document.getElementById('mCancel').onclick = closeModal;
+}
+
+function returnModal(t) {
+  const done = returnedQtyMap(t);
+  const rows = t.items.map((i, idx) => {
+    const max = i.qty - (done[i.title] || 0);
+    if (max <= 0) return '';
+    return `<div class="ret-row" data-idx="${idx}">
+      <div class="ret-info">
+        <div class="ret-title">${i.title}</div>
+        <div class="ret-sub">${won(i.price)} · 반품 가능 ${max}권</div>
+      </div>
+      <div class="ret-qty">
+        <button type="button" data-a="dec">−</button>
+        <input class="rq" data-price="${i.price}" data-max="${max}" value="${max}" inputmode="numeric">
+        <button type="button" data-a="inc">＋</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  modal.innerHTML = `
+    <h3>반품 처리</h3>
+    <p style="font-size:13px;color:#6b7787;margin-bottom:12px">반품할 책과 수량을 선택하세요.</p>
+    <div class="ret-list">${rows}</div>
+    <div class="field" style="margin-top:14px">
+      <label>환불 금액 (실제 돌려줄 금액 · ${t.method})</label>
+      <input id="mRefund" inputmode="numeric">
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn danger" id="mSave">반품 처리</button>
+    </div>`;
+  overlay.classList.add('show');
+
+  const recalc = () => {
+    let sum = 0;
+    modal.querySelectorAll('.rq').forEach(inp => {
+      let q = parseInt(inp.value.replace(/[^\d]/g,''),10) || 0;
+      const max = +inp.dataset.max;
+      q = Math.min(Math.max(q,0), max);
+      inp.value = q;
+      sum += q * (+inp.dataset.price);
+    });
+    document.getElementById('mRefund').value = sum.toLocaleString('ko-KR');
+  };
+  modal.querySelectorAll('.ret-row').forEach(row => {
+    const inp = row.querySelector('.rq');
+    row.querySelector('[data-a=dec]').onclick = () => { inp.value = (+inp.value||0) - 1; recalc(); };
+    row.querySelector('[data-a=inc]').onclick = () => { inp.value = (+inp.value||0) + 1; recalc(); };
+    inp.oninput = recalc;
+  });
+  document.getElementById('mRefund').addEventListener('input', e => {
+    let v = e.target.value.replace(/[^\d]/g,'');
+    e.target.value = v === '' ? '' : parseInt(v,10).toLocaleString('ko-KR');
+  });
+  recalc();
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => processReturn(t);
+}
+
+function processReturn(t) {
+  const items = []; let qtySum = 0, totalSum = 0;
+  modal.querySelectorAll('.ret-row').forEach(row => {
+    const idx = +row.dataset.idx;
+    const inp = row.querySelector('.rq');
+    let q = Math.min(Math.max(parseInt(inp.value.replace(/[^\d]/g,''),10)||0, 0), +inp.dataset.max);
+    if (q <= 0) return;
+    const orig = t.items[idx];
+    items.push({ title: orig.title, qty: -q, price: orig.price, amount: -(orig.price*q) });
+    qtySum += q; totalSum += orig.price * q;
+  });
+  if (items.length === 0) { toast('반품할 수량을 선택하세요.', 'bad'); return; }
+  const refund = parseInt(document.getElementById('mRefund').value.replace(/[^\d]/g,''),10) || 0;
+  const remainingAfter = remainingReturnable(t) - qtySum;
+
+  const batch = writeBatch(db);
+  items.forEach(i => {
+    const q = -i.qty;   // 반품 수량(양수)
+    const b = books.find(x => x.title === i.title);
+    if (b) batch.update(doc(booksCol, b.id), { stock: increment(q), sold: increment(-q) });
+  });
+  batch.set(doc(txCol), {
+    time: new Date().toISOString(), type: 'return', refId: t.id,
+    items, qty: -qtySum, total: -totalSum, received: -refund,
+    diff: (-refund) - (-totalSum), method: t.method
+  });
+  batch.update(doc(txCol, t.id), { returned: remainingAfter <= 0 });
+  batch.commit().catch(e => { console.error(e); toast('반품 저장 실패 · 연결 확인', 'bad'); });
+
+  closeModal();
+  toast(`반품 완료 · ${won(refund)} 차감`, 'good');
+}
+
+function resetAll() {
+  modal.innerHTML = `
+    <h3>전체 초기화</h3>
+    <p style="font-size:14px;color:#6b7787;margin-bottom:18px;line-height:1.5">
+      모든 <b>매출 내역과 재고 데이터</b>가 삭제되고<br>초기 상태(톨스토이 단편선 100권)로 되돌아갑니다.<br>이 작업은 되돌릴 수 없습니다.</p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn danger" id="mSave">초기화</button>
+    </div>`;
+  overlay.classList.add('show');
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = async () => {
+    try {
+      const [bs, ts] = await Promise.all([getDocs(booksCol), getDocs(txCol)]);
+      const batch = writeBatch(db);
+      bs.forEach(d => batch.delete(d.ref));
+      ts.forEach(d => batch.delete(d.ref));
+      batch.set(doc(booksCol), { ...DEFAULT_BOOK, createdAt: Date.now() });
+      await batch.commit();
+      cart = [];
+      document.getElementById('received').value = '';
+      document.getElementById('discount').value = '';
+      closeModal(); renderCart(); toast('초기화되었습니다.', 'good');
+    } catch (e) { console.error(e); toast('초기화 실패 · 연결 확인', 'bad'); }
+  };
+}
+
+/* ================= Toast ================= */
+let toastTimer;
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = type, 2200);
+}
+
+/* ================= Wiring ================= */
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.view).classList.add('active');
+  };
+});
+document.querySelectorAll('.pay-methods button').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.pay-methods button').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    payMethod = btn.dataset.method;
+  };
+});
+document.getElementById('received').addEventListener('input', e => {
+  let v = e.target.value.replace(/[^\d]/g,'');
+  e.target.value = v === '' ? '' : parseInt(v,10).toLocaleString('ko-KR');
+  updateReceivedHint();
+});
+document.getElementById('discount').addEventListener('input', e => {
+  if (discountMode === 'percent') {
+    let v = e.target.value.replace(/[^\d.]/g,'');
+    if ((parseFloat(v) || 0) > 100) v = '100';
+    e.target.value = v;
+  } else {
+    let v = e.target.value.replace(/[^\d]/g,'');
+    e.target.value = v === '' ? '' : parseInt(v,10).toLocaleString('ko-KR');
+  }
+  updateTotals();
+});
+function setDiscountMode(mode) {
+  discountMode = mode;
+  document.getElementById('discModeAmt').classList.toggle('on', mode === 'amount');
+  document.getElementById('discModePct').classList.toggle('on', mode === 'percent');
+  document.getElementById('discUnit').textContent = mode === 'percent' ? '%' : '원';
+  document.getElementById('discount').value = '';
+  document.getElementById('discount').placeholder = mode === 'percent' ? '0' : '0';
+  updateTotals();
+}
+document.getElementById('discModeAmt').onclick = () => setDiscountMode('amount');
+document.getElementById('discModePct').onclick = () => setDiscountMode('percent');
+document.getElementById('checkout').onclick = checkout;
+document.getElementById('clearCart').onclick = clearCart;
+document.getElementById('posReturnBtn').onclick = returnPickerModal;
+document.getElementById('addBookBtn').onclick = addBookModal;
+document.getElementById('exportCsv').onclick = exportCsv;
+document.getElementById('resetAll').onclick = resetAll;
+
+/* ================= Render all ================= */
+function renderAll() {
+  renderCart();
+  renderInventory();
+  renderSales();
+  document.getElementById('hdrRevenue').textContent = won(todayRevenue());
+}
+/* ================= Auth / Init ================= */
+const loginScreen = document.getElementById('loginScreen');
+function showLoginError(msg) {
+  loginScreen.style.display = 'flex';
+  document.getElementById('loginError').textContent = msg || '';
+}
+
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const pw = document.getElementById('loginPw').value;
+  document.getElementById('loginError').textContent = '';
+  document.getElementById('loginBtn').disabled = true;
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+  } catch (err) {
+    console.error(err);
+    showLoginError('로그인 실패 · 이메일/비밀번호를 확인하세요.');
+  } finally {
+    document.getElementById('loginBtn').disabled = false;
+  }
+});
+document.getElementById('logoutBtn').onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, async user => {
+  if (user && user.email === STORE_EMAIL) {
+    loginScreen.style.display = 'none';
+    document.getElementById('loginPw').value = '';
+    await seedIfNeeded();
+    startListeners();
+  } else if (user) {
+    await signOut(auth);
+    showLoginError('허용되지 않은 계정입니다. 가게 공용 계정으로 로그인하세요.');
+  } else {
+    loginScreen.style.display = 'flex';
+  }
+});
+
+(function init(){
+  const t = new Date();
+  const days = ['일','월','화','수','목','금','토'];
+  document.getElementById('today').textContent =
+    `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}(${days[t.getDay()]})`;
+  renderAll();
+})();
+</script>
+</body>
+</html>

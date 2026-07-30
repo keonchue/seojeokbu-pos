@@ -1,0 +1,8 @@
+# OS / editor
+Thumbs.db
+.DS_Store
+*.tmp
+
+# 로컬 원본 이미지 (참고용, 배포 불필요)
+easypos_*.jpg
+이지포스_*.png

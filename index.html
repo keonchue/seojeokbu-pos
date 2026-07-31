@@ -251,6 +251,30 @@
   .btn.solid-danger { background: var(--red); color: #fff; }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
 
+  /* ---------- 검색 / 필터 ---------- */
+  .search {
+    height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-size: 14px; background: #fff; color: inherit; min-width: 0;
+  }
+  .search:focus { outline: none; border-color: var(--blue-light); box-shadow: 0 0 0 3px var(--blue-wash); }
+  .filters {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px;
+  }
+  .filters .search { flex: 1 1 240px; }
+  .filters input[type=date], .filters select {
+    height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-size: 13.5px; background: #fff; color: inherit;
+  }
+  .filters .sep { color: var(--muted); font-size: 13px; }
+  .filters .count { font-size: 13px; color: var(--muted); font-weight: 700; margin-left: auto; white-space: nowrap; }
+  .filters .count b { color: var(--blue-dark); }
+  .filters.on .search { border-color: var(--blue-light); }
+  @media (max-width: 620px) {
+    .filters .count { margin-left: 0; width: 100%; }
+    .filters input[type=date] { flex: 1 1 42%; }
+    .filters select { flex: 1 1 42%; }
+  }
+
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px,1fr)); gap: 12px; margin-bottom: 18px; }
   .stat { background: var(--surface); border-radius: var(--r-md); padding: 16px; border: 1px solid var(--line); box-shadow: var(--sh-1); }
   .stat .lbl { font-size: 12.5px; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
@@ -570,7 +594,7 @@
 
     <div class="product-pane">
       <div class="product-head">
-        <h3>판매할 책을 선택하세요</h3>
+        <input id="qBooks" class="search" type="search" placeholder="🔍 책 제목으로 찾기" style="flex:1;max-width:340px">
         <button class="btn danger" id="posReturnBtn">↩ 반품하기</button>
       </div>
       <div class="grid" id="bookGrid"></div>
@@ -592,6 +616,10 @@
         <div class="stat"><div class="lbl">총 재고 수량</div><div class="val" id="statStock">0권</div></div>
         <div class="stat"><div class="lbl">재고 자산(정가 기준)</div><div class="val" id="statAsset">0원</div></div>
       </div>
+      <div class="filters" id="invFilters">
+        <input id="qInv" class="search" type="search" placeholder="🔍 책 제목으로 찾기">
+        <span class="count" id="invCount"></span>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr>
@@ -611,9 +639,27 @@
       <div class="panel-head">
         <h2>📊 매출 내역</h2>
         <div class="actions">
-          <button class="btn ghost" id="exportCsv">⬇ 전체 CSV</button>
+          <button class="btn ghost" id="exportCsv">⬇ 지금 보이는 목록 CSV</button>
         </div>
       </div>
+
+      <div class="filters" id="salesFilters">
+        <input id="qSales" class="search" type="search" placeholder="🔍 책 제목 · 고객 이름으로 찾기">
+        <input type="date" id="fFrom" title="시작일"><span class="sep">~</span><input type="date" id="fTo" title="종료일">
+        <select id="fMethod">
+          <option value="">결제수단 전체</option>
+          <option value="현금">현금</option>
+          <option value="계좌이체">계좌이체</option>
+        </select>
+        <select id="fType">
+          <option value="">판매+반품</option>
+          <option value="sale">판매만</option>
+          <option value="return">반품만</option>
+        </select>
+        <button class="btn ghost" id="fClear">초기화</button>
+        <span class="count" id="salesCount"></span>
+      </div>
+
       <div class="cards">
         <div class="stat"><div class="lbl">총 판매 건수</div><div class="val" id="sTxCount">0건</div></div>
         <div class="stat"><div class="lbl">판매 금액 합계(정가)</div><div class="val" id="sTotal">0원</div></div>
@@ -860,10 +906,16 @@ async function runBatched(items, apply, size = 400) {
 }
 
 /* ================= 렌더 : 상품 / 장바구니 ================= */
+function matchTitle(title, q) {
+  return !q || String(title).toLowerCase().includes(q);
+}
+
 function renderBookGrid() {
   const grid = $('bookGrid');
   grid.innerHTML = '';
-  books.forEach(b => {
+  const q = $('qBooks').value.trim().toLowerCase();
+  const list = books.filter(b => matchTitle(b.title, q));
+  list.forEach(b => {
     const inCart = cart.find(c => c.id === b.id);
     const remaining = b.stock - (inCart ? inCart.qty : 0);
     const out = remaining <= 0;
@@ -878,9 +930,12 @@ function renderBookGrid() {
     el.onclick = () => addToCart(b.id);
     grid.appendChild(el);
   });
-  if (books.length === 0) {
-    grid.innerHTML = `<div class="cart-empty" style="grid-column:1/-1">
-      등록된 책이 없습니다.<br>‘📦 재고’ 탭에서 책을 먼저 등록하세요.</div>`;
+  if (list.length === 0) {
+    grid.innerHTML = `<div class="cart-empty" style="grid-column:1/-1">${
+      books.length === 0
+        ? '등록된 책이 없습니다.<br>‘📦 재고’ 탭에서 책을 먼저 등록하세요.'
+        : `‘${esc($('qBooks').value.trim())}’ 와(과) 일치하는 책이 없습니다.`
+    }</div>`;
   }
 }
 
@@ -1045,9 +1100,19 @@ function payBreakdown(title, txList = transactions) {
 function renderInventory() {
   const body = $('invBody');
   body.innerHTML = '';
+
+  // 상단 카드는 항상 '전체 재고' 기준 (검색해도 총 자산이 흔들리면 안 됨)
   let totalStock = 0, asset = 0;
-  books.forEach(b => {
-    totalStock += b.stock; asset += b.stock * b.price;
+  books.forEach(b => { totalStock += b.stock; asset += b.stock * b.price; });
+
+  const q = $('qInv').value.trim().toLowerCase();
+  const list = books.filter(b => matchTitle(b.title, q));
+  $('invFilters').classList.toggle('on', !!q);
+  $('invCount').innerHTML = q
+    ? `검색 결과 <b>${list.length}종</b> / 전체 ${books.length}종`
+    : `전체 <b>${books.length}종</b>`;
+
+  list.forEach(b => {
     const pay = payBreakdown(b.title);
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1073,8 +1138,12 @@ function renderInventory() {
     tr.querySelector('[data-a=delete]').onclick = () => deleteBook(b);
     body.appendChild(tr);
   });
-  if (books.length === 0) {
-    body.innerHTML = '<tr class="empty-row"><td colspan="6">등록된 책이 없습니다. “＋ 새 책 등록”을 눌러 추가하세요.</td></tr>';
+  if (list.length === 0) {
+    body.innerHTML = `<tr class="empty-row"><td colspan="6">${
+      books.length === 0
+        ? '등록된 책이 없습니다. “＋ 새 책 등록”을 눌러 추가하세요.'
+        : '검색 조건에 맞는 책이 없습니다.'
+    }</td></tr>`;
   }
   $('statTitles').textContent = books.length;
   $('statStock').textContent = totalStock + '권';
@@ -1085,16 +1154,62 @@ function renderInventory() {
 const SALES_PAGE = 100;
 let salesShown = SALES_PAGE;
 
+/* 매출 내역 검색·필터 — 스프레드시트에서 필터 거는 것과 같은 역할.
+   여기서 걸러진 결과가 화면 합계와 CSV 내보내기에 그대로 반영된다. */
+function salesFilter() {
+  return {
+    q: $('qSales').value.trim().toLowerCase(),
+    from: $('fFrom').value,
+    to: $('fTo').value,
+    method: $('fMethod').value,
+    type: $('fType').value,
+  };
+}
+function filteredTransactions() {
+  const f = salesFilter();
+  return transactions.filter(t => {
+    if (f.method && t.method !== f.method) return false;
+    if (f.type === 'sale' && t.type === 'return') return false;
+    if (f.type === 'return' && t.type !== 'return') return false;
+
+    const day = ymd(new Date(t.time));
+    if (f.from && day < f.from) return false;
+    if (f.to && day > f.to) return false;
+
+    if (f.q) {
+      const hay = [
+        ...(t.items || []).map(i => i.title),
+        t.customer || '',
+        t.method || '',
+      ].join(' ').toLowerCase();
+      if (!hay.includes(f.q)) return false;
+    }
+    return true;
+  });
+}
+function isFiltering() {
+  const f = salesFilter();
+  return !!(f.q || f.from || f.to || f.method || f.type);
+}
+
 function renderSales() {
   const body = $('salesBody');
   body.innerHTML = '';
+
+  const list = filteredTransactions();
   let total = 0, received = 0, discount = 0, refund = 0;
-  transactions.forEach(t => {
+  list.forEach(t => {
     total += t.total; received += t.received; discount += (t.discount || 0);
     if (t.type === 'return') refund += -t.received;
   });
 
-  const shown = transactions.slice(0, salesShown);
+  const filtering = isFiltering();
+  $('salesFilters').classList.toggle('on', filtering);
+  $('salesCount').innerHTML = filtering
+    ? `검색 결과 <b>${list.length}건</b> / 전체 ${transactions.length}건`
+    : `전체 <b>${transactions.length}건</b>`;
+
+  const shown = list.slice(0, salesShown);
   shown.forEach(t => {
     const isReturn = t.type === 'return';
     const desc = (isReturn ? '↩ [반품] ' : '') +
@@ -1130,14 +1245,17 @@ function renderSales() {
     body.appendChild(tr);
   });
 
-  if (transactions.length === 0) {
-    body.innerHTML = '<tr class="empty-row"><td colspan="9">아직 판매 내역이 없습니다.</td></tr>';
+  if (list.length === 0) {
+    body.innerHTML = `<tr class="empty-row"><td colspan="9">${
+      transactions.length === 0 ? '아직 판매 내역이 없습니다.'
+        : '검색 조건에 맞는 내역이 없습니다. 조건을 바꾸거나 “초기화”를 눌러보세요.'
+    }</td></tr>`;
   }
   const more = $('salesMore');
-  more.style.display = transactions.length > salesShown ? '' : 'none';
-  more.textContent = `더 보기 (${transactions.length - salesShown}건 남음)`;
+  more.style.display = list.length > salesShown ? '' : 'none';
+  more.textContent = `더 보기 (${list.length - salesShown}건 남음)`;
 
-  $('sTxCount').textContent = transactions.length + '건';
+  $('sTxCount').textContent = list.length + '건';
   $('sTotal').textContent = won(total);
   $('sDiscount').textContent = discount ? '−' + won(discount) : '0원';
   $('sReceived').textContent = won(received);
@@ -1868,7 +1986,26 @@ $('mbOpen').onclick = openSheet;
 $('sheetClose').onclick = closeSheet;
 $('sheetBackdrop').onclick = closeSheet;
 $('salesMore').onclick = () => { salesShown += SALES_PAGE; renderSales(); };
-$('exportCsv').onclick = () => exportCsv(transactions, `전체_${ymd(new Date())}`);
+$('exportCsv').onclick = () => {
+  const f = salesFilter();
+  const tag = isFiltering()
+    ? [f.q, f.from && f.to ? `${f.from}~${f.to}` : (f.from || f.to), f.method,
+       { sale: '판매만', return: '반품만' }[f.type]].filter(Boolean).join('_')
+    : `전체_${ymd(new Date())}`;
+  exportCsv(filteredTransactions(), tag.replace(/[\\/:*?"<>|]/g, '_'));
+};
+
+// 검색·필터가 바뀌면 페이지를 처음으로 되돌리고 다시 그린다
+['qSales', 'fFrom', 'fTo', 'fMethod', 'fType'].forEach(id => {
+  $(id).addEventListener('input', () => { salesShown = SALES_PAGE; renderSales(); });
+});
+$('fClear').onclick = () => {
+  $('qSales').value = ''; $('fFrom').value = ''; $('fTo').value = '';
+  $('fMethod').value = ''; $('fType').value = '';
+  salesShown = SALES_PAGE; renderSales();
+};
+$('qBooks').addEventListener('input', renderBookGrid);
+$('qInv').addEventListener('input', renderInventory);
 $('exportPeriodCsv').onclick = () => {
   const { label } = periodRange();
   exportCsv(periodTx(), label.replace(/[^\w가-힣]/g, '_'));

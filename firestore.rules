@@ -23,6 +23,14 @@ service cloud.firestore {
       allow read, write: if isStore();
     }
 
+    // 재고·가격 변동 원장 (입고/판매/반품/조정/등록/삭제 기록)
+    // 한 번 남긴 기록은 고쳐 쓸 수 없게 update를 막습니다.
+    // (delete는 '전체 초기화'와 '백업 복원'에 필요해서 열어둡니다)
+    match /stockLogs/{logId} {
+      allow read, create, delete: if isStore();
+      allow update: if false;
+    }
+
     // 초기 세팅 플래그
     match /meta/{docId} {
       allow read, write: if isStore();

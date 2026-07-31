@@ -5,12 +5,16 @@
         와이파이가 끊겨도 앱 화면이 그대로 뜨게 만든다.
         (데이터 동기화는 Firestore의 오프라인 캐시가 따로 담당)
 
-   ※ 앱을 수정해서 배포할 때는 아래 VERSION 숫자를 꼭 올릴 것.
-      올려야 사용자 기기에 새 버전이 내려간다.
+   전략: 캐시는 '평소에 쓰는 사본'이 아니라 '인터넷이 안 될 때 쓰는 예비품'이다.
+        - 우리 파일(index.html 등) → 항상 네트워크 우선. 느리면 3.5초 후 캐시로 대체
+        - Firebase SDK → 주소에 버전(10.12.2)이 박혀 있어 내용이 바뀔 일이 없으므로 캐시 우선
+
+   덕분에 앱을 고쳐 배포할 때 이 파일에서 손댈 것이 없다.
+   (예전 방식은 배포할 때마다 VERSION을 올려야 했고, 잊으면 낡은 화면이 남았다)
    ───────────────────────────────────────────────────────────── */
 
-const VERSION = 'v2';
-const CACHE = `seojeokbu-pos-${VERSION}`;
+const CACHE = 'seojeokbu-pos';
+const NET_TIMEOUT = 3500;   // 이 시간 안에 응답이 없으면 캐시본으로 넘어간다
 
 // 앱 껍데기 — 이것만 있으면 오프라인에서도 화면이 뜬다
 const APP_SHELL = [
@@ -55,16 +59,34 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
+    // 예전 방식이 남긴 seojeokbu-pos-v1 / -v2 같은 보관함 정리
     const keys = await caches.keys();
     await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
 
-// 페이지가 "지금 바로 새 버전으로 교체" 요청을 보낼 때
 self.addEventListener('message', e => {
   if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
+
+// 네트워크를 기다리되, 너무 느리면 캐시본으로 즉시 넘어간다.
+// (인터넷이 '끊긴' 것보다 '느린' 상황이 매대에서는 더 위험하다)
+async function networkFirst(req, fallbackKey) {
+  const cache = await caches.open(CACHE);
+  try {
+    const res = await Promise.race([
+      fetch(req),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), NET_TIMEOUT)),
+    ]);
+    if (res && res.ok) cache.put(fallbackKey || req, res.clone());
+    return res;
+  } catch {
+    const hit = await cache.match(fallbackKey || req) || await cache.match(req);
+    if (hit) return hit;
+    throw new Error('offline and not cached');
+  }
+}
 
 self.addEventListener('fetch', event => {
   const req = event.request;
@@ -73,21 +95,14 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
   if (NEVER_CACHE.some(h => url.hostname.endsWith(h))) return;  // 네트워크로 직행
 
-  // 페이지 이동: 네트워크 우선, 실패하면 캐시된 앱 껍데기
+  // 페이지 이동
   if (req.mode === 'navigate') {
-    event.respondWith((async () => {
-      try {
-        const fresh = await fetch(req);
-        (await caches.open(CACHE)).put('./index.html', fresh.clone());
-        return fresh;
-      } catch {
-        const cache = await caches.open(CACHE);
-        return (await cache.match('./index.html')) || (await cache.match('./')) ||
-          new Response('오프라인 상태이고 저장된 앱도 없습니다.', {
-            status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-          });
-      }
-    })());
+    event.respondWith(
+      networkFirst(req, './index.html').catch(() => new Response(
+        '오프라인 상태이고 저장된 앱도 없습니다.',
+        { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
+      ))
+    );
     return;
   }
 
@@ -95,17 +110,21 @@ self.addEventListener('fetch', event => {
   const isOwn = url.origin === self.location.origin;
   if (!isVendor && !isOwn) return;
 
-  // 나머지 정적 자원: 캐시 먼저 주고(빠름), 뒤에서 조용히 갱신
-  event.respondWith((async () => {
-    const cache = await caches.open(CACHE);
-    const hit = await cache.match(req);
-    const network = fetch(req).then(res => {
+  // Firebase SDK: 주소가 곧 버전이라 내용이 바뀌지 않는다 → 캐시 우선(빠름)
+  if (isVendor) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
+      const hit = await cache.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
       if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
       return res;
-    }).catch(() => null);
+    })());
+    return;
+  }
 
-    if (hit) { event.waitUntil(network); return hit; }
-    const res = await network;
-    return res || new Response('', { status: 504 });
-  })());
+  // 우리 파일: 항상 최신 우선, 안 되면 캐시본
+  event.respondWith(
+    networkFirst(req).catch(() => new Response('', { status: 504 }))
+  );
 });

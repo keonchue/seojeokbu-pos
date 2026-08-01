@@ -1184,7 +1184,7 @@ function checkout() {
   lines.forEach(l => {
     batch.update(doc(booksCol, l.book.id), { stock: increment(-l.qty), sold: increment(l.qty) });
   });
-  batch.set(txRef, {
+  const txData = {
     time: new Date().toISOString(),
     items,
     qty: lines.reduce((s, l) => s + l.qty, 0),
@@ -1195,8 +1195,12 @@ function checkout() {
     customer: customer || null,
     phone: phone || null,
     address: address || null,
-  });
+  };
+  batch.set(txRef, txData);
   batch.commit().catch(e => { console.error(e); toast('결제 저장 실패 · 연결 확인', 'bad'); });
+
+  // 시트 전송은 저장이 끝난 뒤 별도로 — 여기서 실패해도 결제는 이미 끝난 것이다
+  queueForSheet('tx:' + txRef.id, 'sale', sheetRecords(txData));
 
   writeLogs(lines.map(l => ({
     bookId: l.book.id, title: l.book.title, reason: '판매',
@@ -1669,20 +1673,127 @@ function netAmounts(t) {
     return i.amount - cut;
   });
 }
-/* 거래 1건 → 시트 행 여러 개 (품목당 한 줄). CSV 내보내기와 시트 미러가 함께 쓴다. */
-function sheetRows(t) {
+/* 거래 1건 → 시트 줄 여러 개 (품목당 하나). CSV 내보내기와 시트 미러가 함께 쓴다.
+   Apps Script 쪽이 머리글 이름으로 열을 찾으므로 위치가 아니라 이름을 붙여 보낸다.
+   날짜는 YYYY-MM-DD 로 보내고 시트에서 진짜 날짜로 바꾼다 — 월별 피벗이 글자로는 안 묶인다. */
+function sheetRecords(t) {
   const items = t.items || [];
   const nets = netAmounts(t);
-  const date = sheetDate(t.time), method = sheetMethod(t), isReturn = t.type === 'return';
+  const date = ymd(new Date(t.time)), method = sheetMethod(t), isReturn = t.type === 'return';
   return items.map((i, idx) => {
     const amount = nets[idx];
     const unit = i.qty ? Math.round((amount / i.qty) * 100) / 100 : 0;
-    const kind = isReturn ? '반품' : (String(i.title).includes('택배비') ? '택배비' : '출고');
     const cat = CATS.includes(i.category) ? i.category : catForTitle(i.title);
-    return [date, `[${cat}] ${i.title}`, kind, i.qty, '', unit, '', amount,
-            method, t.customer || '', t.phone || '', t.address || ''];
+    return {
+      날짜: date,
+      제품명: `[${cat}] ${i.title}`,
+      구분: isReturn ? '반품' : (String(i.title).includes('택배비') ? '택배비' : '출고'),
+      수량: i.qty,
+      출고단가: unit,
+      출고금액: amount,
+      결제: method,
+      고객: t.customer || '',
+      연락처: t.phone || '',
+      주소: t.address || '',
+    };
   });
 }
+/* 입고(매입) 1건 → 입고 탭 한 줄 */
+function stockRecord({ title, category, qty, cost, supplier, time }) {
+  return {
+    날짜: ymd(new Date(time)),
+    제품명: `[${category}] ${title}`,
+    구분: '입고',
+    수량: qty,
+    입고단가: cost ?? '',
+    입고금액: (cost != null) ? cost * qty : '',
+    고객: supplier || '',
+  };
+}
+/* 시트 열 순서대로 늘어놓기 (CSV 전용 — 시트 미러는 이름을 그대로 쓴다) */
+const RECORD_TO_ROW = ['날짜', '제품명', '구분', '수량', '입고단가', '출고단가',
+                       '입고금액', '출고금액', '결제', '고객', '연락처', '주소'];
+function sheetRows(t) {
+  return sheetRecords(t).map(r =>
+    RECORD_TO_ROW.map(k => k === '날짜' ? sheetDate(t.time) : (r[k] ?? '')));
+}
+
+/* ================= 구글 시트 미러 =================
+   판매·반품·입고를 기존 스프레드시트에도 덧붙인다.
+   원칙: 이게 절대 결제를 막으면 안 된다.
+   - 저장이 끝난 *뒤에* 큐에 넣고, 보내기는 따로 돈다.
+   - 못 보내면 localStorage 에 남아 다음 기회(온라인 복귀·앱 재시작)에 다시 간다.
+   - 같은 키를 두 번 보내도 시트 쪽에서 걸러내므로 중복으로 적히지 않는다.
+   웹앱 주소와 토큰은 코드가 아니라 Firestore meta/sheet 에 둔다 — 저장소가 public 이라
+   주소가 노출되면 아무나 시트에 데이터를 밀어넣을 수 있기 때문. */
+let sheetCfg = null;
+const QUEUE_KEY = 'sheetQueue';
+
+const sheetQueue = () => {
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
+  catch { return []; }
+};
+const setSheetQueue = q => localStorage.setItem(QUEUE_KEY, JSON.stringify(q.slice(-800)));
+
+function queueForSheet(key, type, records) {
+  if (!records || !records.length) return;
+  const q = sheetQueue();
+  if (q.some(x => x.key === key)) return;
+  q.push({ key, type, records });
+  setSheetQueue(q);
+  renderSheetBadge();
+  flushSheet();
+}
+
+async function loadSheetCfg() {
+  try {
+    const snap = await getDoc(doc(db, 'meta', 'sheet'));
+    sheetCfg = snap.exists() ? snap.data() : null;
+  } catch (e) { console.error('시트 설정 읽기 실패', e); sheetCfg = null; }
+  renderSheetBadge();
+  flushSheet();
+}
+
+let flushing = false;
+async function flushSheet(loud = false) {
+  const q = sheetQueue();
+  if (loud && !q.length) { toast('보낼 것이 없습니다.', 'good'); return; }
+  if (flushing || !q.length) return;
+  if (!sheetCfg || !sheetCfg.url) { if (loud) toast('시트 연동이 설정되지 않았습니다.', 'bad'); return; }
+  if (!navigator.onLine) { if (loud) toast('오프라인입니다. 연결되면 자동으로 보냅니다.', 'bad'); return; }
+
+  flushing = true;
+  const sending = q.slice(0, 50);
+  try {
+    // text/plain 으로 보내야 프리플라이트(OPTIONS)가 안 뜬다 — Apps Script 는 이를 처리하지 못한다
+    const res = await fetch(sheetCfg.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ token: sheetCfg.token || '', items: sending }),
+    });
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || '시트가 거절했습니다.');
+
+    const done = new Set(sending.map(x => x.key));
+    setSheetQueue(sheetQueue().filter(x => !done.has(x.key)));
+    renderSheetBadge();
+    if (loud) toast(`시트에 ${out.written}줄 기록했습니다.` +
+                    (out.skipped ? ` (${out.skipped}건은 이미 있음)` : ''), 'good');
+  } catch (e) {
+    console.error('시트 전송 실패 — 큐에 남겨 두고 다음에 다시 보냅니다', e);
+    if (loud) toast('시트 전송 실패 · ' + (e.message || '연결 확인'), 'bad');
+  } finally {
+    flushing = false;
+  }
+}
+
+function renderSheetBadge() {
+  const el = $('sheetPending');
+  if (el) el.textContent = sheetQueue().length ? `못 보낸 기록 ${sheetQueue().length}건` : '밀린 것 없음';
+}
+
+window.addEventListener('online', () => flushSheet());
+setInterval(() => flushSheet(), 120000);   // 실패분을 2분마다 조용히 재시도
 
 /* ================= CSV ================= */
 /* 기존 스프레드시트의 계좌이체/현금 탭에 그대로 붙여넣을 수 있는 형식으로 내보낸다. */
@@ -1874,6 +1985,14 @@ function restockModal(b) {
     ].filter(Boolean).join(' · ') || null;
 
     writeLogs([{ bookId: b.id, title: b.title, reason: '입고', before: b.stock, after: b.stock + add, note: memo }]);
+
+    const now = new Date().toISOString();
+    queueForSheet(`stock:${b.id}:${now}`, 'stock', [stockRecord({
+      title: b.title, category: catOf(b), qty: add, time: now,
+      cost: isNaN(cost) ? (b.cost ?? null) : cost,
+      supplier: supplier || b.supplier || '',
+    })]);
+
     closeModal();
     toast(`${b.title} ${add}권 입고 완료 (재고 ${b.stock + add}권)`, 'good');
   };
@@ -2109,7 +2228,7 @@ function processReturn(t) {
       logs.push({ bookId: b.id, title: b.title, reason: '반품', before: b.stock, after: b.stock + q, txId: retRef.id });
     }
   });
-  batch.set(retRef, {
+  const retData = {
     time: new Date().toISOString(), type: 'return', refId: t.id,
     items, qty: -qtySum, total: -totalSum, received: -refund,
     diff: (-refund) - (-totalSum), method: t.method,
@@ -2118,10 +2237,12 @@ function processReturn(t) {
     customer: t.customer || null,
     phone: t.phone || null,
     address: t.address || null,
-  });
+  };
+  batch.set(retRef, retData);
   batch.update(doc(txCol, t.id), { returned: remainingAfter <= 0 });
   batch.commit().catch(e => { console.error(e); toast('반품 저장 실패 · 연결 확인', 'bad'); });
   writeLogs(logs);
+  queueForSheet('tx:' + retRef.id, 'sale', sheetRecords(retData));
 
   closeModal();
   toast(`반품 완료 · ${won(refund)} 차감`, 'good');
@@ -2161,6 +2282,14 @@ function settingsModal() {
     </div>
 
     <div class="field">
+      <label>구글 시트 자동 기록 · <span id="sheetPending" class="dim"></span></label>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" id="sSheetCfg" style="flex:1">🔗 연동 설정</button>
+        <button class="btn ghost" id="sSheetSend" style="flex:1">📤 지금 보내기</button>
+      </div>
+    </div>
+
+    <div class="field">
       <label>앱으로 설치</label>
       ${isStandalone
         ? '<div class="info-box" style="margin:0">이미 앱으로 실행 중입니다. 👍</div>'
@@ -2190,7 +2319,10 @@ function settingsModal() {
   $('sRestore').onclick = () => $('restoreFile').click();
   $('sLogout').onclick = () => { closeModal(); signOut(auth); };
   $('sImport').onclick = importSheetModal;
+  $('sSheetCfg').onclick = sheetConfigModal;
+  $('sSheetSend').onclick = () => flushSheet(true);
   $('sReset').onclick = resetAll;
+  renderSheetBadge();
   const inst = $('sInstall');
   if (inst) inst.onclick = async () => {
     closeModal();
@@ -2347,6 +2479,68 @@ function importSheetModal() {
     }
   };
   setTimeout(() => paste.focus(), 60);
+}
+
+/* 웹앱 주소·토큰은 Firestore meta/sheet 에 저장한다.
+   저장소가 public 이라 코드에 박아 두면 아무나 시트에 데이터를 밀어넣을 수 있다. */
+function sheetConfigModal() {
+  const cur = sheetCfg || {};
+  openModal(`
+    <h3>🔗 구글 시트 연동</h3>
+    <div class="info-box">
+      스프레드시트 → 확장 프로그램 → Apps Script 에 저장소의
+      <b>apps-script/Code.gs</b> 를 붙여넣고 배포하면 나오는 값입니다.<br>
+      여기 넣은 값은 코드가 아니라 <b>Firebase</b>에 저장됩니다.
+    </div>
+    <div class="field">
+      <label>웹앱 주소 (…/exec 로 끝나는 주소)</label>
+      <input id="cUrl" value="${esc(cur.url || '')}" placeholder="https://script.google.com/macros/s/…/exec">
+    </div>
+    <div class="field">
+      <label>토큰 (Apps Script 에서 <b>토큰_만들기</b> 실행하면 나옵니다)</label>
+      <input id="cToken" value="${esc(cur.token || '')}" placeholder="영문·숫자 32자리">
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn ghost" id="mTest">연결 확인</button>
+      <button class="btn primary" id="mSave">저장</button>
+    </div>`);
+  $('mCancel').onclick = closeModal;
+
+  $('mTest').onclick = async () => {
+    const url = $('cUrl').value.trim();
+    if (!url) { toast('웹앱 주소를 먼저 넣으세요.', 'bad'); return; }
+    $('mTest').disabled = true; $('mTest').textContent = '확인 중…';
+    try {
+      // 빈 목록을 보내 본다 — 시트에는 아무것도 적히지 않고 토큰만 검사된다
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ token: $('cToken').value.trim(), items: [] }),
+      });
+      const out = await res.json();
+      toast(out.ok ? '연결됐습니다. 👍' : '거절됨 · ' + (out.error || ''), out.ok ? 'good' : 'bad');
+    } catch (e) {
+      console.error(e);
+      toast('연결 실패 · 주소와 배포 권한(링크가 있는 모든 사용자)을 확인하세요', 'bad');
+    }
+    $('mTest').disabled = false; $('mTest').textContent = '연결 확인';
+  };
+
+  $('mSave').onclick = async () => {
+    const cfg = { url: $('cUrl').value.trim(), token: $('cToken').value.trim() };
+    $('mSave').disabled = true; $('mSave').textContent = '저장 중…';
+    try {
+      await setDoc(doc(db, 'meta', 'sheet'), cfg);
+      sheetCfg = cfg;
+      closeModal(); toast('연동 설정을 저장했습니다.', 'good');
+      flushSheet();
+    } catch (e) {
+      console.error(e);
+      $('mSave').disabled = false; $('mSave').textContent = '다시 시도';
+      toast('저장 실패 · 연결 확인', 'bad');
+    }
+  };
 }
 
 function resetAll() {
@@ -2524,6 +2718,7 @@ onAuthStateChanged(auth, async user => {
     $('loginPw').value = '';
     startListeners();      // 먼저 화면부터 살린다 (오프라인이어도 캐시로 동작)
     seedIfNeeded();
+    loadSheetCfg();        // 시트 연동 설정을 읽고, 밀려 있던 기록을 마저 보낸다
   } else if (user) {
     await signOut(auth);
     showLoginError('허용되지 않은 계정입니다. 가게 공용 계정으로 로그인하세요.');

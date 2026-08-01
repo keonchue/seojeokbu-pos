@@ -196,6 +196,12 @@
     font-size: 16px; font-weight: 700;
   }
   .customer input:focus { outline: none; border-color: var(--blue-light); }
+  .customer label + input + label, .contact-extra label { margin-top: 8px; }
+  .more-toggle {
+    margin-top: 7px; background: none; border: none; padding: 0; cursor: pointer;
+    font-size: 12.5px; font-weight: 700; color: var(--blue-dark);
+  }
+  .contact-extra.hide { display: none; }
 
   .pay-actions { display: flex; gap: 8px; padding: 0 14px 14px; }
   .pay-actions .clear {
@@ -266,6 +272,12 @@
     font-size: 13.5px; background: #fff; color: inherit;
   }
   .filters .sep { color: var(--muted); font-size: 13px; }
+  .filters .chk {
+    display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px;
+    border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff;
+    font-size: 13.5px; font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap;
+  }
+  .filters .chk input { width: 15px; height: 15px; accent-color: var(--blue); cursor: pointer; }
   .filters .count { font-size: 13px; color: var(--muted); font-weight: 700; margin-left: auto; white-space: nowrap; }
   .filters .count b { color: var(--blue-dark); }
   .filters.on .search { border-color: var(--blue-light); }
@@ -274,6 +286,22 @@
     .filters input[type=date] { flex: 1 1 42%; }
     .filters select { flex: 1 1 42%; }
   }
+
+  /* ---------- 카테고리 칩 ---------- */
+  .cats { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .cats button {
+    padding: 0 13px; min-height: 36px; border: 1px solid var(--line); background: #fff;
+    border-radius: 20px; font-size: 13.5px; font-weight: 700; cursor: pointer; color: var(--muted);
+  }
+  .cats button.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .cats button .n { font-weight: 600; opacity: .7; margin-left: 4px; font-size: 12px; }
+  .cat-badge {
+    display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    background: var(--gray); color: var(--muted); margin-right: 6px; vertical-align: middle;
+  }
+  .cat-badge.c-bible   { background: var(--blue-wash);  color: var(--blue-dark); }
+  .cat-badge.c-kids    { background: var(--amber-wash); color: var(--amber); }
+  .cat-badge.c-general { background: var(--green-wash); color: var(--green-dark); }
 
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px,1fr)); gap: 12px; margin-bottom: 18px; }
   .stat { background: var(--surface); border-radius: var(--r-md); padding: 16px; border: 1px solid var(--line); box-shadow: var(--sh-1); }
@@ -297,6 +325,8 @@
   .pill.diff { background: var(--red-wash); color: var(--red); }
   .pill.mute { background: #e9edf3; color: #7b8695; }
   .pill.warn { background: var(--amber-wash); color: var(--amber); }
+  .sub { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-top: 3px; }
+  .dim { color: var(--muted); opacity: .6; }
   .pay-lines { display: inline-flex; flex-direction: column; gap: 4px; align-items: stretch; }
   .pay-lines .pill { text-align: center; }
   .mini-btn {
@@ -373,7 +403,24 @@
   .field input {
     width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm); font-size: 16px;
   }
-  .field input:focus { outline: none; border-color: var(--blue-light); }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--blue-light); }
+  .field select {
+    width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
+    font-size: 16px; background: #fff; color: inherit; font-weight: 700;
+  }
+  .field textarea {
+    width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
+    font-size: 13px; font-family: ui-monospace, Menlo, Consolas, monospace; resize: vertical;
+    line-height: 1.5; color: inherit; background: #fff;
+  }
+  .field textarea:focus { outline: none; border-color: var(--blue-light); }
+  .chkline {
+    display: flex; align-items: center; gap: 8px; padding: 7px 0;
+    font-size: 13.5px; font-weight: 700; cursor: pointer;
+  }
+  .chkline input { width: 16px; height: 16px; accent-color: var(--blue); cursor: pointer; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; min-width: 0; }
   .modal-actions { display:flex; gap: 8px; margin-top: 8px; }
   .modal-actions .btn { flex: 1; min-height: 46px; }
   .warn-box { background: var(--red-wash); border: 1px solid #f0c0c0; border-radius: var(--r-sm); padding: 12px 14px; font-size: 13px; color: #8f2f2f; line-height: 1.6; margin-bottom: 14px; }
@@ -581,9 +628,21 @@
         <button data-method="현금">💵 현금</button>
       </div>
 
+      <div class="customer hide" id="discLabelWrap">
+        <label>할인 종류 (선택 · 비워두면 “할인”)</label>
+        <input id="discLabel" type="text" placeholder="예) 지역할인, 직원할인" autocomplete="off" enterkeyhint="done">
+      </div>
+
       <div class="customer" id="customerWrap">
         <label>고객 이름 (입금자명 · 선택)</label>
         <input id="customer" type="text" placeholder="예) 홍길동" autocomplete="off" enterkeyhint="done">
+        <button type="button" class="more-toggle" id="contactToggle">＋ 연락처 · 주소 (택배 발송)</button>
+        <div class="contact-extra hide" id="contactExtra">
+          <label>연락처</label>
+          <input id="phone" type="tel" inputmode="tel" placeholder="예) 010-1234-5678" autocomplete="off">
+          <label>주소</label>
+          <input id="address" type="text" placeholder="예) 인천시 연수구 …" autocomplete="off" enterkeyhint="done">
+        </div>
       </div>
 
       <div class="pay-actions">
@@ -597,6 +656,7 @@
         <input id="qBooks" class="search" type="search" placeholder="🔍 책 제목으로 찾기" style="flex:1;max-width:340px">
         <button class="btn danger" id="posReturnBtn">↩ 반품하기</button>
       </div>
+      <div class="cats" id="posCats"></div>
       <div class="grid" id="bookGrid"></div>
     </div>
   </section>
@@ -615,15 +675,19 @@
         <div class="stat"><div class="lbl">등록된 책 종류</div><div class="val" id="statTitles">0</div></div>
         <div class="stat"><div class="lbl">총 재고 수량</div><div class="val" id="statStock">0권</div></div>
         <div class="stat"><div class="lbl">재고 자산(정가 기준)</div><div class="val" id="statAsset">0원</div></div>
+        <div class="stat"><div class="lbl">매입 필요 (안전재고 미만)</div><div class="val red" id="statLow">0종</div></div>
       </div>
       <div class="filters" id="invFilters">
         <input id="qInv" class="search" type="search" placeholder="🔍 책 제목으로 찾기">
+        <label class="chk"><input type="checkbox" id="onlyLow"> 매입 필요만</label>
         <span class="count" id="invCount"></span>
       </div>
+      <div class="cats" id="invCats"></div>
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>책 제목</th><th class="num">판매가</th><th class="num">현재 재고</th>
+            <th>책 제목</th><th class="num">판매가</th><th class="num">입고단가</th>
+            <th class="num">현재 재고</th>
             <th class="center">결제 방법</th>
             <th class="num">누적 판매</th><th class="center">관리</th>
           </tr></thead>
@@ -786,6 +850,42 @@ const bookById = id => books.find(b => b.id === id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const digits = v => String(v ?? '').replace(/[^\d]/g, '');
+
+/* ---------- 카테고리 · 안전재고 ----------
+   기존 스프레드시트가 제품명을 `[성경] 호크마 성경` 처럼 적어 왔다.
+   앱은 제목에 접두사를 넣지 않고 category 필드로 따로 들고,
+   시트로 내보낼 때만 `[카테고리] 제목` 으로 합친다. */
+const CATS = ['성경', '어린이', '일반', '기타'];
+const CAT_SLUG = { '성경': 'c-bible', '어린이': 'c-kids', '일반': 'c-general', '기타': 'c-etc' };
+const catOf = b => CATS.includes(b?.category) ? b.category : '기타';
+const catBadge = b => `<span class="cat-badge ${CAT_SLUG[catOf(b)]}">${catOf(b)}</span>`;
+const sheetTitle = b => `[${catOf(b)}] ${b.title}`;
+/* 시트의 '상태' 열과 같은 규칙: 현재재고 < 안전재고 이면 매입필요 */
+const safetyOf = b => Number.isFinite(b?.safety) ? b.safety : 0;
+const isLow = b => b.stock < safetyOf(b);
+
+let posCat = '전체', invCat = '전체';
+function renderCatChips(elId, cur, onPick) {
+  const el = $(elId);
+  if (!el) return;
+  el.innerHTML = '';
+  ['전체', ...CATS].forEach(c => {
+    const n = c === '전체' ? books.length : books.filter(b => catOf(b) === c).length;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = c === cur ? 'on' : '';
+    btn.innerHTML = `${c}<span class="n">${n}</span>`;
+    btn.onclick = () => onPick(c);
+    el.appendChild(btn);
+  });
+}
+function matchCat(b, cat) { return cat === '전체' || catOf(b) === cat; }
+
+/* 목록 정렬: 재고 있는 책이 위, 품절이 아래. 그 안에서 제목 가나다순.
+   품절 판정은 장바구니를 뺀 값이 아니라 b.stock 으로 한다 —
+   담을 때마다 카드 위치가 튀면 누르기 어렵기 때문. */
+const byStockThenName = (a, b) =>
+  ((a.stock <= 0) - (b.stock <= 0)) || String(a.title).localeCompare(String(b.title), 'ko');
 const $ = id => document.getElementById(id);
 
 /* ================= 연결 상태 (오프라인 감지) ================= */
@@ -914,14 +1014,15 @@ function renderBookGrid() {
   const grid = $('bookGrid');
   grid.innerHTML = '';
   const q = $('qBooks').value.trim().toLowerCase();
-  const list = books.filter(b => matchTitle(b.title, q));
+  renderCatChips('posCats', posCat, c => { posCat = c; renderBookGrid(); });
+  const list = books.filter(b => matchTitle(b.title, q) && matchCat(b, posCat)).sort(byStockThenName);
   list.forEach(b => {
     const inCart = cart.find(c => c.id === b.id);
     const remaining = b.stock - (inCart ? inCart.qty : 0);
     const out = remaining <= 0;
     let cls = 'bs', label = `재고 ${remaining}`;
     if (remaining <= 0) { cls += ' zero'; label = '품절'; }
-    else if (remaining <= 10) cls += ' low';
+    else if (remaining < safetyOf(b) || remaining <= 10) cls += ' low';
     const el = document.createElement('button');
     el.className = 'book-btn' + (out ? ' out' : '');
     el.innerHTML = `<span class="${cls}">${label}</span>
@@ -934,7 +1035,9 @@ function renderBookGrid() {
     grid.innerHTML = `<div class="cart-empty" style="grid-column:1/-1">${
       books.length === 0
         ? '등록된 책이 없습니다.<br>‘📦 재고’ 탭에서 책을 먼저 등록하세요.'
-        : `‘${esc($('qBooks').value.trim())}’ 와(과) 일치하는 책이 없습니다.`
+        : q
+          ? `‘${esc($('qBooks').value.trim())}’ 와(과) 일치하는 책이 없습니다.`
+          : `‘${posCat}’ 카테고리에 등록된 책이 없습니다.`
     }</div>`;
   }
 }
@@ -1007,14 +1110,19 @@ function updateTotals() {
   $('discCalc').textContent =
     (discountMode === 'percent' && disc > 0) ? `${discountPct()}% → −${won(disc)}` : '';
   $('mbAmt').textContent = won(cartTotal() - disc);
+
+  // 할인이 걸렸을 때만 '할인 종류'를 묻는다 → 시트 결제방식 열에 계좌이체(지역할인) 형태로 들어감
+  const dw = $('discLabelWrap');
+  dw.classList.toggle('hide', disc <= 0);
+  if (disc <= 0) $('discLabel').value = '';
 }
 
-/* 고객 이름은 계좌이체일 때만 받는다 (현금은 입금자명이 없음) */
+/* 고객 정보는 계좌이체일 때만 받는다 (현금은 입금자명이 없음) */
 function syncCustomerField() {
   const wrap = $('customerWrap');
   const isTransfer = payMethod === '계좌이체';
   wrap.classList.toggle('hide', !isTransfer);
-  if (!isTransfer) $('customer').value = '';
+  if (!isTransfer) { $('customer').value = ''; $('phone').value = ''; $('address').value = ''; }
 }
 
 /* ================= 장바구니 동작 ================= */
@@ -1037,7 +1145,11 @@ function removeFromCart(id) { cart = cart.filter(c => c.id !== id); renderCart()
 function clearCart() {
   cart = [];
   $('customer').value = '';
+  $('phone').value = '';
+  $('address').value = '';
   $('discount').value = '';
+  $('discLabel').value = '';
+  $('contactExtra').classList.add('hide');
   renderCart();
   closeSheet();
 }
@@ -1050,14 +1162,20 @@ function checkout() {
   const discPct = discountMode === 'percent' ? discountPct() : null;
   const payable = total - discount;
   const received = payable;   // 받을 금액 = 받은 금액
-  const customer = payMethod === '계좌이체' ? $('customer').value.trim() : '';
+  const isTransfer = payMethod === '계좌이체';
+  const customer = isTransfer ? $('customer').value.trim() : '';
+  const phone    = isTransfer ? $('phone').value.trim() : '';
+  const address  = isTransfer ? $('address').value.trim() : '';
+  // 할인 종류: 비워두면 그냥 '할인' → 시트에는 계좌이체(할인) / 계좌이체(지역할인) 로 기록
+  const discLabel = discount > 0 ? ($('discLabel').value.trim() || '할인') : null;
 
   const lines = cart.map(c => {
     const b = bookById(c.id);
     return { book: b, qty: c.qty };
   }).filter(l => l.book);
   const items = lines.map(l => ({
-    title: l.book.title, qty: l.qty, price: l.book.price, amount: l.book.price * l.qty
+    title: l.book.title, category: catOf(l.book),
+    qty: l.qty, price: l.book.price, amount: l.book.price * l.qty
   }));
 
   // 재고는 increment(원자적)으로, 매출·이력은 새 문서로 → 동시 판매에도 안전
@@ -1073,7 +1191,10 @@ function checkout() {
     total, discount, discountPct: discPct, payable, received,
     diff: 0,
     method: payMethod,
+    discountLabel: discLabel,
     customer: customer || null,
+    phone: phone || null,
+    address: address || null,
   });
   batch.commit().catch(e => { console.error(e); toast('결제 저장 실패 · 연결 확인', 'bad'); });
 
@@ -1102,23 +1223,34 @@ function renderInventory() {
   body.innerHTML = '';
 
   // 상단 카드는 항상 '전체 재고' 기준 (검색해도 총 자산이 흔들리면 안 됨)
-  let totalStock = 0, asset = 0;
-  books.forEach(b => { totalStock += b.stock; asset += b.stock * b.price; });
+  let totalStock = 0, asset = 0, lowCount = 0;
+  books.forEach(b => { totalStock += b.stock; asset += b.stock * b.price; if (isLow(b)) lowCount++; });
 
   const q = $('qInv').value.trim().toLowerCase();
-  const list = books.filter(b => matchTitle(b.title, q));
-  $('invFilters').classList.toggle('on', !!q);
-  $('invCount').innerHTML = q
+  const onlyLow = $('onlyLow').checked;
+  renderCatChips('invCats', invCat, c => { invCat = c; renderInventory(); });
+  const list = books
+    .filter(b => matchTitle(b.title, q) && matchCat(b, invCat) && (!onlyLow || isLow(b)))
+    .sort(byStockThenName);
+  const filtering = !!q || invCat !== '전체' || onlyLow;
+  $('invFilters').classList.toggle('on', filtering);
+  $('invCount').innerHTML = filtering
     ? `검색 결과 <b>${list.length}종</b> / 전체 ${books.length}종`
     : `전체 <b>${books.length}종</b>`;
 
   list.forEach(b => {
     const pay = payBreakdown(b.title);
+    const low = isLow(b);
+    const safety = safetyOf(b);
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="cell-main" data-label="책"><b>${esc(b.title)}</b></td>
+      <td class="cell-main" data-label="책">${catBadge(b)}<b>${esc(b.title)}</b>${
+        b.supplier ? `<div class="sub">거래처 ${esc(b.supplier)}</div>` : ''}</td>
       <td class="num" data-label="판매가">${won(b.price)}</td>
-      <td class="num" data-label="현재 재고"><b>${b.stock}</b>권</td>
+      <td class="num" data-label="입고단가">${b.cost ? won(b.cost) : '<span class="dim">—</span>'}</td>
+      <td class="num" data-label="현재 재고"><b>${b.stock}</b>권
+        ${low ? '<div><span class="pill warn">매입 필요</span></div>'
+              : (safety ? `<div class="sub">안전 ${safety}권</div>` : '')}</td>
       <td class="center" data-label="결제 방법">
         <div class="pay-lines">
           <span class="pill cash">현금 ${pay.cash}권</span>
@@ -1139,7 +1271,7 @@ function renderInventory() {
     body.appendChild(tr);
   });
   if (list.length === 0) {
-    body.innerHTML = `<tr class="empty-row"><td colspan="6">${
+    body.innerHTML = `<tr class="empty-row"><td colspan="7">${
       books.length === 0
         ? '등록된 책이 없습니다. “＋ 새 책 등록”을 눌러 추가하세요.'
         : '검색 조건에 맞는 책이 없습니다.'
@@ -1148,6 +1280,7 @@ function renderInventory() {
   $('statTitles').textContent = books.length;
   $('statStock').textContent = totalStock + '권';
   $('statAsset').textContent = won(asset);
+  $('statLow').textContent = lowCount + '종';
 }
 
 /* ================= 매출 내역 ================= */
@@ -1227,6 +1360,7 @@ function renderSales() {
         manage = note + '<button class="mini-btn del" data-a="return">반품</button>';
       }
     }
+    manage += '<button class="mini-btn" data-a="drop" title="기록 삭제">🗑</button>';
 
     const tr = document.createElement('tr');
     if (isReturn) tr.style.background = '#fdf5f5';
@@ -1242,6 +1376,7 @@ function renderSales() {
       <td class="center" data-label="관리">${manage}</td>`;
     const rbtn = tr.querySelector('[data-a=return]');
     if (rbtn) rbtn.onclick = () => returnModal(t);
+    tr.querySelector('[data-a=drop]').onclick = () => deleteTxModal(t);
     body.appendChild(tr);
   });
 
@@ -1440,21 +1575,120 @@ function renderRank(list) {
   });
 }
 
-/* ================= CSV ================= */
-function buildCsv(list) {
-  const rows = [['일시', '구분', '책 제목', '수량', '판매가', '정가합계', '할인', '결제금액', '결제수단', '고객']];
-  [...list].reverse().forEach(t => {
-    const dt = new Date(t.time);
-    const dstr = `${ymd(dt)} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
-    const kind = t.type === 'return' ? '반품' : '판매';
-    (t.items || []).forEach((i, idx) => {
-      rows.push([
-        dstr, kind, i.title, i.qty, i.price, i.amount,
-        idx === 0 ? (t.discount || 0) : '', idx === 0 ? t.received : '',
-        idx === 0 ? t.method : '', idx === 0 ? (t.customer || '') : ''
-      ]);
-    });
+/* 잘못 입력했거나 테스트로 만든 기록을 매출 내역에서 지운다.
+   반품과는 다르다 — 반품은 '있었던 일'로 남기고, 이건 '없던 일'로 만든다.
+   누적 판매 수(sold)는 매출과 어긋나면 안 되니 항상 되돌리고,
+   재고는 선택 — 시트에서 재고를 새로 맞춘 뒤라면 되돌리면 오히려 어긋나기 때문. */
+function deleteTxModal(t) {
+  const isReturn = t.type === 'return';
+  const desc = (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
+  openModal(`
+    <h3>기록 삭제</h3>
+    <div class="warn-box">
+      <b>${fmtDateTime(t.time)}</b><br>${desc}<br>
+      ${esc(t.method || '')} · <b>${won(t.received)}</b>${t.customer ? ' · ' + esc(t.customer) : ''}
+      <br><br>이 기록을 <b>없던 일로</b> 만듭니다. 되돌릴 수 없습니다.
+    </div>
+    <label class="chkline"><input type="checkbox" id="dStock"> 재고도 함께 되돌리기
+      <span class="dim">(${Math.abs(t.qty)}권 ${isReturn ? '차감' : '복구'})</span></label>
+    <div class="info-box" style="margin-top:10px">
+      방금 스프레드시트에서 재고를 맞췄다면 <b>체크하지 마세요.</b> 지금 재고가 이미 정답입니다.
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn solid-danger" id="mSave">삭제</button>
+    </div>`);
+  $('mCancel').onclick = closeModal;
+  $('mSave').onclick = async () => {
+    const undoStock = $('dStock').checked;
+    $('mSave').disabled = true; $('mSave').textContent = '삭제 중…';
+    try {
+      const batch = writeBatch(db);
+      (t.items || []).forEach(i => {
+        const b = books.find(x => x.title === i.title);
+        if (!b) return;
+        // 판매(qty 양수)를 지우면 재고는 늘고, 반품(qty 음수)을 지우면 재고는 준다 — 한 식으로 처리된다
+        const patch = { sold: increment(-i.qty) };
+        if (undoStock) patch.stock = increment(i.qty);
+        batch.update(doc(booksCol, b.id), patch);
+      });
+      batch.delete(doc(txCol, t.id));
+      // 반품 기록을 지우면 원본 거래의 '반품됨' 표시도 풀어 준다
+      if (isReturn && t.refId && transactions.some(x => x.id === t.refId))
+        batch.update(doc(txCol, t.refId), { returned: false });
+      await batch.commit();
+
+      // 이 거래로 남은 원장 기록도 같이 정리.
+      // 원장은 부가 데이터라 여기서 실패해도 삭제 자체는 이미 끝난 것으로 본다.
+      const gone = stockLogs.filter(l => l.txId === t.id);
+      if (gone.length) {
+        try { await runBatched(gone, (b, l) => b.delete(doc(logsCol, l.id))); }
+        catch (e) { console.error('원장 정리 실패(거래는 삭제됨)', e); }
+      }
+
+      closeModal(); toast('기록을 삭제했습니다.', 'good');
+    } catch (e) {
+      console.error(e);
+      $('mSave').disabled = false; $('mSave').textContent = '다시 시도';
+      toast('삭제 실패 · 연결 확인', 'bad');
+    }
+  };
+}
+
+/* ================= 기존 스프레드시트 형식 =================
+   기존 시트 열: 날짜 · 제품명 · 입출고구분 · 수량 · 입고단가 · 출고단가 · 입고금액 ·
+                출고금액 · 결제방식 · 고객명 · 연락처 · 주소
+   시트에는 '할인' 열이 없다. 그동안 해 온 방식대로 할인이 반영된 실제 단가를
+   출고단가에 적고, 할인 종류는 결제방식에 계좌이체(지역할인) 형태로 붙인다. */
+const SHEET_HEADERS = ['날짜', '제품명', '입출고구분', '수량', '입고단가', '출고단가',
+                       '입고금액', '출고금액', '결제방식', '고객명', '연락처', '주소'];
+
+const sheetDate = iso => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`;
+};
+const catForTitle = title => {
+  const b = books.find(x => x.title === title);
+  return b ? catOf(b) : '기타';
+};
+function sheetMethod(t) {
+  const label = t.discountLabel || ((t.discount > 0) ? '할인' : null);
+  return label ? `${t.method}(${label})` : (t.method || '');
+}
+/* 정가합계와 실제 받은 금액의 차액(할인 · 반품 차감)을 품목에 정가 비율대로 나눠 담는다.
+   반올림 오차는 마지막 품목이 흡수하므로 출고금액 합계는 실제 금액과 정확히 일치한다. */
+function netAmounts(t) {
+  const items = t.items || [];
+  const gross = items.reduce((s, i) => s + i.amount, 0);
+  const received = (typeof t.received === 'number') ? t.received : gross;
+  let left = gross - received;
+  if (!left || !gross) return items.map(i => i.amount);
+  return items.map((i, idx) => {
+    const cut = (idx === items.length - 1) ? left : Math.round((gross - received) * i.amount / gross);
+    left -= cut;
+    return i.amount - cut;
   });
+}
+/* 거래 1건 → 시트 행 여러 개 (품목당 한 줄). CSV 내보내기와 시트 미러가 함께 쓴다. */
+function sheetRows(t) {
+  const items = t.items || [];
+  const nets = netAmounts(t);
+  const date = sheetDate(t.time), method = sheetMethod(t), isReturn = t.type === 'return';
+  return items.map((i, idx) => {
+    const amount = nets[idx];
+    const unit = i.qty ? Math.round((amount / i.qty) * 100) / 100 : 0;
+    const kind = isReturn ? '반품' : (String(i.title).includes('택배비') ? '택배비' : '출고');
+    const cat = CATS.includes(i.category) ? i.category : catForTitle(i.title);
+    return [date, `[${cat}] ${i.title}`, kind, i.qty, '', unit, '', amount,
+            method, t.customer || '', t.phone || '', t.address || ''];
+  });
+}
+
+/* ================= CSV ================= */
+/* 기존 스프레드시트의 계좌이체/현금 탭에 그대로 붙여넣을 수 있는 형식으로 내보낸다. */
+function buildCsv(list) {
+  const rows = [SHEET_HEADERS];
+  [...list].reverse().forEach(t => rows.push(...sheetRows(t)));
   return rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
 }
 function download(filename, content, type) {
@@ -1555,12 +1789,26 @@ function confirmModal({ title, warn, keyword, okLabel, onOk }) {
   setTimeout(() => word.focus(), 60);
 }
 
+/* 카테고리 <select> — 등록·수정 모달 공용 */
+function catSelect(cur = '기타') {
+  return `<select id="mCat">${CATS.map(c =>
+    `<option value="${c}"${c === cur ? ' selected' : ''}>${c}</option>`).join('')}</select>`;
+}
+
 function addBookModal() {
   openModal(`
     <h3>새 책 등록</h3>
     <div class="field"><label>책 제목</label><input id="mTitle" placeholder="예) 톨스토이 단편선"></div>
-    <div class="field"><label>판매가 (원)</label><input id="mPrice" inputmode="numeric" placeholder="28000"></div>
-    <div class="field"><label>초기 재고 (권)</label><input id="mStock" inputmode="numeric" placeholder="100"></div>
+    <div class="field"><label>카테고리</label>${catSelect()}</div>
+    <div class="field-row">
+      <div class="field"><label>판매가 (원)</label><input id="mPrice" inputmode="numeric" placeholder="28000"></div>
+      <div class="field"><label>입고단가 (원 · 선택)</label><input id="mCost" inputmode="numeric" placeholder="21000"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>초기 재고 (권)</label><input id="mStock" inputmode="numeric" placeholder="100"></div>
+      <div class="field"><label>안전재고 (권)</label><input id="mSafety" inputmode="numeric" placeholder="0"></div>
+    </div>
+    <div class="field"><label>거래처 (선택)</label><input id="mSupplier" placeholder="예) 성서원, 교보문고"></div>
     <div class="modal-actions">
       <button class="btn ghost" id="mCancel">취소</button>
       <button class="btn green" id="mSave">등록</button>
@@ -1570,10 +1818,18 @@ function addBookModal() {
     const title = $('mTitle').value.trim();
     const price = parseInt(digits($('mPrice').value), 10);
     const stock = parseInt(digits($('mStock').value), 10);
-    if (!title || !price || isNaN(stock)) { toast('모든 항목을 입력하세요.', 'bad'); return; }
+    if (!title || !price || isNaN(stock)) { toast('제목 · 판매가 · 초기 재고를 입력하세요.', 'bad'); return; }
+    const cost = parseInt(digits($('mCost').value), 10);
+    const safety = parseInt(digits($('mSafety').value), 10);
     const ref = doc(booksCol);
-    setDoc(ref, { title, price, stock, sold: 0, createdAt: Date.now() })
-      .catch(e => { console.error(e); toast('등록 실패 · 연결 확인', 'bad'); });
+    setDoc(ref, {
+      title, price, stock, sold: 0,
+      category: $('mCat').value,
+      cost: isNaN(cost) ? null : cost,
+      safety: isNaN(safety) ? 0 : safety,
+      supplier: $('mSupplier').value.trim() || null,
+      createdAt: Date.now(),
+    }).catch(e => { console.error(e); toast('등록 실패 · 연결 확인', 'bad'); });
     writeLogs([{ bookId: ref.id, title, reason: '등록', before: 0, after: stock, note: `판매가 ${price}원` }]);
     closeModal(); toast('새 책을 등록했습니다.', 'good');
   };
@@ -1585,7 +1841,13 @@ function restockModal(b) {
     <h3>입고 · ${esc(b.title)}</h3>
     <div class="field"><label>현재 재고: ${b.stock}권 → 추가할 수량</label>
       <input id="mAdd" inputmode="numeric" placeholder="예) 50"></div>
-    <div class="field"><label>메모 (선택 · 어디서 받았는지 등)</label>
+    <div class="field-row">
+      <div class="field"><label>입고단가 (원 · 선택)</label>
+        <input id="mCost" inputmode="numeric" placeholder="${b.cost || '21000'}"></div>
+      <div class="field"><label>거래처 (선택)</label>
+        <input id="mSupplier" placeholder="${esc(b.supplier || '예) 성서원')}"></div>
+    </div>
+    <div class="field"><label>메모 (선택)</label>
       <input id="mNote" placeholder="예) 출판사 2차 입고"></div>
     <div class="modal-actions">
       <button class="btn ghost" id="mCancel">취소</button>
@@ -1595,10 +1857,23 @@ function restockModal(b) {
   $('mSave').onclick = () => {
     const add = parseInt(digits($('mAdd').value), 10);
     if (!add || add <= 0) { toast('수량을 입력하세요.', 'bad'); return; }
-    const note = $('mNote').value.trim() || null;
-    updateDoc(doc(booksCol, b.id), { stock: increment(add) })
+    const cost = parseInt(digits($('mCost').value), 10);
+    const supplier = $('mSupplier').value.trim();
+
+    // 입고단가·거래처를 적었으면 책 정보의 '최근 매입 조건'도 같이 갱신한다
+    const patch = { stock: increment(add) };
+    if (!isNaN(cost)) patch.cost = cost;
+    if (supplier) patch.supplier = supplier;
+    updateDoc(doc(booksCol, b.id), patch)
       .catch(e => { console.error(e); toast('입고 실패 · 연결 확인', 'bad'); });
-    writeLogs([{ bookId: b.id, title: b.title, reason: '입고', before: b.stock, after: b.stock + add, note }]);
+
+    const memo = [
+      supplier || b.supplier ? `거래처 ${supplier || b.supplier}` : '',
+      !isNaN(cost) ? `입고단가 ${won(cost)} · 입고금액 ${won(cost * add)}` : '',
+      $('mNote').value.trim(),
+    ].filter(Boolean).join(' · ') || null;
+
+    writeLogs([{ bookId: b.id, title: b.title, reason: '입고', before: b.stock, after: b.stock + add, note: memo }]);
     closeModal();
     toast(`${b.title} ${add}권 입고 완료 (재고 ${b.stock + add}권)`, 'good');
   };
@@ -1609,8 +1884,16 @@ function editBookModal(b) {
   openModal(`
     <h3>책 정보 수정</h3>
     <div class="field"><label>책 제목</label><input id="mTitle" value="${esc(b.title)}"></div>
-    <div class="field"><label>판매가 (원)</label><input id="mPrice" inputmode="numeric" value="${b.price}"></div>
-    <div class="field"><label>재고 수량 (직접 조정)</label><input id="mStock" inputmode="numeric" value="${b.stock}"></div>
+    <div class="field"><label>카테고리</label>${catSelect(catOf(b))}</div>
+    <div class="field-row">
+      <div class="field"><label>판매가 (원)</label><input id="mPrice" inputmode="numeric" value="${b.price}"></div>
+      <div class="field"><label>입고단가 (원 · 선택)</label><input id="mCost" inputmode="numeric" value="${b.cost ?? ''}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>재고 수량 (직접 조정)</label><input id="mStock" inputmode="numeric" value="${b.stock}"></div>
+      <div class="field"><label>안전재고 (권)</label><input id="mSafety" inputmode="numeric" value="${safetyOf(b)}"></div>
+    </div>
+    <div class="field"><label>거래처 (선택)</label><input id="mSupplier" value="${esc(b.supplier || '')}" placeholder="예) 성서원"></div>
     <div class="field"><label>조정 사유 (선택)</label><input id="mNote" placeholder="예) 실사 후 분실 2권 반영"></div>
     <div class="modal-actions">
       <button class="btn ghost" id="mCancel">취소</button>
@@ -1623,14 +1906,22 @@ function editBookModal(b) {
     const stock = parseInt(digits($('mStock').value), 10);
     if (!title || !price || isNaN(stock)) { toast('올바르게 입력하세요.', 'bad'); return; }
     const note = $('mNote').value.trim() || null;
+    const cost = parseInt(digits($('mCost').value), 10);
+    const safety = parseInt(digits($('mSafety').value), 10);
+    const category = $('mCat').value;
+    const supplier = $('mSupplier').value.trim() || null;
 
-    updateDoc(doc(booksCol, b.id), { title, price, stock })
-      .catch(e => { console.error(e); toast('저장 실패 · 연결 확인', 'bad'); });
+    updateDoc(doc(booksCol, b.id), {
+      title, price, stock, category, supplier,
+      cost: isNaN(cost) ? null : cost,
+      safety: isNaN(safety) ? 0 : safety,
+    }).catch(e => { console.error(e); toast('저장 실패 · 연결 확인', 'bad'); });
 
     const logs = [];
     if (stock !== b.stock) logs.push({ bookId: b.id, title, reason: '조정', before: b.stock, after: stock, note });
     if (price !== b.price) logs.push({ bookId: b.id, title, reason: '가격변경', field: 'price', before: b.price, after: price, note });
     if (title !== b.title) logs.push({ bookId: b.id, title, reason: '이름변경', field: 'title', note: `${b.title} → ${title}` });
+    if (category !== catOf(b)) logs.push({ bookId: b.id, title, reason: '분류변경', field: 'category', note: `${catOf(b)} → ${category}` });
     writeLogs(logs);
 
     closeModal(); toast('저장했습니다.', 'good');
@@ -1660,7 +1951,7 @@ function deleteBook(b) {
 function logModal(b) { showLogs(b ? stockLogs.filter(l => l.bookId === b.id) : stockLogs, b); }
 function showLogs(list, b) {
   const reasonPill = r => {
-    const cls = { 판매: 'transfer', 반품: 'warn', 입고: 'cash', 조정: 'warn', 등록: 'cash', 삭제: 'diff', 가격변경: 'mute', 이름변경: 'mute' }[r] || 'mute';
+    const cls = { 판매: 'transfer', 반품: 'warn', 입고: 'cash', 조정: 'warn', 등록: 'cash', 삭제: 'diff', 가격변경: 'mute', 이름변경: 'mute', 분류변경: 'mute' }[r] || 'mute';
     return `<span class="pill ${cls}">${esc(r)}</span>`;
   };
   const rows = list.slice(0, 200).map(l => {
@@ -1797,7 +2088,10 @@ function processReturn(t) {
     const q = Math.min(Math.max(parseInt(digits(inp.value), 10) || 0, 0), +inp.dataset.max);
     if (q <= 0) return;
     const orig = t.items[idx];
-    items.push({ title: orig.title, qty: -q, price: orig.price, amount: -(orig.price * q) });
+    items.push({
+      title: orig.title, category: orig.category || catForTitle(orig.title),
+      qty: -q, price: orig.price, amount: -(orig.price * q),
+    });
     qtySum += q; totalSum += orig.price * q;
   });
   if (items.length === 0) { toast('반품할 수량을 선택하세요.', 'bad'); return; }
@@ -1819,7 +2113,11 @@ function processReturn(t) {
     time: new Date().toISOString(), type: 'return', refId: t.id,
     items, qty: -qtySum, total: -totalSum, received: -refund,
     diff: (-refund) - (-totalSum), method: t.method,
-    customer: t.customer || null,   // 원래 결제한 고객을 그대로 이어받는다
+    // 원래 결제한 고객·할인 종류를 그대로 이어받는다 (시트에 같은 형식으로 남기기 위해)
+    discountLabel: t.discountLabel || null,
+    customer: t.customer || null,
+    phone: t.phone || null,
+    address: t.address || null,
   });
   batch.update(doc(txCol, t.id), { returned: remainingAfter <= 0 });
   batch.commit().catch(e => { console.error(e); toast('반품 저장 실패 · 연결 확인', 'bad'); });
@@ -1858,6 +2156,11 @@ function settingsModal() {
     </div>
 
     <div class="field">
+      <label>스프레드시트에서 상품 가져오기</label>
+      <button class="btn ghost" id="sImport" style="width:100%">📋 카테고리 · 단가 · 안전재고 일괄 반영</button>
+    </div>
+
+    <div class="field">
       <label>앱으로 설치</label>
       ${isStandalone
         ? '<div class="info-box" style="margin:0">이미 앱으로 실행 중입니다. 👍</div>'
@@ -1886,6 +2189,7 @@ function settingsModal() {
   $('sBackup').onclick = () => backupNow();
   $('sRestore').onclick = () => $('restoreFile').click();
   $('sLogout').onclick = () => { closeModal(); signOut(auth); };
+  $('sImport').onclick = importSheetModal;
   $('sReset').onclick = resetAll;
   const inst = $('sInstall');
   if (inst) inst.onclick = async () => {
@@ -1896,6 +2200,153 @@ function settingsModal() {
     deferredInstall = null;
     $('installBtn').style.display = 'none';
   };
+}
+
+/* ================= 스프레드시트 → 앱 상품 일괄 반영 =================
+   기존 시트의 '재고현황' 탭(제품명 · 단가 · 안전재고 · 현재재고 · 상태)을
+   그대로 복사해 붙여넣으면 카테고리/판매가/안전재고/재고를 맞춰준다.
+   제품명 앞의 [성경] 같은 대괄호는 카테고리로 떼어내고, 앱에는 순수 제목만 남긴다. */
+const stripCat = s => {
+  const m = String(s).trim().match(/^\[\s*([^\]]+?)\s*\]\s*(.+)$/);
+  return m ? { cat: CATS.includes(m[1]) ? m[1] : '기타', title: m[2].trim() }
+           : { cat: '기타', title: String(s).trim() };
+};
+/* '₩50,000', '-27', '' 를 모두 안전하게 숫자로. 빈칸은 null(= 건드리지 않음) */
+const sheetNum = v => {
+  const s = String(v ?? '').replace(/[^\d.-]/g, '');
+  if (s === '' || s === '-') return null;
+  const n = Number(s);
+  return isFinite(n) ? Math.round(n) : null;
+};
+const normKey = s => stripCat(s).title.toLowerCase().replace(/\s+/g, '');
+
+function parseSheetPaste(text) {
+  const out = [];
+  text.split(/\r?\n/).forEach(line => {
+    if (!line.trim()) return;
+    const c = line.split('\t').map(x => x.trim());
+    const name = c[0];
+    if (!name) return;
+    if (/^(제품명|상품명|책\s*제목)$/.test(name)) return;   // 헤더 줄 건너뛰기
+    const { cat, title } = stripCat(name);
+    out.push({ title, category: cat,
+               price: sheetNum(c[1]), safety: sheetNum(c[2]), stock: sheetNum(c[3]) });
+  });
+  return out;
+}
+
+function importSheetModal() {
+  openModal(`
+    <h3>📋 스프레드시트에서 상품 가져오기</h3>
+    <div class="info-box">
+      기존 시트의 <b>재고현황 탭</b>에서 <b>제품명 · 단가 · 안전재고 · 현재재고</b> 네 열을
+      통째로 복사해서 아래에 붙여넣으세요.<br>
+      제목이 같은 책은 <b>덮어쓰고</b>, 시트에만 있는 책은 <b>새로 등록</b>합니다.<br>
+      앱에만 있고 시트에 없는 책은 <b>건드리지 않습니다.</b>
+    </div>
+    <div class="field">
+      <textarea id="iPaste" rows="7" placeholder="[성경] 대조 성경	₩50,000	-50	-27	정상&#10;[기타] 찬송가	₩25,000	5	12	정상"></textarea>
+    </div>
+    <div class="field">
+      <label>무엇을 반영할까요</label>
+      <label class="chkline"><input type="checkbox" id="iCat" checked> 카테고리</label>
+      <label class="chkline"><input type="checkbox" id="iPrice" checked> 판매가</label>
+      <label class="chkline"><input type="checkbox" id="iSafety" checked> 안전재고</label>
+      <label class="chkline"><input type="checkbox" id="iStock"> 현재 재고 <span class="dim">(앱 재고가 더 최신이면 체크하지 마세요)</span></label>
+    </div>
+    <div id="iPreview"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn primary" id="mSave" disabled>미리보기 먼저</button>
+    </div>`, true);
+
+  const paste = $('iPaste'), save = $('mSave');
+  let parsed = [];
+
+  const preview = () => {
+    const raw = parseSheetPaste(paste.value);
+
+    /* 앱은 책을 '제목'으로 찾는다(반품·집계 모두). 같은 제목이 카테고리만 다르게
+       두 줄 있으면 책이 두 개 생겨 재고가 갈라지므로, 마지막 줄만 남기고 알려준다. */
+    const seenRow = new Map(), dupTitles = [];
+    raw.forEach(r => {
+      const k = normKey(r.title);
+      if (seenRow.has(k)) dupTitles.push(r.title);
+      seenRow.set(k, r);
+    });
+    parsed = [...seenRow.values()];
+
+    const byKey = new Map(books.map(b => [normKey(b.title), b]));
+    let hit = 0, add = 0;
+    parsed.forEach(r => { const b = byKey.get(normKey(r.title)); if (b) { r._id = b.id; hit++; } else add++; });
+    const unknown = books.filter(b => !seenRow.has(normKey(b.title))).map(b => b.title);
+    const noPrice = parsed.filter(r => r.price === null && !r._id).map(r => r.title);
+
+    const warn = (msg, list) => `<div class="warn-box" style="margin:10px 0 0">${msg}
+      <div class="sub" style="max-height:64px;overflow:auto;color:inherit">${esc(list.join(', '))}</div></div>`;
+
+    $('iPreview').innerHTML = parsed.length === 0 ? '' : `
+      <div class="info-box" style="margin-top:10px">
+        붙여넣은 줄 <b>${raw.length}개</b> →
+        기존 책 갱신 <b>${hit}종</b> · 새로 등록 <b>${add}종</b><br>
+        ${unknown.length ? `시트에 없어 그대로 두는 앱 책 <b>${unknown.length}종</b>
+          <div class="sub" style="max-height:64px;overflow:auto">${esc(unknown.slice(0, 40).join(', '))}${unknown.length > 40 ? ' …' : ''}</div>`
+          : '앱의 모든 책이 시트에 있습니다.'}
+      </div>
+      ${dupTitles.length ? warn(`<b>제목이 겹치는 줄 ${dupTitles.length}개</b> — 카테고리만 다른 같은 제목입니다.
+        아래 것만 반영되니, 시트에서 한쪽을 정리하는 편이 좋습니다.`, dupTitles) : ''}
+      ${noPrice.length ? warn(`<b>단가가 비어 있는 새 책 ${noPrice.length}종</b> — 판매가 0원으로 등록됩니다.
+        나중에 재고 화면에서 수정하세요.`, noPrice) : ''}`;
+    save.disabled = parsed.length === 0;
+    save.textContent = parsed.length ? `${parsed.length}종 반영하기` : '미리보기 먼저';
+  };
+  paste.addEventListener('input', preview);
+  $('mCancel').onclick = closeModal;
+
+  save.onclick = async () => {
+    const want = { cat: $('iCat').checked, price: $('iPrice').checked,
+                   safety: $('iSafety').checked, stock: $('iStock').checked };
+    save.disabled = true; save.textContent = '반영 중…';
+    const logs = [];
+    try {
+      await runBatched(parsed, (batch, r) => {
+        const old = r._id ? bookById(r._id) : null;
+        const patch = {};
+        if (want.cat) patch.category = r.category;
+        if (want.price && r.price !== null) patch.price = r.price;
+        if (want.safety && r.safety !== null) patch.safety = r.safety;
+        if (want.stock && r.stock !== null) patch.stock = r.stock;
+
+        if (old) {
+          batch.update(doc(booksCol, old.id), patch);
+          if (patch.stock !== undefined && patch.stock !== old.stock)
+            logs.push({ bookId: old.id, title: old.title, reason: '조정',
+                        before: old.stock, after: patch.stock, note: '스프레드시트 반영' });
+          if (patch.price !== undefined && patch.price !== old.price)
+            logs.push({ bookId: old.id, title: old.title, reason: '가격변경', field: 'price',
+                        before: old.price, after: patch.price, note: '스프레드시트 반영' });
+        } else {
+          const ref = doc(booksCol);
+          const stock = r.stock ?? 0;
+          batch.set(ref, {
+            title: r.title, category: r.category,
+            price: r.price ?? 0, stock, sold: 0,
+            safety: r.safety ?? 0, cost: null, supplier: null, createdAt: Date.now(),
+          });
+          logs.push({ bookId: ref.id, title: r.title, reason: '등록',
+                      before: 0, after: stock, note: '스프레드시트에서 가져옴' });
+        }
+      });
+      writeLogs(logs);
+      closeModal();
+      toast(`${parsed.length}종을 시트 기준으로 맞췄습니다.`, 'good');
+    } catch (e) {
+      console.error(e);
+      save.disabled = false; save.textContent = '다시 시도';
+      toast('반영 실패 · 연결 확인', 'bad');
+    }
+  };
+  setTimeout(() => paste.focus(), 60);
 }
 
 function resetAll() {
@@ -2006,6 +2457,12 @@ $('fClear').onclick = () => {
 };
 $('qBooks').addEventListener('input', renderBookGrid);
 $('qInv').addEventListener('input', renderInventory);
+$('onlyLow').addEventListener('change', renderInventory);
+$('contactToggle').onclick = () => {
+  const box = $('contactExtra'), open = box.classList.toggle('hide');
+  $('contactToggle').textContent = open ? '＋ 연락처 · 주소 (택배 발송)' : '− 연락처 · 주소 접기';
+  if (!open) setTimeout(() => $('phone').focus(), 40);
+};
 $('exportPeriodCsv').onclick = () => {
   const { label } = periodRange();
   exportCsv(periodTx(), label.replace(/[^\w가-힣]/g, '_'));

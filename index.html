@@ -76,6 +76,40 @@
   header .brand span { color: #9ec3f0; font-weight: 500; font-size: 12px; margin-left: 7px; }
   header .info { font-size: 13px; color: #cfe0f5; display: flex; gap: 14px; align-items: center; }
   header .info b { color: #fff; font-weight: 700; }
+  /* 시계는 숫자 폭이 고정돼야 초가 바뀔 때 옆 글자가 안 흔들린다 */
+  header .clock { font-variant-numeric: tabular-nums; }
+
+  /* ---------- 개업 / 마감 ---------- */
+  .biz-chip {
+    border: 1px solid transparent; border-radius: 999px; padding: 4px 11px;
+    font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+    font-family: inherit; transition: filter .15s;
+  }
+  .biz-chip:hover { filter: brightness(1.15); }
+  .biz-chip.on  { background: rgba(126,231,168,.2); border-color: rgba(126,231,168,.5); color: #cdf5df; }
+  .biz-chip.off { background: rgba(255,196,120,.2); border-color: rgba(255,196,120,.55); color: #ffe2bd; }
+  #bizScreen {
+    position: fixed; inset: 0; z-index: 480; background: linear-gradient(160deg, #1f4e8c, #16386a);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .biz-card {
+    background: #fff; border-radius: var(--r-lg); padding: 32px 28px; width: 380px; max-width: 100%;
+    text-align: center; box-shadow: 0 18px 50px rgba(0,0,0,.3);
+  }
+  .biz-card .biz-icon { font-size: 40px; line-height: 1; }
+  .biz-card h2 { margin: 12px 0 6px; font-size: 21px; }
+  .biz-card .biz-sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; line-height: 1.6; }
+  .biz-card .btn { width: 100%; }
+  .biz-card .btn + .btn { margin-top: 8px; }
+  .biz-last {
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--r);
+    padding: 12px 14px; margin-bottom: 18px; font-size: 13px; text-align: left; line-height: 1.7;
+  }
+  .biz-last .big { font-size: 19px; font-weight: 800; }
+  .close-sum { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; }
+  .close-sum .row { display: flex; justify-content: space-between; font-size: 14px; }
+  .close-sum .row.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 9px; font-size: 17px; font-weight: 800; }
+  .close-sum .row .dim { color: var(--muted); }
   .icon-btn {
     background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.28);
     border-radius: var(--r-sm); min-width: 38px; height: 34px; padding: 0 11px;
@@ -565,8 +599,9 @@
 <header>
   <div class="brand">📚 서적부 POS <span>Book Store</span></div>
   <div class="info">
-    <div class="hide-sm">영업일자 <b id="today"></b></div>
-    <div>오늘 <b id="hdrRevenue">0원</b></div>
+    <div class="hide-sm">영업일자 <b id="today"></b> <b id="clock" class="clock"></b></div>
+    <div>매출 <b id="hdrRevenue">0원</b></div>
+    <button id="bizChip" class="biz-chip off" title="개업 · 마감">–</button>
     <div id="syncBadge" class="sync"><span class="dot"></span><span id="syncText">연결 중…</span></div>
     <button id="installBtn" class="icon-btn" style="display:none" title="홈 화면에 설치">⬇ 설치</button>
     <button id="settingsBtn" class="icon-btn" title="설정 · 백업">⚙</button>
@@ -587,6 +622,17 @@
     <button type="submit" id="loginBtn">로그인</button>
     <div id="loginError" class="login-err"></div>
   </form>
+</div>
+
+<div id="bizScreen">
+  <div class="biz-card">
+    <div class="biz-icon">🔒</div>
+    <h2>아직 개업 전입니다</h2>
+    <p class="biz-sub">개업해야 판매·반품을 할 수 있습니다.<br>매출 조회와 재고 관리는 그냥 하셔도 됩니다.</p>
+    <div id="bizLast" class="biz-last"></div>
+    <button class="btn primary" id="bizOpenBtn">🔓 개업하기</button>
+    <button class="btn ghost" id="bizPeekBtn">닫고 둘러보기</button>
+  </div>
 </div>
 
 <div class="tabs">
@@ -823,7 +869,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs, setDoc,
-  onSnapshot, query, orderBy, limit, writeBatch, increment }
+  onSnapshot, query, orderBy, limit, writeBatch, increment, arrayUnion }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig, STORE_EMAIL } from "./firebase-config.js";
 
@@ -950,6 +996,17 @@ function startListeners() {
   onSnapshot(query(logsCol, orderBy('time', 'desc'), limit(500)), snap => {
     stockLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   }, e => console.error('logs listener', e));
+
+  // 개업/마감 상태 — 한 기기에서 마감하면 다른 기기도 즉시 잠긴다
+  onSnapshot(doc(db, 'meta', 'session'), snap => {
+    session = snap.exists() ? snap.data() : null;
+    renderBiz(); renderAll(); tickClock();
+  }, e => console.error('session listener', e));
+
+  onSnapshot(doc(db, 'meta', 'closings'), snap => {
+    closings = (snap.exists() && snap.data().list) || [];
+    renderBiz();
+  }, e => console.error('closings listener', e));
 }
 
 async function seedIfNeeded() {
@@ -1157,6 +1214,7 @@ function clearCart() {
 /* ================= 결제 ================= */
 function checkout() {
   if (cart.length === 0) return;
+  if (!requireOpen('판매')) return;
   const total = cartTotal();
   const discount = currentDiscount();
   const discPct = discountMode === 'percent' ? discountPct() : null;
@@ -1408,11 +1466,195 @@ function fmtDateTime(iso) {
 function ymd(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-function todayRevenue() {
-  const key = ymd(new Date());
-  return transactions
-    .filter(tx => ymd(new Date(tx.time)) === key)
-    .reduce((s, tx) => s + tx.received, 0);
+/* ================= 개업 / 마감 =================
+   하루 영업을 '개업 → 마감' 한 구간으로 묶는다. 상태는 meta/session 한 문서에 두어
+   여러 기기가 같은 상태를 실시간으로 본다 (한 사람이 마감하면 다른 폰에서도 바로 잠긴다).
+
+   '마감하면 매출 초기화' = 헤더 매출이 0으로 돌아간다는 뜻이다. 거래 기록은 절대
+   지우지 않는다 — 매출 내역·리포트·시트 미러가 전부 그 기록 위에서 돌아가기 때문.
+   대신 헤더 매출을 '개업한 뒤로 쌓인 것'만 세게 해서, 다음 개업 때 자연히 0부터 시작한다.
+
+   마감 요약은 meta/closings 한 문서에 쌓는다. 새 컬렉션을 만들면 보안 규칙을 콘솔에
+   다시 게시해야 하는데, 그 단계를 잊으면 마감이 통째로 실패하기 때문이다. */
+let session = null;        // meta/session — 지금 영업 중인지
+let closings = [];         // meta/closings — 지난 마감 요약들
+
+const bizOpen = () => !!(session && session.open);
+
+/* 이번 영업(개업 시각 이후)에 쌓인 거래. 반품은 received 가 음수라 그대로 더하면 차감된다. */
+function sessionTx() {
+  if (!bizOpen()) return [];
+  const from = session.openedAt || '';
+  return transactions.filter(t => t.time >= from);   // ISO 문자열이라 그대로 비교된다
+}
+function sessionRevenue() {
+  return sessionTx().reduce((s, t) => s + t.received, 0);
+}
+function sessionStats() {
+  const list = sessionTx();
+  const returns = list.filter(t => t.type === 'return');
+  const byMethod = {};
+  list.forEach(t => {
+    const k = t.method || '기타';
+    byMethod[k] = (byMethod[k] || 0) + t.received;
+  });
+  return {
+    revenue: list.reduce((s, t) => s + t.received, 0),
+    saleCount: list.length - returns.length,
+    returnCount: returns.length,
+    returnAmount: returns.reduce((s, t) => s + t.received, 0),
+    qty: list.reduce((s, t) => s + (t.qty || 0), 0),
+    byMethod,
+  };
+}
+
+/* 판매·반품 직전에 부른다. 마감 상태면 막고 개업 화면을 띄운다. */
+function requireOpen(what) {
+  if (bizOpen()) return true;
+  toast(`마감된 상태입니다. 개업해야 ${what}할 수 있습니다.`, 'bad');
+  bizPeeked = false;
+  renderBiz();
+  return false;
+}
+
+let bizPeeked = false;     // '닫고 둘러보기'를 눌렀는지
+let bizWasOpen = null;     // 열림 → 닫힘으로 바뀌는 순간을 잡기 위한 직전 상태
+
+function lastClosingHtml() {
+  const last = closings[closings.length - 1];
+  if (!last) {
+    return '<span class="dim">아직 마감 기록이 없습니다. 개업하면 다음부터 지난 영업 요약이 여기 표시됩니다.</span>';
+  }
+  return `<div>지난 영업 <b>${esc(last.bizDate || '')}</b></div>
+    <div class="dim">${last.openedAt ? fmtDateTime(last.openedAt) + ' 개업 · ' : ''}${fmtDateTime(last.closedAt)} 마감</div>
+    <div class="big">${won(last.revenue)}</div>
+    <div class="dim">판매 ${last.saleCount || 0}건${last.returnCount ? ` · 반품 ${last.returnCount}건` : ''}</div>`;
+}
+
+function renderBiz() {
+  const open = bizOpen();
+  const chip = $('bizChip');
+  chip.className = 'biz-chip ' + (open ? 'on' : 'off');
+  chip.textContent = open ? '🟢 영업 중' : '🔴 마감됨';
+  chip.title = open ? `${fmtDateTime(session.openedAt)} 개업 · 눌러서 마감` : '눌러서 개업';
+
+  // 다른 기기에서 마감해도 이쪽 화면이 곧바로 개업 화면으로 바뀌게 한다
+  if (bizWasOpen === true && !open) bizPeeked = false;
+  if (open) bizPeeked = false;
+  bizWasOpen = open;
+
+  $('bizLast').innerHTML = lastClosingHtml();
+  $('bizScreen').style.display = (!open && !bizPeeked && auth.currentUser) ? 'flex' : 'none';
+}
+
+async function openBiz() {
+  const btn = $('bizOpenBtn');
+  btn.disabled = true; btn.textContent = '개업하는 중…';
+  const now = new Date();
+  try {
+    await setDoc(doc(db, 'meta', 'session'), {
+      open: true,
+      openedAt: now.toISOString(),
+      openedBy: auth.currentUser ? auth.currentUser.email : null,
+      bizDate: ymd(now),
+      seq: ((session && session.seq) || 0) + 1,
+    });
+    bizPeeked = false;
+    toast('개업했습니다. 좋은 하루 되세요!', 'good');
+  } catch (e) {
+    console.error('개업 실패', e);
+    toast('개업 실패 · 연결 확인', 'bad');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔓 개업하기';
+  }
+}
+
+function closeBizModal() {
+  if (!bizOpen()) { bizPeeked = false; renderBiz(); return; }
+  const s = sessionStats();
+  const methods = Object.keys(s.byMethod);
+  openModal(`
+    <h3>🔒 마감하기</h3>
+    <div class="info-box">
+      <b>${esc(session.bizDate || '')}</b> 영업 · ${fmtDateTime(session.openedAt)} 개업 → 지금 마감
+    </div>
+    <div class="close-sum">
+      ${methods.map(m => `<div class="row"><span class="dim">${esc(m)}</span><span>${won(s.byMethod[m])}</span></div>`).join('')}
+      ${s.returnCount ? `<div class="row"><span class="dim">반품 ${s.returnCount}건</span><span>${won(s.returnAmount)}</span></div>` : ''}
+      <div class="row"><span class="dim">판매</span><span>${s.saleCount}건 · ${s.qty}권</span></div>
+      <div class="row total"><span>합계</span><span>${won(s.revenue)}</span></div>
+    </div>
+    <div class="info-box">
+      마감하면 헤더 매출이 <b>0으로 돌아갑니다.</b> 거래 기록은 그대로 남으니
+      매출 내역·리포트에서 언제든 볼 수 있습니다.<br>
+      마감한 뒤에는 <b>개업해야 다시 판매·반품</b>할 수 있습니다.
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn primary" id="mSave">마감하기</button>
+    </div>`);
+  $('mCancel').onclick = closeModal;
+  $('mSave').onclick = async () => {
+    const btn = $('mSave');
+    btn.disabled = true; btn.textContent = '마감 중…';
+    const now = new Date();
+    // 창을 띄운 뒤에 판매가 하나 더 들어왔을 수 있어 저장 직전에 다시 센다
+    const rec = {
+      seq: session.seq || 0,
+      bizDate: session.bizDate || ymd(now),
+      openedAt: session.openedAt || null,
+      openedBy: session.openedBy || null,
+      closedAt: now.toISOString(),
+      closedBy: auth.currentUser ? auth.currentUser.email : null,
+      ...sessionStats(),
+    };
+    try {
+      // 세션부터 닫는다 — 요약 저장이 실패해도 마감 자체는 끝난 것으로 본다
+      await setDoc(doc(db, 'meta', 'session'),
+        { open: false, closedAt: rec.closedAt, closedBy: rec.closedBy }, { merge: true });
+    } catch (e) {
+      console.error('마감 실패', e);
+      btn.disabled = false; btn.textContent = '다시 시도';
+      toast('마감 실패 · 연결 확인', 'bad');
+      return;
+    }
+    try {
+      await setDoc(doc(db, 'meta', 'closings'), { list: arrayUnion(rec) }, { merge: true });
+    } catch (e) {
+      console.error('마감 요약 저장 실패 (마감 자체는 완료)', e);
+    }
+    closeModal();
+    toast(`마감했습니다 · ${won(rec.revenue)}`, 'good');
+  };
+}
+
+function closingsModal() {
+  const rows = [...closings].reverse();
+  openModal(`
+    <h3>📒 지난 마감 내역</h3>
+    ${rows.length === 0 ? '<div class="info-box">아직 마감 기록이 없습니다.</div>' : `
+      <div style="max-height:56vh;overflow:auto">
+        ${rows.map(c => `
+          <div class="biz-last" style="margin-bottom:8px">
+            <div><b>${esc(c.bizDate || '')}</b>
+              <span class="dim"> · ${c.openedAt ? fmtDateTime(c.openedAt) + ' → ' : ''}${fmtDateTime(c.closedAt)}</span></div>
+            <div class="big">${won(c.revenue)}</div>
+            <div class="dim">판매 ${c.saleCount || 0}건 · ${c.qty || 0}권${c.returnCount ? ` · 반품 ${c.returnCount}건 (${won(c.returnAmount)})` : ''}</div>
+            <div class="dim">${Object.keys(c.byMethod || {}).map(m => `${esc(m)} ${won(c.byMethod[m])}`).join(' · ')}</div>
+          </div>`).join('')}
+      </div>`}
+    <div class="modal-actions"><button class="btn ghost" id="mCancel">닫기</button></div>`);
+  $('mCancel').onclick = closeModal;
+}
+
+/* 영업일자는 개업한 날 기준이다 — 자정을 넘겨 장사해도 그 영업의 날짜를 유지한다. */
+function tickClock() {
+  const now = new Date();
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  const base = (bizOpen() && session.bizDate) ? new Date(session.bizDate + 'T00:00:00') : now;
+  const p = n => String(n).padStart(2, '0');
+  $('today').textContent = `${ymd(base)}(${days[base.getDay()]})`;
+  $('clock').textContent = `${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`;
 }
 
 /* ================= 리포트 ================= */
@@ -2235,6 +2477,7 @@ function processReturn(t) {
     qtySum += q; totalSum += orig.price * q;
   });
   if (items.length === 0) { toast('반품할 수량을 선택하세요.', 'bad'); return; }
+  if (!requireOpen('반품')) { closeModal(); return; }
   const refund = parseInt(digits($('mRefund').value), 10) || 0;
   const remainingAfter = remainingReturnable(t) - qtySum;
 
@@ -2298,6 +2541,14 @@ function settingsModal() {
     </div>
 
     <div class="field">
+      <label>영업</label>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" id="sBiz" style="flex:1">${bizOpen() ? '🔒 마감하기' : '🔓 개업하기'}</button>
+        <button class="btn ghost" id="sClosings" style="flex:1">📒 지난 마감 내역</button>
+      </div>
+    </div>
+
+    <div class="field">
       <label>스프레드시트에서 상품 가져오기</label>
       <button class="btn ghost" id="sImport" style="width:100%">📋 카테고리 · 단가 · 안전재고 일괄 반영</button>
     </div>
@@ -2340,6 +2591,12 @@ function settingsModal() {
   $('sRestore').onclick = () => $('restoreFile').click();
   $('sLogout').onclick = () => { closeModal(); signOut(auth); };
   $('sImport').onclick = importSheetModal;
+  $('sBiz').onclick = () => {
+    closeModal();
+    if (bizOpen()) closeBizModal();
+    else { bizPeeked = false; renderBiz(); }
+  };
+  $('sClosings').onclick = closingsModal;
   $('sSheetCfg').onclick = sheetConfigModal;
   $('sSheetSend').onclick = () => flushSheet(true);
   $('sReset').onclick = resetAll;
@@ -2738,7 +2995,8 @@ function renderAll() {
   renderInventory();
   renderSales();
   renderReport();
-  $('hdrRevenue').textContent = won(todayRevenue());
+  $('hdrRevenue').textContent = won(sessionRevenue());
+  renderBiz();
 }
 
 /* ================= 로그인 / 초기화 ================= */
@@ -2773,11 +3031,14 @@ onAuthStateChanged(auth, async user => {
     startListeners();      // 먼저 화면부터 살린다 (오프라인이어도 캐시로 동작)
     seedIfNeeded();
     loadSheetCfg();        // 시트 연동 설정을 읽고, 밀려 있던 기록을 마저 보낸다
+    bizPeeked = false;     // 로그인할 때마다 개업 화면을 다시 보여준다
+    renderBiz();
   } else if (user) {
     await signOut(auth);
     showLoginError('허용되지 않은 계정입니다. 가게 공용 계정으로 로그인하세요.');
   } else {
     loginScreen.style.display = 'flex';
+    $('bizScreen').style.display = 'none';   // 로그인 화면을 가리지 않게
   }
 });
 
@@ -2831,8 +3092,15 @@ window.addEventListener('appinstalled', () => {
 /* ================= 시작 ================= */
 (function init() {
   const t = new Date();
-  const days = ['일', '월', '화', '수', '목', '금', '토'];
-  $('today').textContent = `${ymd(t)}(${days[t.getDay()]})`;
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  $('bizChip').onclick = () => {
+    if (bizOpen()) closeBizModal();
+    else { bizPeeked = false; renderBiz(); }
+  };
+  $('bizOpenBtn').onclick = openBiz;
+  $('bizPeekBtn').onclick = () => { bizPeeked = true; renderBiz(); };
 
   // 리포트 직접 기간 기본값 = 이번 달
   $('pFrom').value = ymd(new Date(t.getFullYear(), t.getMonth(), 1));

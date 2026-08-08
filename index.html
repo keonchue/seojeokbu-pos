@@ -1974,6 +1974,36 @@ function sheetRows(t) {
 let sheetCfg = null;
 const QUEUE_KEY = 'sheetQueue';
 
+/* Apps Script 쪽 코드는 git push 로 배포되지 않는다 — 구글에서 따로 '새 버전' 배포를 해야 한다.
+   그 단계를 잊으면 조용히 옛 코드가 돌기 때문에, 앱이 배포된 버전을 물어보고 알려준다.
+   apps-script/Code.gs 를 고칠 때 MIRROR_VERSION 과 이 값을 같이 올린다. */
+const SHEET_MIRROR_VERSION = '2026-08-08b';
+let sheetMirrorVersion = null;      // 실제로 배포돼 있는 버전 (확인 전이면 null)
+
+const sheetMirrorStale = () =>
+  !!sheetMirrorVersion && sheetMirrorVersion !== SHEET_MIRROR_VERSION;
+
+async function pingSheetMirror() {
+  sheetMirrorVersion = null;
+  if (!sheetCfg || !sheetCfg.url || !navigator.onLine) { renderSheetBadge(); return; }
+  try {
+    const res = await fetch(sheetCfg.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ token: sheetCfg.token || '', action: 'ping' }),
+    });
+    const out = await res.json();
+    // 버전을 안 실어 보내면 이 기능이 생기기 전의 아주 옛 배포다
+    sheetMirrorVersion = out.version || '(버전 없음)';
+    if (sheetMirrorStale()) {
+      console.warn(`시트 스크립트가 옛 버전입니다: 배포됨 ${sheetMirrorVersion} / 필요 ${SHEET_MIRROR_VERSION}`);
+    }
+  } catch (e) {
+    console.error('시트 미러 버전 확인 실패', e);
+  }
+  renderSheetBadge();
+}
+
 const sheetQueue = () => {
   try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
   catch { return []; }
@@ -2009,6 +2039,7 @@ async function loadSheetCfg() {
     sheetCfg = snap.exists() ? snap.data() : null;
   } catch (e) { console.error('시트 설정 읽기 실패', e); sheetCfg = null; }
   renderSheetBadge();
+  pingSheetMirror();     // 시트 쪽에 새 배포를 안 했으면 설정 화면에서 알려준다
   flushSheet();
 }
 
@@ -2052,7 +2083,19 @@ async function flushSheet(loud = false) {
 
 function renderSheetBadge() {
   const el = $('sheetPending');
-  if (el) el.textContent = sheetQueue().length ? `못 보낸 기록 ${sheetQueue().length}건` : '밀린 것 없음';
+  if (!el) return;
+  const n = sheetQueue().length;
+  el.textContent = n ? `못 보낸 기록 ${n}건` : '밀린 것 없음';
+  const warn = $('sheetStale');
+  if (warn) {
+    warn.style.display = sheetMirrorStale() ? '' : 'none';
+    warn.innerHTML = sheetMirrorStale()
+      ? `⚠ <b>시트 스크립트가 옛 버전입니다.</b> 배포된 것 <b>${esc(sheetMirrorVersion)}</b> ·
+         필요한 것 <b>${esc(SHEET_MIRROR_VERSION)}</b><br>
+         Apps Script 에 <code>apps-script/Code.gs</code> 를 다시 붙여넣고
+         <b>배포 → 배포 관리 → 수정 → 새 버전</b> 을 해주세요.`
+      : '';
+  }
 }
 
 window.addEventListener('online', () => flushSheet());
@@ -2555,6 +2598,7 @@ function settingsModal() {
 
     <div class="field">
       <label>구글 시트 자동 기록 · <span id="sheetPending" class="dim"></span></label>
+      <div class="warn-box" id="sheetStale" style="display:none;margin:0 0 8px"></div>
       <div style="display:flex;gap:8px">
         <button class="btn ghost" id="sSheetCfg" style="flex:1">🔗 연동 설정</button>
         <button class="btn ghost" id="sSheetSend" style="flex:1">📤 지금 보내기</button>
@@ -2599,6 +2643,7 @@ function settingsModal() {
   $('sClosings').onclick = closingsModal;
   $('sSheetCfg').onclick = sheetConfigModal;
   $('sSheetSend').onclick = () => flushSheet(true);
+  pingSheetMirror();   // 설정을 열 때마다 시트 쪽 버전을 다시 확인한다
   $('sReset').onclick = resetAll;
   renderSheetBadge();
   const inst = $('sInstall');

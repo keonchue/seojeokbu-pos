@@ -24,6 +24,11 @@
  * 코드에 적어두면 아무나 시트에 데이터를 밀어넣을 수 있다)
  */
 
+/* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
+   앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
+   주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
+var MIRROR_VERSION = '2026-08-08b';
+
 // ── 실제 탭 이름 (2026-08-08 시트에서 확인) ─────────────────────────────
 // 탭 이름을 시트에서 바꿨다면 `탭이름_확인` 을 실행해 여기에 옮겨 적으세요.
 var TABS = {
@@ -67,6 +72,9 @@ function doPost(e) {
     if (!body.token || body.token !== scriptToken()) {
       return json({ ok: false, error: '토큰이 맞지 않습니다.' });
     }
+    // 앱이 '지금 배포된 버전이 뭐냐'만 물어볼 때 (버전은 json() 이 붙여 준다)
+    if (body.action === 'ping') return json({ ok: true });
+
     // 앱이 기준정보(단가·안전재고)를 읽어 갈 때
     if (body.action === 'books') {
       return json(readStockTab(SpreadsheetApp.getActiveSpreadsheet()));
@@ -94,12 +102,14 @@ function doPost(e) {
   }
 }
 
-// 브라우저로 열어보면 살아 있는지만 알려준다 (토큰·데이터는 노출하지 않는다)
+// 브라우저로 열어보면 살아 있는지와 배포된 버전만 알려준다 (토큰·데이터는 노출하지 않는다)
 function doGet() {
   return json({ ok: true, service: '서적부 POS 시트 미러' });
 }
 
+// 모든 응답에 배포된 버전을 실어 보낸다 — 앱이 이걸 보고 재배포가 필요한지 판단한다
 function json(obj) {
+  obj.version = MIRROR_VERSION;
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
@@ -367,6 +377,8 @@ function scriptToken() {
 function 설치_확인() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var out = [];
+  out.push('이 코드의 버전: ' + MIRROR_VERSION +
+           '  (배포된 버전과 다르면 배포 관리 → 수정 → 새 버전)');
   out.push(scriptToken() ? '토큰: 설정됨' : '토큰: 없음 → 토큰_만들기 를 먼저 실행하세요');
 
   Object.keys(TABS).forEach(function (kind) {

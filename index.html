@@ -927,6 +927,32 @@ function renderCatChips(elId, cur, onPick) {
 }
 function matchCat(b, cat) { return cat === '전체' || catOf(b) === cat; }
 
+/* ---------- 제목이 같고 분류만 다른 책 ----------
+   실제로 '일반판'과 '어린이판'이 따로 있는 책이 있다(존 워너메이커, 링컨).
+   앱은 원래 책을 제목만으로 찾았는데, 그러면 엉뚱한 판의 재고가 깎인다.
+   그래서 분류까지 같이 본다. 옛 기록에는 분류가 없을 수 있어, 없으면 제목만으로 찾는다. */
+const titleKey = s => String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, '');
+const bookKey = (title, cat) => `${CATS.includes(cat) ? cat : '기타'}::${titleKey(title)}`;
+
+function findBook(title, cat) {
+  if (CATS.includes(cat)) {
+    const exact = books.find(b => b.title === title && catOf(b) === cat);
+    if (exact) return exact;
+  }
+  return books.find(b => b.title === title);
+}
+
+/* 제목만으로는 구별이 안 되는 책들. 이때만 화면에 분류를 같이 보여 준다. */
+function sharedTitles() {
+  const seen = new Map();
+  books.forEach(b => {
+    const k = titleKey(b.title);
+    seen.set(k, (seen.get(k) || 0) + 1);
+  });
+  return seen;
+}
+const isSharedTitle = (counts, title) => (counts.get(titleKey(title)) || 0) > 1;
+
 /* 목록 정렬: 재고 있는 책이 위, 품절이 아래. 그 안에서 제목 가나다순.
    품절 판정은 장바구니를 뺀 값이 아니라 b.stock 으로 한다 —
    담을 때마다 카드 위치가 튀면 누르기 어렵기 때문. */
@@ -1000,6 +1026,7 @@ function startListeners() {
   // 개업/마감 상태 — 한 기기에서 마감하면 다른 기기도 즉시 잠긴다
   onSnapshot(doc(db, 'meta', 'session'), snap => {
     session = snap.exists() ? snap.data() : null;
+    sessionLoaded = true;
     renderBiz(); renderAll(); tickClock();
   }, e => console.error('session listener', e));
 
@@ -1073,6 +1100,7 @@ function renderBookGrid() {
   const q = $('qBooks').value.trim().toLowerCase();
   renderCatChips('posCats', posCat, c => { posCat = c; renderBookGrid(); });
   const list = books.filter(b => matchTitle(b.title, q) && matchCat(b, posCat)).sort(byStockThenName);
+  const shared = sharedTitles();
   list.forEach(b => {
     const inCart = cart.find(c => c.id === b.id);
     const remaining = b.stock - (inCart ? inCart.qty : 0);
@@ -1082,8 +1110,10 @@ function renderBookGrid() {
     else if (remaining < safetyOf(b) || remaining <= 10) cls += ' low';
     const el = document.createElement('button');
     el.className = 'book-btn' + (out ? ' out' : '');
+    // 제목이 같은 책이 또 있으면 분류를 붙여 준다 — 안 그러면 어느 쪽인지 구별이 안 된다
+    const tag = isSharedTitle(shared, b.title) ? catBadge(b) : '';
     el.innerHTML = `<span class="${cls}">${label}</span>
-      <div class="bt">${esc(b.title)}</div>
+      <div class="bt">${tag}${esc(b.title)}</div>
       <div class="bp">${won(b.price)}</div>`;
     el.onclick = () => addToCart(b.id);
     grid.appendChild(el);
@@ -1270,11 +1300,15 @@ function checkout() {
 }
 
 /* ================= 재고 화면 ================= */
-function payBreakdown(title, txList = transactions) {
+/* 제목이 같고 분류만 다른 책이 있으므로 분류까지 맞춰 센다.
+   옛 기록에는 분류가 없을 수 있어, 그럴 땐 제목만 맞으면 센다. */
+function payBreakdown(book, txList = transactions) {
+  const cat = catOf(book);
   let cash = 0, transfer = 0;
   txList.forEach(t => {
     (t.items || []).forEach(i => {
-      if (i.title !== title) return;
+      if (i.title !== book.title) return;
+      if (CATS.includes(i.category) && i.category !== cat) return;
       if (t.method === '현금') cash += i.qty; else transfer += i.qty;
     });
   });
@@ -1301,7 +1335,7 @@ function renderInventory() {
     : `전체 <b>${books.length}종</b>`;
 
   list.forEach(b => {
-    const pay = payBreakdown(b.title);
+    const pay = payBreakdown(b);
     const low = isLow(b);
     const safety = safetyOf(b);
     const tr = document.createElement('tr');
@@ -1512,13 +1546,23 @@ function sessionStats() {
 function requireOpen(what) {
   if (bizOpen()) return true;
   toast(`마감된 상태입니다. 개업해야 ${what}할 수 있습니다.`, 'bad');
-  bizPeeked = false;
+  bizPeekedFor = null;
   renderBiz();
   return false;
 }
 
-let bizPeeked = false;     // '닫고 둘러보기'를 눌렀는지
-let bizWasOpen = null;     // 열림 → 닫힘으로 바뀌는 순간을 잡기 위한 직전 상태
+/* '닫고 둘러보기'를 누른 마감 상태를 기억한다.
+   단순히 true/false 로 두면, 로그인 복원이 늦게 끝날 때 그 값이 초기화되면서
+   방금 닫은 안내가 다시 튀어나온다. 그래서 '어느 마감을 닫았는지'를 기억한다.
+   새로 마감하면(다른 기기 포함) 표시가 달라져 안내가 다시 뜬다. */
+let bizPeekedFor = null;
+const bizStamp = () => (session && session.closedAt) || 'none';
+
+/* 영업 상태를 읽기 전에는 안내를 띄우지 않는다.
+   미리 띄우면 (1) 영업 중인데도 잠깐 깜빡이고,
+   (2) 그때 '닫고 둘러보기'를 누르면 아직 모르는 상태를 닫은 것으로 기억해서
+       잠시 뒤 데이터가 도착하는 순간 안내가 도로 튀어나온다. */
+let sessionLoaded = false;
 
 function lastClosingHtml() {
   const last = closings[closings.length - 1];
@@ -1538,13 +1582,9 @@ function renderBiz() {
   chip.textContent = open ? '🟢 영업 중' : '🔴 마감됨';
   chip.title = open ? `${fmtDateTime(session.openedAt)} 개업 · 눌러서 마감` : '눌러서 개업';
 
-  // 다른 기기에서 마감해도 이쪽 화면이 곧바로 개업 화면으로 바뀌게 한다
-  if (bizWasOpen === true && !open) bizPeeked = false;
-  if (open) bizPeeked = false;
-  bizWasOpen = open;
-
   $('bizLast').innerHTML = lastClosingHtml();
-  $('bizScreen').style.display = (!open && !bizPeeked && auth.currentUser) ? 'flex' : 'none';
+  const show = sessionLoaded && !open && auth.currentUser && bizPeekedFor !== bizStamp();
+  $('bizScreen').style.display = show ? 'flex' : 'none';
 }
 
 async function openBiz() {
@@ -1559,7 +1599,7 @@ async function openBiz() {
       bizDate: ymd(now),
       seq: ((session && session.seq) || 0) + 1,
     });
-    bizPeeked = false;
+    bizPeekedFor = null;
     toast('개업했습니다. 좋은 하루 되세요!', 'good');
   } catch (e) {
     console.error('개업 실패', e);
@@ -1570,7 +1610,7 @@ async function openBiz() {
 }
 
 function closeBizModal() {
-  if (!bizOpen()) { bizPeeked = false; renderBiz(); return; }
+  if (!bizOpen()) { bizPeekedFor = null; renderBiz(); return; }
   const s = sessionStats();
   const methods = Object.keys(s.byMethod);
   openModal(`
@@ -1794,16 +1834,21 @@ function shortLabel(k, byMonth) {
 
 function renderRank(list) {
   const body = $('rankBody');
+  const shared = sharedTitles();
+  // 제목이 같고 분류만 다른 책은 서로 다른 책이므로 순위도 따로 잡는다
   const map = new Map();
   list.forEach(t => {
     (t.items || []).forEach(i => {
-      const r = map.get(i.title) || { qty: 0, amount: 0, cash: 0, transfer: 0 };
+      const k = bookKey(i.title, i.category);
+      const r = map.get(k) || { title: i.title, category: i.category, qty: 0, amount: 0, cash: 0, transfer: 0 };
       r.qty += i.qty; r.amount += i.amount;
       if (t.method === '현금') r.cash += i.qty; else r.transfer += i.qty;
-      map.set(i.title, r);
+      map.set(k, r);
     });
   });
-  const rows = [...map.entries()].sort((a, b) => b[1].qty - a[1].qty);
+  const rows = [...map.values()]
+    .map(r => [r.title + (isSharedTitle(shared, r.title) && r.category ? ` [${r.category}]` : ''), r])
+    .sort((a, b) => b[1].qty - a[1].qty);
   body.innerHTML = '';
   if (rows.length === 0) {
     body.innerHTML = '<tr class="empty-row"><td colspan="5">이 기간에는 판매된 책이 없습니다.</td></tr>';
@@ -1851,7 +1896,7 @@ function deleteTxModal(t) {
     try {
       const batch = writeBatch(db);
       (t.items || []).forEach(i => {
-        const b = books.find(x => x.title === i.title);
+        const b = findBook(i.title, i.category);
         if (!b) return;
         // 판매(qty 양수)를 지우면 재고는 늘고, 반품(qty 음수)을 지우면 재고는 준다 — 한 식으로 처리된다
         const patch = { sold: increment(-i.qty) };
@@ -2408,18 +2453,23 @@ function showLogs(list, b) {
 }
 
 /* ================= 반품 ================= */
+/* 이미 반품된 수량. 한 영수증에 제목이 같고 분류만 다른 책이 같이 담길 수 있어
+   제목+분류로 센다 (제목만으로 세면 두 판이 한 칸에 합쳐진다). */
 function returnedQtyMap(t) {
   const m = {};
   transactions.forEach(r => {
     if (r.type === 'return' && r.refId === t.id) {
-      (r.items || []).forEach(i => { m[i.title] = (m[i.title] || 0) + (-i.qty); });
+      (r.items || []).forEach(i => {
+        const k = bookKey(i.title, i.category);
+        m[k] = (m[k] || 0) + (-i.qty);
+      });
     }
   });
   return m;
 }
 function remainingReturnable(t) {
   const done = returnedQtyMap(t);
-  return (t.items || []).reduce((s, i) => s + (i.qty - (done[i.title] || 0)), 0);
+  return (t.items || []).reduce((s, i) => s + (i.qty - (done[bookKey(i.title, i.category)] || 0)), 0);
 }
 
 function returnPickerModal() {
@@ -2451,12 +2501,16 @@ function returnPickerModal() {
 
 function returnModal(t) {
   const done = returnedQtyMap(t);
+  const shared = sharedTitles();
   const rows = (t.items || []).map((i, idx) => {
-    const max = i.qty - (done[i.title] || 0);
+    const max = i.qty - (done[bookKey(i.title, i.category)] || 0);
     if (max <= 0) return '';
+    // 제목이 겹치는 책이면 어느 판인지 같이 보여 줘야 고를 수 있다
+    const tag = (i.category && isSharedTitle(shared, i.title))
+      ? `<span class="cat-badge ${CAT_SLUG[i.category] || 'c-etc'}">${esc(i.category)}</span>` : '';
     return `<div class="ret-row" data-idx="${idx}">
       <div>
-        <div class="ret-title">${esc(i.title)}</div>
+        <div class="ret-title">${tag}${esc(i.title)}</div>
         <div class="ret-sub">${won(i.price)} · 반품 가능 ${max}권</div>
       </div>
       <div class="ret-qty">
@@ -2529,7 +2583,7 @@ function processReturn(t) {
   const logs = [];
   items.forEach(i => {
     const q = -i.qty;
-    const b = books.find(x => x.title === i.title);
+    const b = findBook(i.title, i.category);
     if (b) {
       batch.update(doc(booksCol, b.id), { stock: increment(q), sold: increment(-q) });
       logs.push({ bookId: b.id, title: b.title, reason: '반품', before: b.stock, after: b.stock + q, txId: retRef.id });
@@ -2638,7 +2692,7 @@ function settingsModal() {
   $('sBiz').onclick = () => {
     closeModal();
     if (bizOpen()) closeBizModal();
-    else { bizPeeked = false; renderBiz(); }
+    else { bizPeekedFor = null; renderBiz(); }
   };
   $('sClosings').onclick = closingsModal;
   $('sSheetCfg').onclick = sheetConfigModal;
@@ -2673,7 +2727,6 @@ const sheetNum = v => {
   const n = Number(s);
   return isFinite(n) ? Math.round(n) : null;
 };
-const normKey = s => stripCat(s).title.toLowerCase().replace(/\s+/g, '');
 
 function parseSheetPaste(text) {
   const out = [];
@@ -2740,20 +2793,47 @@ function importSheetModal() {
   const preview = () => {
     const raw = parseSheetPaste(paste.value);
 
-    /* 앱은 책을 '제목'으로 찾는다(반품·집계 모두). 같은 제목이 카테고리만 다르게
-       두 줄 있으면 책이 두 개 생겨 재고가 갈라지므로, 마지막 줄만 남기고 알려준다. */
-    const seenRow = new Map(), dupTitles = [];
+    /* 분류까지 통째로 같은 줄만 진짜 중복이다 — 마지막 줄만 남기고 알려준다.
+       분류가 다르면 서로 다른 책으로 본다 (일반판 / 어린이판이 실제로 따로 있다). */
+    const seenRow = new Map(), dupRows = [];
     raw.forEach(r => {
-      const k = normKey(r.title);
-      if (seenRow.has(k)) dupTitles.push(r.title);
+      const k = bookKey(r.title, r.category);
+      if (seenRow.has(k)) dupRows.push(`[${r.category}] ${r.title}`);
       seenRow.set(k, r);
     });
     parsed = [...seenRow.values()];
 
-    const byKey = new Map(books.map(b => [normKey(b.title), b]));
+    /* 앱의 책과 이어 붙이는 규칙:
+       1) 분류+제목이 같은 책이 있으면 그것.
+       2) 없더라도 시트에 그 제목이 한 줄뿐이고 앱에도 한 권뿐이면 같은 책으로 본다
+          — 시트에서 분류만 고친 경우인데, 이걸 새 책으로 만들면 책이 갈라진다.
+       그 외에는 새로 등록한다. */
+    const rowsPerTitle = new Map();
+    parsed.forEach(r => {
+      const k = titleKey(r.title);
+      rowsPerTitle.set(k, (rowsPerTitle.get(k) || 0) + 1);
+    });
+    const byCatTitle = new Map(books.map(b => [bookKey(b.title, catOf(b)), b]));
+    const onlyByTitle = new Map();
+    books.forEach(b => {
+      const k = titleKey(b.title);
+      onlyByTitle.set(k, onlyByTitle.has(k) ? null : b);   // 앱에도 둘 이상이면 제목만으론 못 고른다
+    });
+
+    const usedIds = new Set();
     let hit = 0, add = 0;
-    parsed.forEach(r => { const b = byKey.get(normKey(r.title)); if (b) { r._id = b.id; hit++; } else add++; });
-    const unknown = books.filter(b => !seenRow.has(normKey(b.title))).map(b => b.title);
+    parsed.forEach(r => {
+      r._id = null;
+      let b = byCatTitle.get(bookKey(r.title, r.category));
+      if (!b && rowsPerTitle.get(titleKey(r.title)) === 1) b = onlyByTitle.get(titleKey(r.title)) || null;
+      if (b && !usedIds.has(b.id)) { r._id = b.id; usedIds.add(b.id); hit++; }
+      else add++;
+    });
+
+    // 이번에 '같은 제목의 다른 책'으로 새로 갈라지는 것들 — 의도한 건지 확인하시라고 보여 준다
+    const splitting = parsed.filter(r => !r._id && books.some(b => titleKey(b.title) === titleKey(r.title)))
+                            .map(r => `[${r.category}] ${r.title}`);
+    const unknown = books.filter(b => !usedIds.has(b.id)).map(b => b.title);
     const noPrice = parsed.filter(r => r.price === null && !r._id).map(r => r.title);
 
     const warn = (msg, list) => `<div class="warn-box" style="margin:10px 0 0">${msg}
@@ -2767,8 +2847,12 @@ function importSheetModal() {
           <div class="sub" style="max-height:64px;overflow:auto">${esc(unknown.slice(0, 40).join(', '))}${unknown.length > 40 ? ' …' : ''}</div>`
           : '앱의 모든 책이 시트에 있습니다.'}
       </div>
-      ${dupTitles.length ? warn(`<b>제목이 겹치는 줄 ${dupTitles.length}개</b> — 카테고리만 다른 같은 제목입니다.
-        아래 것만 반영되니, 시트에서 한쪽을 정리하는 편이 좋습니다.`, dupTitles) : ''}
+      ${splitting.length ? `<div class="info-box" style="margin:10px 0 0">
+        <b>같은 제목의 다른 책으로 ${splitting.length}종이 새로 등록됩니다.</b>
+        제목은 같지만 분류가 달라 <b>따로 관리</b>됩니다 (판매·재고가 각각 잡힙니다).
+        <div class="sub" style="max-height:64px;overflow:auto">${esc(splitting.join(', '))}</div></div>` : ''}
+      ${dupRows.length ? warn(`<b>완전히 겹치는 줄 ${dupRows.length}개</b> — 분류·제목이 똑같은 줄이 시트에 두 번 있습니다.
+        아래 것만 반영되니, 시트에서 한쪽을 지우는 편이 좋습니다.`, dupRows) : ''}
       ${noPrice.length ? warn(`<b>단가가 비어 있는 새 책 ${noPrice.length}종</b> — 판매가 0원으로 등록됩니다.
         나중에 재고 화면에서 수정하세요.`, noPrice) : ''}`;
     save.disabled = parsed.length === 0;
@@ -3076,7 +3160,7 @@ onAuthStateChanged(auth, async user => {
     startListeners();      // 먼저 화면부터 살린다 (오프라인이어도 캐시로 동작)
     seedIfNeeded();
     loadSheetCfg();        // 시트 연동 설정을 읽고, 밀려 있던 기록을 마저 보낸다
-    bizPeeked = false;     // 로그인할 때마다 개업 화면을 다시 보여준다
+    // 개업 안내는 renderBiz 가 알아서 띄운다 (이미 닫은 안내는 다시 안 뜬다)
     renderBiz();
   } else if (user) {
     await signOut(auth);
@@ -3142,10 +3226,10 @@ window.addEventListener('appinstalled', () => {
 
   $('bizChip').onclick = () => {
     if (bizOpen()) closeBizModal();
-    else { bizPeeked = false; renderBiz(); }
+    else { bizPeekedFor = null; renderBiz(); }
   };
   $('bizOpenBtn').onclick = openBiz;
-  $('bizPeekBtn').onclick = () => { bizPeeked = true; renderBiz(); };
+  $('bizPeekBtn').onclick = () => { bizPeekedFor = bizStamp(); renderBiz(); };
 
   // 리포트 직접 기간 기본값 = 이번 달
   $('pFrom').value = ymd(new Date(t.getFullYear(), t.getMonth(), 1));

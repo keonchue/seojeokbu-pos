@@ -2779,7 +2779,9 @@ function importSheetModal() {
       <label class="chkline"><input type="checkbox" id="iCat" checked> 카테고리</label>
       <label class="chkline"><input type="checkbox" id="iPrice" checked> 판매가</label>
       <label class="chkline"><input type="checkbox" id="iSafety" checked> 안전재고</label>
-      <label class="chkline"><input type="checkbox" id="iStock"> 현재 재고 <span class="dim">(앱 재고가 더 최신이면 체크하지 마세요)</span></label>
+      <label class="chkline" id="iStockLine"><input type="checkbox" id="iStock"> 현재 재고
+        <span class="dim" id="iStockHint"></span></label>
+      <div id="iStockNote"></div>
     </div>
     <div id="iPreview"></div>
     <div class="modal-actions">
@@ -2789,6 +2791,23 @@ function importSheetModal() {
 
   const paste = $('iPaste'), save = $('mSave');
   let parsed = [];
+
+  /* '현재 재고'는 시트가 앱의 거래를 다 받아 적은 뒤에만 정답이다.
+     못 보낸 기록이 남아 있으면 시트 재고는 그만큼 옛날 값이라, 그걸 가져오면
+     이미 팔린 책이 되살아난다. 사람이 눈으로 판단하기 어려운 조건이라 큐를 보고 앱이 잠근다. */
+  const pending = sheetQueue().length;
+  $('iStock').disabled = pending > 0;
+  $('iStockHint').textContent = pending
+    ? '(잠김)'
+    : '(시트에 손으로 적은 입고·판매가 있을 때만)';
+  if (pending) {
+    $('iStockLine').style.opacity = '.5';
+    $('iStockLine').style.cursor = 'default';
+    $('iStockNote').innerHTML = `<div class="warn-box" style="margin:6px 0 0">
+      시트로 <b>못 보낸 기록이 ${pending}건</b> 있어서 <b>현재 재고</b>를 잠갔습니다.
+      지금 시트의 재고는 그만큼 옛날 값이라, 그대로 가져오면 이미 팔린 책이 되살아납니다.<br>
+      ⚙ 설정에서 <b>📤 지금 보내기</b> 를 먼저 누르고 다시 오세요.</div>`;
+  }
 
   const preview = () => {
     const raw = parseSheetPaste(paste.value);

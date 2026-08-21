@@ -239,7 +239,7 @@
   .sp-row .sp-v.bad { color: var(--red); }
   .sp-hint { font-size: 12px; color: var(--muted); padding: 2px 2px 0; }
   .sp-hint.bad { color: var(--red); font-weight: 700; }
-  /* 반품 모달의 수단별 환불 입력 — 장바구니의 나눠받기와 같은 모양을 쓴다 */
+  /* 반품 모달의 수단별 환불 입력 — 장바구니의 분할결제와 같은 모양을 쓴다 */
   .sp-row.total { border-top: 1px dashed var(--line); margin-top: 5px; padding-top: 9px; }
   #mRefundCash, #mRefundTr { width: 130px; }
   #mRefundTr { color: var(--blue-dark); }
@@ -695,7 +695,7 @@
       <div class="pay-methods">
         <button data-method="계좌이체" class="sel">💳 계좌이체</button>
         <button data-method="현금">💵 현금</button>
-        <button data-method="분할">🧾 나눠받기</button>
+        <button data-method="분할">🧾 분할결제</button>
       </div>
 
       <div class="split-pay hide" id="splitWrap">
@@ -796,7 +796,7 @@
           <option value="">결제수단 전체</option>
           <option value="현금">현금</option>
           <option value="계좌이체">계좌이체</option>
-          <option value="분할">나눠받기</option>
+          <option value="분할">분할결제</option>
         </select>
         <select id="fType">
           <option value="">판매+반품</option>
@@ -1233,7 +1233,7 @@ function splitCashInput() {
   const raw = digits($('splitCash').value);
   return raw === '' ? 0 : parseInt(raw, 10);
 }
-/* 둘 다 1원 이상이어야 '나눠받기'다 — 한쪽이 0이면 그냥 현금이거나 그냥 계좌이체 */
+/* 둘 다 1원 이상이어야 '분할결제'다 — 한쪽이 0이면 그냥 현금이거나 그냥 계좌이체 */
 function splitValid() {
   const payable = payableAmount(), cash = splitCashInput();
   return payable > 0 && cash > 0 && cash < payable;
@@ -1313,7 +1313,7 @@ function clearCart() {
   $('discLabel').value = '';
   $('splitCash').value = '';
   $('contactExtra').classList.add('hide');
-  // 나눠받기 금액은 손님마다 다르다 — 다음 손님에게 그대로 남으면 안 되므로 되돌린다
+  // 분할결제 금액은 손님마다 다르다 — 다음 손님에게 그대로 남으면 안 되므로 되돌린다
   if (payMethod === '분할') selectPayMethod('계좌이체');
   renderCart();
   closeSheet();
@@ -1329,7 +1329,7 @@ function checkout() {
   const payable = total - discount;
   const received = payable;   // 받을 금액 = 받은 금액
 
-  // 나눠받기는 현금·계좌이체가 둘 다 1원 이상일 때만 성립한다
+  // 분할결제는 현금·계좌이체가 둘 다 1원 이상일 때만 성립한다
   const isSplit = payMethod === '분할';
   if (isSplit && !splitValid()) {
     toast(splitCashInput() <= 0
@@ -1448,10 +1448,12 @@ function payParts(t) {
   return p;
 }
 /* 화면에 결제수단을 보여줄 때 쓰는 요약 (분할이면 두 줄) */
+/* 저장되는 값은 '분할'이지만 화면에는 '분할결제'로 보여 준다 */
+const methodLabel = m => (m === '분할' ? '분할결제' : (m || ''));
 function methodPills(t) {
   if (!isSplitTx(t)) {
     const cls = t.method === '현금' ? 'cash' : 'transfer';
-    return `<span class="pill ${cls}">${esc(t.method || '')}</span>`;
+    return `<span class="pill ${cls}">${esc(methodLabel(t.method))}</span>`;
   }
   const c = Math.abs(t.split.cash), tr = Math.abs(t.split.transfer);
   return `<div class="pay-lines">
@@ -1461,7 +1463,7 @@ function methodPills(t) {
 }
 /* 모달·안내문에 쓰는 글자 형태 */
 function methodText(t) {
-  if (!isSplitTx(t)) return t.method || '';
+  if (!isSplitTx(t)) return methodLabel(t.method);
   return `현금 ${won(Math.abs(t.split.cash))} · 계좌이체 ${won(Math.abs(t.split.transfer))}`;
 }
 
@@ -1578,7 +1580,7 @@ function filteredTransactions() {
         ...(t.items || []).map(i => i.title),
         t.customer || '',
         t.method || '',
-        ...(isSplitTx(t) ? ['현금', '계좌이체', '나눠받기'] : []),
+        ...(isSplitTx(t) ? ['현금', '계좌이체', '분할결제'] : []),
       ].join(' ').toLowerCase();
       if (!hay.includes(f.q)) return false;
     }

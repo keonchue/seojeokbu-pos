@@ -215,12 +215,35 @@
   .sum-row.disc-calc { padding: 0 2px 4px; margin-top: -4px; min-height: 18px; }
   .sum-row.disc-calc #discCalc { color: var(--red); font-size: 13px; font-weight: 700; }
 
-  .pay-methods { display: flex; gap: 8px; padding: 0 14px 10px; }
+  .pay-methods { display: flex; gap: 6px; padding: 0 14px 10px; }
   .pay-methods button {
-    flex: 1; min-height: var(--tap); border: 2px solid var(--line); background: #fff;
-    border-radius: var(--r-sm); font-size: 15px; font-weight: 700; cursor: pointer; color: var(--muted);
+    flex: 1; min-height: var(--tap); border: 2px solid var(--line); background: #fff; padding: 0 4px;
+    border-radius: var(--r-sm); font-size: 14.5px; font-weight: 700; cursor: pointer; color: var(--muted);
+    white-space: nowrap;
   }
   .pay-methods button.sel { border-color: var(--blue); background: var(--blue-wash); color: var(--blue-dark); }
+  .pay-methods button[data-method="분할"].sel { border-color: var(--amber); background: var(--amber-wash); color: var(--amber); }
+
+  /* 분할결제 — 현금만 입력받고 계좌이체는 자동으로 채운다 */
+  .split-pay { padding: 0 14px 10px; }
+  .split-pay.hide { display: none; }
+  .sp-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 2px; font-size: 15px; }
+  .sp-row .sp-k { color: var(--muted); font-weight: 700; }
+  .sp-row input {
+    width: 118px; text-align: right; padding: 9px 10px; border: 2px solid var(--line);
+    border-radius: 7px; font-size: 16px; font-weight: 800; color: var(--green-dark); background: #fff;
+  }
+  .sp-row input:focus { outline: none; border-color: var(--green); }
+  .sp-row em { font-style: normal; color: var(--muted); font-size: 14px; margin-left: 5px; }
+  .sp-row .sp-v { font-size: 16px; font-weight: 800; color: var(--blue-dark); }
+  .sp-row .sp-v.bad { color: var(--red); }
+  .sp-hint { font-size: 12px; color: var(--muted); padding: 2px 2px 0; }
+  .sp-hint.bad { color: var(--red); font-weight: 700; }
+  /* 반품 모달의 수단별 환불 입력 — 장바구니의 나눠받기와 같은 모양을 쓴다 */
+  .sp-row.total { border-top: 1px dashed var(--line); margin-top: 5px; padding-top: 9px; }
+  #mRefundCash, #mRefundTr { width: 130px; }
+  #mRefundTr { color: var(--blue-dark); }
+  #mRefundTr:focus { border-color: var(--blue-light); }
 
   .customer { padding: 0 14px 10px; }
   .customer.hide { display: none; }
@@ -672,6 +695,19 @@
       <div class="pay-methods">
         <button data-method="계좌이체" class="sel">💳 계좌이체</button>
         <button data-method="현금">💵 현금</button>
+        <button data-method="분할">🧾 나눠받기</button>
+      </div>
+
+      <div class="split-pay hide" id="splitWrap">
+        <div class="sp-row">
+          <span class="sp-k">💵 현금</span>
+          <span><input id="splitCash" type="text" inputmode="numeric" placeholder="0"><em>원</em></span>
+        </div>
+        <div class="sp-row">
+          <span class="sp-k">💳 계좌이체 <span class="dim">(자동)</span></span>
+          <span class="sp-v" id="splitTransfer">0원</span>
+        </div>
+        <div class="sp-hint" id="splitHint">현금으로 받은 금액을 적으면 나머지가 계좌이체로 잡힙니다.</div>
       </div>
 
       <div class="customer hide" id="discLabelWrap">
@@ -760,6 +796,7 @@
           <option value="">결제수단 전체</option>
           <option value="현금">현금</option>
           <option value="계좌이체">계좌이체</option>
+          <option value="분할">나눠받기</option>
         </select>
         <select id="fType">
           <option value="">판매+반품</option>
@@ -1190,6 +1227,34 @@ function currentDiscount() {
 }
 function payableAmount() { return cartTotal() - currentDiscount(); }
 
+/* ================= 분할결제 (현금 + 계좌이체) =================
+   입력받는 건 현금 금액 하나뿐이다. 계좌이체분은 받을 금액에서 빼서 자동으로 정해진다. */
+function splitCashInput() {
+  const raw = digits($('splitCash').value);
+  return raw === '' ? 0 : parseInt(raw, 10);
+}
+/* 둘 다 1원 이상이어야 '나눠받기'다 — 한쪽이 0이면 그냥 현금이거나 그냥 계좌이체 */
+function splitValid() {
+  const payable = payableAmount(), cash = splitCashInput();
+  return payable > 0 && cash > 0 && cash < payable;
+}
+function syncSplitField() {
+  const isSplit = payMethod === '분할';
+  $('splitWrap').classList.toggle('hide', !isSplit);
+  if (!isSplit) { $('splitCash').value = ''; return; }
+
+  const payable = payableAmount(), cash = splitCashInput(), rest = payable - cash;
+  const el = $('splitTransfer'), hint = $('splitHint');
+  el.textContent = won(Math.max(rest, 0));
+  el.classList.toggle('bad', rest < 0);
+
+  let msg = '현금으로 받은 금액을 적으면 나머지가 계좌이체로 잡힙니다.', bad = false;
+  if (cash > payable) { msg = `받을 금액(${won(payable)})보다 많습니다.`; bad = true; }
+  else if (cash > 0 && rest === 0) { msg = '전액 현금입니다 — 💵 현금을 고르세요.'; bad = true; }
+  hint.textContent = msg;
+  hint.classList.toggle('bad', bad);
+}
+
 function updateTotals() {
   const disc = currentDiscount();
   $('sumTotal').textContent = won(cartTotal());
@@ -1202,14 +1267,24 @@ function updateTotals() {
   const dw = $('discLabelWrap');
   dw.classList.toggle('hide', disc <= 0);
   if (disc <= 0) $('discLabel').value = '';
+
+  syncSplitField();   // 할인이 바뀌면 받을 금액이 바뀌므로 계좌이체분도 다시 계산한다
 }
 
-/* 고객 정보는 계좌이체일 때만 받는다 (현금은 입금자명이 없음) */
+/* 고객 정보는 계좌이체가 섞였을 때만 받는다 (현금만 받으면 입금자명이 없음) */
 function syncCustomerField() {
   const wrap = $('customerWrap');
-  const isTransfer = payMethod === '계좌이체';
-  wrap.classList.toggle('hide', !isTransfer);
-  if (!isTransfer) { $('customer').value = ''; $('phone').value = ''; $('address').value = ''; }
+  const hasTransfer = payMethod === '계좌이체' || payMethod === '분할';
+  wrap.classList.toggle('hide', !hasTransfer);
+  if (!hasTransfer) { $('customer').value = ''; $('phone').value = ''; $('address').value = ''; }
+}
+
+function selectPayMethod(m) {
+  payMethod = m;
+  document.querySelectorAll('.pay-methods button')
+    .forEach(b => b.classList.toggle('sel', b.dataset.method === m));
+  syncCustomerField();
+  syncSplitField();
 }
 
 /* ================= 장바구니 동작 ================= */
@@ -1236,7 +1311,10 @@ function clearCart() {
   $('address').value = '';
   $('discount').value = '';
   $('discLabel').value = '';
+  $('splitCash').value = '';
   $('contactExtra').classList.add('hide');
+  // 나눠받기 금액은 손님마다 다르다 — 다음 손님에게 그대로 남으면 안 되므로 되돌린다
+  if (payMethod === '분할') selectPayMethod('계좌이체');
   renderCart();
   closeSheet();
 }
@@ -1250,10 +1328,22 @@ function checkout() {
   const discPct = discountMode === 'percent' ? discountPct() : null;
   const payable = total - discount;
   const received = payable;   // 받을 금액 = 받은 금액
-  const isTransfer = payMethod === '계좌이체';
-  const customer = isTransfer ? $('customer').value.trim() : '';
-  const phone    = isTransfer ? $('phone').value.trim() : '';
-  const address  = isTransfer ? $('address').value.trim() : '';
+
+  // 나눠받기는 현금·계좌이체가 둘 다 1원 이상일 때만 성립한다
+  const isSplit = payMethod === '분할';
+  if (isSplit && !splitValid()) {
+    toast(splitCashInput() <= 0
+      ? '현금으로 받은 금액을 입력하세요.'
+      : `현금 금액은 받을 금액(${won(payable)})보다 적어야 합니다.`, 'bad');
+    $('splitCash').focus();
+    return;
+  }
+  const split = isSplit ? { cash: splitCashInput(), transfer: payable - splitCashInput() } : null;
+
+  const hasTransfer = payMethod === '계좌이체' || isSplit;
+  const customer = hasTransfer ? $('customer').value.trim() : '';
+  const phone    = hasTransfer ? $('phone').value.trim() : '';
+  const address  = hasTransfer ? $('address').value.trim() : '';
   // 할인 종류: 비워두면 그냥 '할인' → 시트에는 계좌이체(할인) / 계좌이체(지역할인) 로 기록
   const discLabel = discount > 0 ? ($('discLabel').value.trim() || '할인') : null;
 
@@ -1279,6 +1369,7 @@ function checkout() {
     total, discount, discountPct: discPct, payable, received,
     diff: 0,
     method: payMethod,
+    split,
     discountLabel: discLabel,
     customer: customer || null,
     phone: phone || null,
@@ -1295,8 +1386,83 @@ function checkout() {
     before: l.book.stock, after: l.book.stock - l.qty, txId: txRef.id,
   })));
 
-  toast(`결제 완료 · ${won(received)} (${payMethod}${customer ? ' · ' + customer : ''})`, 'good');
+  const methodText = split
+    ? `현금 ${won(split.cash)} · 계좌이체 ${won(split.transfer)}`
+    : payMethod;
+  toast(`결제 완료 · ${won(received)} (${methodText}${customer ? ' · ' + customer : ''})`, 'good');
   clearCart();
+}
+
+/* ================= 분할결제 나누기 =================
+   분할결제 1건을 '현금 거래 · 계좌이체 거래' 두 건처럼 보이게 가른다.
+   통계·재고 권수·시트 기록이 전부 이 함수 하나를 거치므로 어디서 세어도 숫자가 같다.
+
+   가르는 기준은 '권'이다 — 금액 비율에 가장 가까운 권수로 자르고, 각 몫 안에서
+   금액은 netAmounts 가 정가 비율대로 나눠 담는다. 그래서 수량 합과 금액 합이
+   원래 거래와 정확히 일치한다. 단가가 조금 어긋나는 건 할인 걸었을 때 이미 하고 있는
+   방식(할인 반영 단가를 출고단가에 적기)과 같은 원칙이라 시트에서 어색하지 않다. */
+function isSplitTx(t) {
+  return !!(t && t.split && t.split.cash && t.split.transfer);
+}
+function splitParts(t) {
+  const items = (t.items || []).filter(i => i.qty);
+  const { cash, transfer } = t.split;
+  const sgn = (cash + transfer) < 0 ? -1 : 1;          // 반품이면 양쪽 다 음수
+  const totalQty = items.reduce((s, i) => s + Math.abs(i.qty), 0);
+  const ratio = Math.abs(cash) / (Math.abs(cash) + Math.abs(transfer));
+
+  let cashQty = Math.round(totalQty * ratio);
+  // 책이 두 권 이상이면 양쪽 최소 한 권씩 — 0권짜리 줄은 만들지 않는다
+  if (totalQty >= 2) cashQty = Math.min(Math.max(cashQty, 1), totalQty - 1);
+  else cashQty = Math.min(Math.max(cashQty, 0), totalQty);
+
+  const cashItems = [], trItems = [];
+  let need = cashQty;
+  items.forEach(i => {
+    const q = Math.abs(i.qty), take = Math.min(q, need);
+    need -= take;
+    const cut = n => ({ ...i, qty: sgn * n, amount: sgn * i.price * n });
+    if (take > 0) cashItems.push(cut(take));
+    if (q - take > 0) trItems.push(cut(q - take));
+  });
+  /* 책이 한 권뿐이라 권으로 못 가르는 경우 — 빈 쪽은 0권 줄로 두고 금액만 싣는다.
+     시트에서 돈이 사라지지 않게 하려는 것이므로, 정가를 세는 통계는 placeholder 를 건너뛴다
+     (반대쪽 줄이 이미 그 책의 정가를 통째로 들고 있다). */
+  const fill = (list, amount) => list.length ? list
+    : [{ ...(items[0] || { title: '', category: '', price: 0 }), qty: 0, amount, placeholder: true }];
+  const part = (list, amount, method, qty) => ({
+    ...t, items: list, qty, received: amount, method, split: null,
+    total: list.reduce((s, i) => s + i.amount, 0),
+  });
+  return [
+    part(fill(cashItems, cash), cash, '현금', sgn * cashQty),
+    part(fill(trItems, transfer), transfer, '계좌이체', sgn * (totalQty - cashQty)),
+  ];
+}
+/* 통계용 — 분할결제면 두 몫으로, 아니면 그대로 한 건. 같은 거래를 여러 번 세므로 캐시한다. */
+const _splitCache = new WeakMap();
+function payParts(t) {
+  if (!isSplitTx(t)) return [t];
+  let p = _splitCache.get(t);
+  if (!p) { p = splitParts(t); _splitCache.set(t, p); }
+  return p;
+}
+/* 화면에 결제수단을 보여줄 때 쓰는 요약 (분할이면 두 줄) */
+function methodPills(t) {
+  if (!isSplitTx(t)) {
+    const cls = t.method === '현금' ? 'cash' : 'transfer';
+    return `<span class="pill ${cls}">${esc(t.method || '')}</span>`;
+  }
+  const c = Math.abs(t.split.cash), tr = Math.abs(t.split.transfer);
+  return `<div class="pay-lines">
+    <span class="pill cash">현금 ${won(c)}</span>
+    <span class="pill transfer">이체 ${won(tr)}</span>
+  </div>`;
+}
+/* 모달·안내문에 쓰는 글자 형태 */
+function methodText(t) {
+  if (!isSplitTx(t)) return t.method || '';
+  return `현금 ${won(Math.abs(t.split.cash))} · 계좌이체 ${won(Math.abs(t.split.transfer))}`;
 }
 
 /* ================= 재고 화면 ================= */
@@ -1305,13 +1471,13 @@ function checkout() {
 function payBreakdown(book, txList = transactions) {
   const cat = catOf(book);
   let cash = 0, transfer = 0;
-  txList.forEach(t => {
+  txList.forEach(tx => payParts(tx).forEach(t => {
     (t.items || []).forEach(i => {
       if (i.title !== book.title) return;
       if (CATS.includes(i.category) && i.category !== cat) return;
       if (t.method === '현금') cash += i.qty; else transfer += i.qty;
     });
-  });
+  }));
   return { cash, transfer };
 }
 function renderInventory() {
@@ -1397,7 +1563,9 @@ function salesFilter() {
 function filteredTransactions() {
   const f = salesFilter();
   return transactions.filter(t => {
-    if (f.method && t.method !== f.method) return false;
+    // 분할결제는 현금으로 걸러도, 계좌이체로 걸러도 나와야 한다 (둘 다 들어 있으므로)
+    if (f.method === '분할') { if (!isSplitTx(t)) return false; }
+    else if (f.method && !payParts(t).some(p => p.method === f.method)) return false;
     if (f.type === 'sale' && t.type === 'return') return false;
     if (f.type === 'return' && t.type !== 'return') return false;
 
@@ -1410,6 +1578,7 @@ function filteredTransactions() {
         ...(t.items || []).map(i => i.title),
         t.customer || '',
         t.method || '',
+        ...(isSplitTx(t) ? ['현금', '계좌이체', '나눠받기'] : []),
       ].join(' ').toLowerCase();
       if (!hay.includes(f.q)) return false;
     }
@@ -1443,8 +1612,6 @@ function renderSales() {
     const isReturn = t.type === 'return';
     const desc = (isReturn ? '↩ [반품] ' : '') +
       (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
-    const methodCls = t.method === '현금' ? 'cash' : 'transfer';
-
     let manage;
     if (isReturn) manage = '<span class="pill diff">반품</span>';
     else {
@@ -1468,7 +1635,7 @@ function renderSales() {
       <td class="num" data-label="정가 합계">${won(t.total)}</td>
       <td class="num" data-label="할인">${t.discount ? '−' + won(t.discount) + (t.discountPct ? ` (${t.discountPct}%)` : '') : '-'}</td>
       <td class="num" data-label="결제 금액"><b>${won(t.received)}</b></td>
-      <td class="center" data-label="결제수단"><span class="pill ${methodCls}">${esc(t.method)}</span></td>
+      <td class="center" data-label="결제수단">${methodPills(t)}</td>
       <td class="center" data-label="관리">${manage}</td>`;
     const rbtn = tr.querySelector('[data-a=return]');
     if (rbtn) rbtn.onclick = () => returnModal(t);
@@ -1528,10 +1695,10 @@ function sessionStats() {
   const list = sessionTx();
   const returns = list.filter(t => t.type === 'return');
   const byMethod = {};
-  list.forEach(t => {
+  list.forEach(tx => payParts(tx).forEach(t => {
     const k = t.method || '기타';
     byMethod[k] = (byMethod[k] || 0) + t.received;
-  });
+  }));
   return {
     revenue: list.reduce((s, t) => s + t.received, 0),
     saleCount: list.length - returns.length,
@@ -1738,7 +1905,9 @@ function renderReport() {
   list.forEach(t => {
     revenue += t.received; qty += t.qty; disc += (t.discount || 0);
     if (t.type === 'return') refund += -t.received; else count++;
-    if (t.method === '현금') cash += t.received; else transfer += t.received;
+    payParts(t).forEach(p => {
+      if (p.method === '현금') cash += p.received; else transfer += p.received;
+    });
   });
 
   $('rLabel').textContent = `${label} 매출 (실수령)`;
@@ -1837,15 +2006,16 @@ function renderRank(list) {
   const shared = sharedTitles();
   // 제목이 같고 분류만 다른 책은 서로 다른 책이므로 순위도 따로 잡는다
   const map = new Map();
-  list.forEach(t => {
+  list.forEach(tx => payParts(tx).forEach(t => {
     (t.items || []).forEach(i => {
+      if (i.placeholder) return;   // 분할결제에서 금액만 옮겨 담은 0권 줄
       const k = bookKey(i.title, i.category);
       const r = map.get(k) || { title: i.title, category: i.category, qty: 0, amount: 0, cash: 0, transfer: 0 };
       r.qty += i.qty; r.amount += i.amount;
       if (t.method === '현금') r.cash += i.qty; else r.transfer += i.qty;
       map.set(k, r);
     });
-  });
+  }));
   const rows = [...map.values()]
     .map(r => [r.title + (isSharedTitle(shared, r.title) && r.category ? ` [${r.category}]` : ''), r])
     .sort((a, b) => b[1].qty - a[1].qty);
@@ -1877,7 +2047,7 @@ function deleteTxModal(t) {
     <h3>기록 삭제</h3>
     <div class="warn-box">
       <b>${fmtDateTime(t.time)}</b><br>${desc}<br>
-      ${esc(t.method || '')} · <b>${won(t.received)}</b>${t.customer ? ' · ' + esc(t.customer) : ''}
+      ${esc(methodText(t))} · <b>${won(t.received)}</b>${t.customer ? ' · ' + esc(t.customer) : ''}
       <br><br>이 기록을 <b>없던 일로</b> 만듭니다. 되돌릴 수 없습니다.
     </div>
     <label class="chkline"><input type="checkbox" id="dStock"> 재고도 함께 되돌리기
@@ -1967,6 +2137,8 @@ function netAmounts(t) {
    Apps Script 쪽이 머리글 이름으로 열을 찾으므로 위치가 아니라 이름을 붙여 보낸다.
    날짜는 YYYY-MM-DD 로 보내고 시트에서 진짜 날짜로 바꾼다 — 월별 피벗이 글자로는 안 묶인다. */
 function sheetRecords(t) {
+  // 분할결제는 현금 몫 · 계좌이체 몫으로 갈라 각각 줄을 만든다 (결제방식 열이 섞이지 않게)
+  if (isSplitTx(t)) return payParts(t).flatMap(p => sheetRecords(p));
   const items = t.items || [];
   const nets = netAmounts(t);
   const date = ymd(new Date(t.time)), method = sheetMethod(t), isReturn = t.type === 'return';
@@ -2022,7 +2194,7 @@ const QUEUE_KEY = 'sheetQueue';
 /* Apps Script 쪽 코드는 git push 로 배포되지 않는다 — 구글에서 따로 '새 버전' 배포를 해야 한다.
    그 단계를 잊으면 조용히 옛 코드가 돌기 때문에, 앱이 배포된 버전을 물어보고 알려준다.
    apps-script/Code.gs 를 고칠 때 MIRROR_VERSION 과 이 값을 같이 올린다. */
-const SHEET_MIRROR_VERSION = '2026-08-08b';
+const SHEET_MIRROR_VERSION = '2026-08-22a';
 let sheetMirrorVersion = null;      // 실제로 배포돼 있는 버전 (확인 전이면 null)
 
 const sheetMirrorStale = () =>
@@ -2482,7 +2654,7 @@ function returnPickerModal() {
     return `<div class="pick-row" data-id="${t.id}">
       <div>
         <div class="ret-title">${desc}${partial}</div>
-        <div class="ret-sub">${fmtDateTime(t.time)} · ${won(t.received)} · ${esc(t.method)}${t.customer ? ' · ' + esc(t.customer) : ''}</div>
+        <div class="ret-sub">${fmtDateTime(t.time)} · ${won(t.received)} · ${esc(methodText(t))}${t.customer ? ' · ' + esc(t.customer) : ''}</div>
       </div>
       <button class="mini-btn del" data-a="pick">반품</button>
     </div>`;
@@ -2521,19 +2693,41 @@ function returnModal(t) {
     </div>`;
   }).join('');
 
+  /* 분할결제 건은 현금·계좌이체 환불액을 따로 직접 적는다.
+     (수량을 고르면 원래 받은 비율대로 채워 주고, 그대로 두든 고쳐 쓰든 자유) */
+  const isSplit = isSplitTx(t);
+  const refundField = isSplit ? `
+    <div class="field" style="margin-top:14px">
+      <label>환불 금액 (수단별로 실제 돌려줄 금액을 적으세요)</label>
+      <div class="sp-row">
+        <span class="sp-k">💵 현금</span>
+        <span><input id="mRefundCash" inputmode="numeric"><em>원</em></span>
+      </div>
+      <div class="sp-row">
+        <span class="sp-k">💳 계좌이체</span>
+        <span><input id="mRefundTr" inputmode="numeric"><em>원</em></span>
+      </div>
+      <div class="sp-row total">
+        <span class="sp-k">합계</span><span class="sp-v" id="mRefundSum">0원</span>
+      </div>
+      <div class="sp-hint" id="mRefundHint"></div>
+    </div>` : `
+    <div class="field" style="margin-top:14px">
+      <label>환불 금액 (실제 돌려줄 금액 · ${esc(methodText(t))})</label>
+      <input id="mRefund" inputmode="numeric">
+    </div>`;
+
   openModal(`
     <h3>반품 처리</h3>
     <p class="desc">반품할 책과 수량을 선택하세요.</p>
     <div class="ret-list">${rows}</div>
-    <div class="field" style="margin-top:14px">
-      <label>환불 금액 (실제 돌려줄 금액 · ${esc(t.method)})</label>
-      <input id="mRefund" inputmode="numeric">
-    </div>
+    ${refundField}
     <div class="modal-actions">
       <button class="btn ghost" id="mCancel">취소</button>
       <button class="btn solid-danger" id="mSave">반품 처리</button>
     </div>`);
 
+  // 수량이 바뀌면 환불액을 다시 채운다 (분할이면 원래 받은 비율대로 두 칸에 나눠서)
   const recalc = () => {
     let sum = 0;
     modal.querySelectorAll('.rq').forEach(inp => {
@@ -2542,7 +2736,14 @@ function returnModal(t) {
       inp.value = q;
       sum += q * (+inp.dataset.price);
     });
-    $('mRefund').value = sum.toLocaleString('ko-KR');
+    if (isSplit) {
+      const cash = Math.round(sum * t.split.cash / (t.split.cash + t.split.transfer));
+      $('mRefundCash').value = cash.toLocaleString('ko-KR');
+      $('mRefundTr').value = (sum - cash).toLocaleString('ko-KR');
+      syncRefundSum(t);
+    } else {
+      $('mRefund').value = sum.toLocaleString('ko-KR');
+    }
   };
   modal.querySelectorAll('.ret-row').forEach(row => {
     const inp = row.querySelector('.rq');
@@ -2550,13 +2751,46 @@ function returnModal(t) {
     row.querySelector('[data-a=inc]').onclick = () => { inp.value = (+inp.value || 0) + 1; recalc(); };
     inp.oninput = recalc;
   });
-  $('mRefund').addEventListener('input', e => {
+  const moneyInput = (id, after) => $(id).addEventListener('input', e => {
     const v = digits(e.target.value);
     e.target.value = v === '' ? '' : parseInt(v, 10).toLocaleString('ko-KR');
+    if (after) after();
   });
+  if (isSplit) {
+    moneyInput('mRefundCash', () => syncRefundSum(t));
+    moneyInput('mRefundTr', () => syncRefundSum(t));
+  } else {
+    moneyInput('mRefund');
+  }
   recalc();
   $('mCancel').onclick = closeModal;
   $('mSave').onclick = () => processReturn(t);
+}
+
+const refundInput = id => { const el = $(id); return el ? (parseInt(digits(el.value), 10) || 0) : 0; };
+
+/* 합계와 안내문을 새로 그린다. 원래 받은 금액보다 많이 돌려주려 하면 눈에 띄게 알려 준다
+   (막지는 않는다 — 여러 번 나눠 반품하는 경우가 있어 가게 판단에 맡긴다). */
+function syncRefundSum(t) {
+  const hint = $('mRefundHint');
+  if (!hint) return;
+  const cash = refundInput('mRefundCash'), tr = refundInput('mRefundTr');
+  $('mRefundSum').textContent = won(cash + tr);
+  const oc = Math.abs(t.split.cash), ot = Math.abs(t.split.transfer);
+  const over = cash > oc || tr > ot;
+  hint.textContent = over
+    ? `원래 받은 금액보다 많습니다 — 현금 ${won(oc)} · 계좌이체 ${won(ot)}`
+    : `원래 받은 금액 · 현금 ${won(oc)} · 계좌이체 ${won(ot)}`;
+  hint.classList.toggle('bad', over);
+}
+
+/* 반품 기록에 남길 결제수단 — 한쪽이 0원이면 나눌 게 없으니 남은 한쪽으로만 적는다. */
+function refundMethod(t, cash, transfer) {
+  if (!isSplitTx(t)) return { method: t.method, split: null };
+  if (cash > 0 && transfer > 0) return { method: '분할', split: { cash: -cash, transfer: -transfer } };
+  if (cash > 0) return { method: '현금', split: null };
+  if (transfer > 0) return { method: '계좌이체', split: null };
+  return { method: t.method, split: null };
 }
 
 function processReturn(t) {
@@ -2575,7 +2809,9 @@ function processReturn(t) {
   });
   if (items.length === 0) { toast('반품할 수량을 선택하세요.', 'bad'); return; }
   if (!requireOpen('반품')) { closeModal(); return; }
-  const refund = parseInt(digits($('mRefund').value), 10) || 0;
+  // 분할결제 건은 수단별로 따로 적은 금액을 더한 게 총 환불액이다
+  const cashRefund = refundInput('mRefundCash'), trRefund = refundInput('mRefundTr');
+  const refund = isSplitTx(t) ? cashRefund + trRefund : refundInput('mRefund');
   const remainingAfter = remainingReturnable(t) - qtySum;
 
   const retRef = doc(txCol);
@@ -2592,7 +2828,7 @@ function processReturn(t) {
   const retData = {
     time: new Date().toISOString(), type: 'return', refId: t.id,
     items, qty: -qtySum, total: -totalSum, received: -refund,
-    diff: (-refund) - (-totalSum), method: t.method,
+    diff: (-refund) - (-totalSum), ...refundMethod(t, cashRefund, trRefund),
     // 원래 결제한 고객·할인 종류를 그대로 이어받는다 (시트에 같은 형식으로 남기기 위해)
     discountLabel: t.discountLabel || null,
     customer: t.customer || null,
@@ -2606,7 +2842,9 @@ function processReturn(t) {
   queueForSheet('tx:' + retRef.id, 'sale', sheetRecords(retData));
 
   closeModal();
-  toast(`반품 완료 · ${won(refund)} 차감`, 'good');
+  const how = (isSplitTx(t) && cashRefund > 0 && trRefund > 0)
+    ? ` (현금 ${won(cashRefund)} · 계좌이체 ${won(trRefund)})` : '';
+  toast(`반품 완료 · ${won(refund)} 차감${how}`, 'good');
 }
 
 /* ================= 설정 ================= */
@@ -3053,11 +3291,14 @@ document.querySelectorAll('.tabs button').forEach(btn => {
 });
 document.querySelectorAll('.pay-methods button').forEach(btn => {
   btn.onclick = () => {
-    document.querySelectorAll('.pay-methods button').forEach(b => b.classList.remove('sel'));
-    btn.classList.add('sel');
-    payMethod = btn.dataset.method;
-    syncCustomerField();
+    selectPayMethod(btn.dataset.method);
+    if (btn.dataset.method === '분할') $('splitCash').focus();
   };
+});
+$('splitCash').addEventListener('input', e => {
+  const v = digits(e.target.value);
+  e.target.value = v === '' ? '' : parseInt(v, 10).toLocaleString('ko-KR');
+  syncSplitField();
 });
 $('discount').addEventListener('input', e => {
   if (discountMode === 'percent') {

@@ -3,6 +3,8 @@
  * ---------------------------------------------------------------------------
  * 앱에서 판매·반품·입고가 저장되면 이 웹앱으로 보내고, 여기서 기존 시트의
  * 계좌이체모음 / 현금모음 / 입고모음 탭 맨 아래에 줄을 덧붙인다.
+ * 탭은 거래가 아니라 '줄'의 결제수단으로 정한다 — 분할결제(현금+계좌이체) 한 건은
+ * 현금 줄과 계좌이체 줄로 갈려서 두 탭에 나뉘어 들어간다.
  * 택배비 줄은 결제수단 탭에 적은 뒤 택배비모음 탭에도 한 번 더 적는다.
  * 앱에서 기록을 지우면 시트의 그 줄도 지운다 (숨김 `기록ID` 열로 찾는다).
  * 반대로 단가·안전재고는 앱이 재고관리 탭에서 읽어 갈 수 있다.
@@ -27,7 +29,7 @@
 /* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
    앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
    주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
-var MIRROR_VERSION = '2026-08-08b';
+var MIRROR_VERSION = '2026-08-22a';
 
 // ── 실제 탭 이름 (2026-08-08 시트에서 확인) ─────────────────────────────
 // 탭 이름을 시트에서 바꿨다면 `탭이름_확인` 을 실행해 여기에 옮겨 적으세요.
@@ -125,16 +127,17 @@ function writeItems(ss, items) {
   items.forEach(function (item) {
     if (!item || !item.key) return;
     if (sent[item.key]) { skipped++; return; }   // 이미 보낸 거래 — 다시 안 적는다
-    var tab = tabFor(item);
-    if (!tab) return;
     var records = item.records || [];
-    bucket(buckets, tab, item.key, records);
+    var byTab = groupByTab(item, records);
+    Object.keys(byTab).forEach(function (tab) {
+      bucket(buckets, tab, item.key, byTab[tab]);
 
-    // 택배비 줄은 결제수단 탭에 적은 뒤 '택배비모음' 탭에도 같은 줄을 한 번 더 적는다.
-    // (그동안 손으로 두 곳에 적어 온 방식 그대로)
-    if (TABS.택배비 && tab !== TABS.택배비) {
-      bucket(buckets, TABS.택배비, item.key, records.filter(isDeliveryFee));
-    }
+      // 택배비 줄은 결제수단 탭에 적은 뒤 '택배비모음' 탭에도 같은 줄을 한 번 더 적는다.
+      // (그동안 손으로 두 곳에 적어 온 방식 그대로)
+      if (TABS.택배비 && tab !== TABS.택배비) {
+        bucket(buckets, TABS.택배비, item.key, byTab[tab].filter(isDeliveryFee));
+      }
+    });
     newKeys.push(item.key);
     sent[item.key] = true;
   });
@@ -160,10 +163,23 @@ function isDeliveryFee(rec) {
          String(rec.제품명 || '').indexOf('택배비') !== -1;
 }
 
+/* 줄마다 갈 탭을 정해 묶는다.
+   분할결제는 한 거래 안에 현금 줄과 계좌이체 줄이 같이 들어오므로
+   거래 단위가 아니라 '줄 단위'로 탭을 정해야 한다. */
+function groupByTab(item, records) {
+  var out = {};
+  records.forEach(function (rec) {
+    var tab = tabForRecord(item, rec);
+    if (!tab) return;
+    (out[tab] = out[tab] || []).push(rec);
+  });
+  return out;
+}
+
 // 판매·반품은 결제수단에 따라 계좌이체/현금 탭으로, 입고는 입고 탭으로 간다
-function tabFor(item) {
+function tabForRecord(item, rec) {
   if (item.type === 'stock') return TABS.입고;
-  var pay = String((item.records && item.records[0] && item.records[0].결제) || '');
+  var pay = String((rec && rec.결제) || '');
   if (pay.indexOf('현금') === 0) return TABS.현금;
   if (pay.indexOf('계좌이체') === 0) return TABS.계좌이체;
   return TABS.계좌이체;   // 결제수단이 비어 있으면 계좌이체 탭으로 모은다

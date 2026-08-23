@@ -6,3 +6,8 @@ Thumbs.db
 # 로컬 원본 이미지 (참고용, 배포 불필요)
 easypos_*.jpg
 이지포스_*.png
+
+# 제품·디자인 기록 (운영자 이름과 시트 구조가 들어 있어 공개 저장소에 올리지 않는다)
+PRODUCT.md
+DESIGN.md
+.impeccable/

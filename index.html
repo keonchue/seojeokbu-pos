@@ -2220,22 +2220,30 @@ function netAmounts(t) {
 }
 /* 거래 1건 → 시트 줄 여러 개 (품목당 하나). CSV 내보내기와 시트 미러가 함께 쓴다.
    Apps Script 쪽이 머리글 이름으로 열을 찾으므로 위치가 아니라 이름을 붙여 보낸다.
-   날짜는 YYYY-MM-DD 로 보내고 시트에서 진짜 날짜로 바꾼다 — 월별 피벗이 글자로는 안 묶인다. */
+   날짜는 YYYY-MM-DD 로 보내고 시트에서 진짜 날짜로 바꾼다 — 월별 피벗이 글자로는 안 묶인다.
+
+   구분·부호는 원장(입출고기록)의 관습을 그대로 따른다. 재고관리의 현재재고가
+     SUMIFS(수량, 구분="입고") - SUMIFS(수량, 구분="출고*")
+   라서, 반품을 '반품'으로 적으면 어느 쪽에도 안 걸려 재고가 되돌아가지 않는다.
+   시트에 손으로 적어 온 방식대로 **반품은 구분 '입고' · 수량 양수 · 금액 음수**로 적는다. */
 function sheetRecords(t) {
   // 분할결제는 현금 몫 · 계좌이체 몫으로 갈라 각각 줄을 만든다 (결제방식 열이 섞이지 않게)
   if (isSplitTx(t)) return payParts(t).flatMap(p => sheetRecords(p));
   const items = t.items || [];
   const nets = netAmounts(t);
-  const date = ymd(new Date(t.time)), method = sheetMethod(t), isReturn = t.type === 'return';
+  const date = ymd(new Date(t.time)), isReturn = t.type === 'return';
+  // 환불 줄의 결제방식은 '현금 환불' 처럼 수단 + 환불 (할인 종류는 원 거래에만 붙인다)
+  const method = isReturn ? `${t.method || ''} 환불`.trim() : sheetMethod(t);
   return items.map((i, idx) => {
-    const amount = nets[idx];
-    const unit = i.qty ? Math.round((amount / i.qty) * 100) / 100 : 0;
+    const amount = nets[idx];                      // 반품이면 음수
+    const qty = Math.abs(i.qty);                   // 수량은 언제나 양수
+    const unit = qty ? Math.round((amount / qty) * 100) / 100 : 0;
     const cat = CATS.includes(i.category) ? i.category : catForTitle(i.title);
     return {
       날짜: date,
       제품명: `[${cat}] ${i.title}`,
-      구분: isReturn ? '반품' : (String(i.title).includes('택배비') ? '택배비' : '출고'),
-      수량: i.qty,
+      구분: isReturn ? '입고' : (String(i.title).includes('택배비') ? '택배비' : '출고'),
+      수량: qty,
       출고단가: unit,
       출고금액: amount,
       결제: method,
@@ -2245,7 +2253,7 @@ function sheetRecords(t) {
     };
   });
 }
-/* 입고(매입) 1건 → 입고 탭 한 줄 */
+/* 입고(매입) 1건 → 원장 한 줄 (거래처는 고객명 칸에 적는 게 시트 관습) */
 function stockRecord({ title, category, qty, cost, supplier, time }) {
   return {
     날짜: ymd(new Date(time)),
@@ -2257,6 +2265,26 @@ function stockRecord({ title, category, qty, cost, supplier, time }) {
     고객: supplier || '',
   };
 }
+/* 재고 조정(실사·분실·신규 등록의 초기 재고) 1건 → 원장 한 줄.
+   시트에 손으로 적어 온 모양 그대로: 늘면 '입고', 줄면 '출고', 금액은 비우고
+   결제방식 칸에 '재고조정'. 이 줄이 있어야 시트 현재재고가 앱 재고를 따라온다.
+   (2026-08-31 이전에는 앱의 조정·초기재고가 시트로 아예 가지 않았다) */
+function adjustRecord({ title, category, delta, note, time }) {
+  return {
+    날짜: ymd(new Date(time)),
+    제품명: `[${CATS.includes(category) ? category : '기타'}] ${title}`,
+    구분: delta > 0 ? '입고' : '출고',
+    수량: Math.abs(delta),
+    결제: '재고조정',
+    고객: note || '',
+  };
+}
+/* 재고 조정 줄을 시트 큐에 넣는다. 조정은 거래 문서가 없어 키를 시각으로 만든다. */
+function queueAdjust(bookId, opts) {
+  if (!opts.delta) return;
+  const time = opts.time || new Date().toISOString();
+  queueForSheet(`adj:${bookId}:${time}`, 'adjust', [adjustRecord({ ...opts, time })]);
+}
 /* 시트 열 순서대로 늘어놓기 (CSV 전용 — 시트 미러는 이름을 그대로 쓴다) */
 const RECORD_TO_ROW = ['날짜', '제품명', '구분', '수량', '입고단가', '출고단가',
                        '입고금액', '출고금액', '결제', '고객', '연락처', '주소'];
@@ -2266,7 +2294,10 @@ function sheetRows(t) {
 }
 
 /* ================= 구글 시트 미러 =================
-   판매·반품·입고를 기존 스프레드시트에도 덧붙인다.
+   판매·반품·입고·재고조정을 기존 스프레드시트의 원장 '입출고기록' 에 덧붙인다.
+   계좌이체모음·현금모음·입고모음·택배비모음은 그 원장을 FILTER 로 걸러 보여 주는
+   화면일 뿐이라 앱이 직접 쓰면 안 된다 — 거기 쓴 줄은 재고·집계 어디에도 안 잡히고
+   FILTER 가 자랄 자리를 막아 탭을 통째로 #REF! 로 날린다.
    원칙: 이게 절대 결제를 막으면 안 된다.
    - 저장이 끝난 *뒤에* 큐에 넣고, 보내기는 따로 돈다.
    - 못 보내면 localStorage 에 남아 다음 기회(온라인 복귀·앱 재시작)에 다시 간다.
@@ -2279,7 +2310,7 @@ const QUEUE_KEY = 'sheetQueue';
 /* Apps Script 쪽 코드는 git push 로 배포되지 않는다 — 구글에서 따로 '새 버전' 배포를 해야 한다.
    그 단계를 잊으면 조용히 옛 코드가 돌기 때문에, 앱이 배포된 버전을 물어보고 알려준다.
    apps-script/Code.gs 를 고칠 때 MIRROR_VERSION 과 이 값을 같이 올린다. */
-const SHEET_MIRROR_VERSION = '2026-08-22a';
+const SHEET_MIRROR_VERSION = '2026-08-31a';
 let sheetMirrorVersion = null;      // 실제로 배포돼 있는 버전 (확인 전이면 null)
 
 const sheetMirrorStale = () =>
@@ -2335,6 +2366,22 @@ function queueSheetDelete(key) {
   flushSheet();
 }
 
+/* 시트에서 가져온 줄에 '앱이 가져갔음' 표시를 남긴다.
+   이게 남아야 같은 줄을 두 번 가져오지 않는다. 표시가 못 가면 큐에 남아 자동으로 재시도된다.
+   mark 는 시트에 줄을 더하는 게 아니라 기록ID 칸만 채우므로, 여러 번 보내도 결과가 같다. */
+function queueSheetMark(marks) {
+  if (!marks || !marks.length) return;
+  const q = sheetQueue();
+  marks.forEach(m => {
+    const key = `mark:${m.key}:${m.row}`;
+    if (q.some(x => x.key === key)) return;
+    q.push({ key, op: 'mark', mark: m });
+  });
+  setSheetQueue(q);
+  renderSheetBadge();
+  flushSheet();
+}
+
 async function loadSheetCfg() {
   try {
     const snap = await getDoc(doc(db, 'meta', 'sheet'));
@@ -2362,8 +2409,9 @@ async function flushSheet(loud = false) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         token: sheetCfg.token || '',
-        items: sending.filter(x => x.op !== 'delete'),
+        items: sending.filter(x => !x.op),
         deletes: sending.filter(x => x.op === 'delete').map(x => x.target),
+        marks: sending.filter(x => x.op === 'mark').map(x => x.mark),
       }),
     });
     const out = await res.json();
@@ -2374,6 +2422,7 @@ async function flushSheet(loud = false) {
     renderSheetBadge();
     if (loud) toast(`시트에 ${out.written}줄 기록했습니다.` +
                     (out.removed ? ` · ${out.removed}줄 지웠습니다.` : '') +
+                    (out.marked ? ` · ${out.marked}줄 표시했습니다.` : '') +
                     (out.skipped ? ` (${out.skipped}건은 이미 있음)` : ''), 'good');
   } catch (e) {
     console.error('시트 전송 실패 — 큐에 남겨 두고 다음에 다시 보냅니다', e);
@@ -2550,6 +2599,8 @@ function addBookModal() {
       createdAt: Date.now(),
     }).catch(e => { console.error(e); toast('등록 실패 · 연결 확인', 'bad'); });
     writeLogs([{ bookId: ref.id, title, reason: '등록', before: 0, after: stock, note: `판매가 ${price}원` }]);
+    // 초기 재고도 시트 원장에 남긴다 (안 그러면 시트에는 이 책이 0권으로 남는다)
+    queueAdjust(ref.id, { title, category: $('mCat').value, delta: stock, note: '신규 등록' });
     closeModal(); toast('새 책을 등록했습니다.', 'good');
   };
   setTimeout(() => $('mTitle').focus(), 60);
@@ -2645,7 +2696,11 @@ function editBookModal(b) {
     }).catch(e => { console.error(e); toast('저장 실패 · 연결 확인', 'bad'); });
 
     const logs = [];
-    if (stock !== b.stock) logs.push({ bookId: b.id, title, reason: '조정', before: b.stock, after: stock, note });
+    if (stock !== b.stock) {
+      logs.push({ bookId: b.id, title, reason: '조정', before: b.stock, after: stock, note });
+      // 손으로 한 조정도 시트 원장에 남겨야 시트 현재재고가 앱을 따라온다
+      queueAdjust(b.id, { title, category, delta: stock - b.stock, note: note || '앱에서 조정' });
+    }
     if (price !== b.price) logs.push({ bookId: b.id, title, reason: '가격변경', field: 'price', before: b.price, after: price, note });
     if (title !== b.title) logs.push({ bookId: b.id, title, reason: '이름변경', field: 'title', note: `${b.title} → ${title}` });
     if (category !== catOf(b)) logs.push({ bookId: b.id, title, reason: '분류변경', field: 'category', note: `${catOf(b)} → ${category}` });
@@ -2980,6 +3035,10 @@ function settingsModal() {
         <button class="btn ghost" id="sSheetCfg" style="flex:1">🔗 연동 설정</button>
         <button class="btn ghost" id="sSheetSend" style="flex:1">📤 지금 보내기</button>
       </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn ghost" id="sSheetPull" style="flex:1">📥 판매 가져오기</button>
+        <button class="btn ghost" id="sSheetStock" style="flex:1">🧮 재고 맞추기</button>
+      </div>
     </div>
 
     <div class="field">
@@ -3020,6 +3079,8 @@ function settingsModal() {
   $('sClosings').onclick = closingsModal;
   $('sSheetCfg').onclick = sheetConfigModal;
   $('sSheetSend').onclick = () => flushSheet(true);
+  $('sSheetPull').onclick = importSalesModal;
+  $('sSheetStock').onclick = syncStockModal;
   pingSheetMirror();   // 설정을 열 때마다 시트 쪽 버전을 다시 확인한다
   $('sReset').onclick = resetAll;
   renderSheetBadge();
@@ -3035,7 +3096,7 @@ function settingsModal() {
 }
 
 /* ================= 스프레드시트 → 앱 상품 일괄 반영 =================
-   기존 시트의 '재고현황' 탭(제품명 · 단가 · 안전재고 · 현재재고 · 상태)을
+   기존 시트의 '재고관리' 탭(제품명 · 단가 · 안전재고 · 현재재고 · 상태)을
    그대로 복사해 붙여넣으면 카테고리/판매가/안전재고/재고를 맞춰준다.
    제품명 앞의 [성경] 같은 대괄호는 카테고리로 떼어내고, 앱에는 순수 제목만 남긴다. */
 const stripCat = s => {
@@ -3068,16 +3129,22 @@ function parseSheetPaste(text) {
 
 /* 시트의 재고관리 탭을 그대로 읽어 온다 — 손으로 복사·붙여넣기 하는 수고를 덜기 위함.
    받은 것을 붙여넣기 칸에 채워 넣을 뿐, 반영 여부는 아래 미리보기를 거쳐 사람이 정한다. */
-async function fetchSheetBooks() {
+async function askSheet(body) {
   if (!sheetCfg || !sheetCfg.url) throw new Error('시트 연동이 아직 설정되지 않았습니다');
   const res = await fetch(sheetCfg.url, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ token: sheetCfg.token || '', action: 'books' }),
+    body: JSON.stringify({ token: sheetCfg.token || '', ...body }),
   });
   const out = await res.json();
   if (!out.ok) throw new Error(out.error || '시트가 거절했습니다');
-  return (out.books || [])
+  return out;
+}
+async function fetchSheetStock() {
+  return (await askSheet({ action: 'books' })).books || [];
+}
+async function fetchSheetBooks() {
+  return (await fetchSheetStock())
     .map(b => [b.제품명, b.단가, b.안전재고, b.현재재고].join('\t')).join('\n');
 }
 
@@ -3089,7 +3156,9 @@ function importSheetModal() {
       아래 버튼을 누르면 바로 읽어 오고, 연동 전이라면 네 열
       (<b>제품명 · 단가 · 안전재고 · 현재재고</b>)을 복사해 붙여넣어도 됩니다.<br>
       제목이 같은 책은 <b>덮어쓰고</b>, 시트에만 있는 책은 <b>새로 등록</b>합니다.<br>
-      앱에만 있고 시트에 없는 책은 <b>건드리지 않습니다.</b>
+      앱에만 있고 시트에 없는 책은 <b>건드리지 않습니다.</b><br>
+      여기서 바꾼 재고는 <b>시트로 되돌려 보내지 않습니다</b> — 시트에서 읽어 온 값이라
+      다시 보내면 같은 숫자가 두 번 도는 셈이 됩니다. 반대 방향은 <b>🧮 재고 맞추기</b>가 합니다.
     </div>
     <div class="field">
       <button class="btn ghost" id="iPull" style="width:100%">🔻 시트에서 바로 가져오기</button>
@@ -3261,6 +3330,313 @@ function importSheetModal() {
     }
   };
   setTimeout(() => paste.focus(), 60);
+}
+
+/* ================= 시트 재고 맞추기 (앱 → 시트) =================
+   시트의 현재재고는 원장(입출고기록)을 집계한 수식이라, 원장에 안 들어간 변동만큼 앱과 벌어진다.
+   2026-08-31 이전에는 앱의 재고 조정·신규 등록 초기재고가 시트로 아예 가지 않았고,
+   앱이 쓴 판매 줄도 원장이 아니라 화면 탭에 붙어 집계에서 빠져 있었다.
+   그 누적 차이를 '재고조정' 줄 한 줄씩으로 메워 두 숫자를 같은 자리에서 다시 출발시킨다. */
+function syncStockModal() {
+  openModal(`
+    <h3>🧮 시트 재고 맞추기</h3>
+    <div class="info-box">
+      시트 <b>재고관리</b> 탭의 현재재고와 앱 재고를 비교해, 차이만큼
+      원장에 <b>재고조정</b> 줄을 남깁니다. <b>앱 재고가 정답</b>이라고 보고 시트를 맞추는 것입니다.<br>
+      앱 재고는 건드리지 않습니다.
+    </div>
+    <div id="yState"><div class="info-box" style="margin:0">시트에서 읽는 중…</div></div>
+    <div id="yPreview"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">닫기</button>
+      <button class="btn primary" id="mSave" disabled>불러오는 중…</button>
+    </div>`, true);
+  $('mCancel').onclick = closeModal;
+  const save = $('mSave');
+
+  /* 아직 시트로 못 보낸 기록이 있으면 시트 재고는 그만큼 옛날 값이다.
+     그 상태로 맞추면 이미 보낸 판매를 조정 줄로 한 번 더 되돌리게 된다. */
+  const pending = sheetQueue().length;
+  if (pending) {
+    $('yState').innerHTML = `<div class="warn-box" style="margin:0">
+      시트로 <b>못 보낸 기록이 ${pending}건</b> 있습니다. 지금 시트 재고는 그만큼 옛날 값이라
+      맞추면 오히려 어긋납니다.<br>⚙ 설정에서 <b>📤 지금 보내기</b> 를 먼저 누르고 다시 오세요.</div>`;
+    save.textContent = '먼저 보내기';
+    return;
+  }
+
+  let gaps = [];
+  (async () => {
+    try {
+      const res = await askSheet({ action: 'books' });
+
+      /* 옛 미러가 화면 탭(계좌이체모음 등)에 붙여 둔 줄이 아직 남아 있으면,
+         그 줄들은 원장에 없어서 시트 현재재고에 안 잡혀 있다. 그 상태로 맞추면
+         조정 줄로 한 번 메우고, 나중에 `앱줄_원장으로_옮기기` 로 또 메워 두 번이 된다. */
+      if (res.stray) {
+        $('yState').innerHTML = `<div class="warn-box" style="margin:0">
+          화면 탭에 옛 미러가 직접 쓴 줄이 <b>${res.stray}개</b> 남아 있습니다.
+          그 줄이 원장에 들어가기 전에 맞추면 <b>두 번 보정</b>됩니다.<br>
+          Apps Script 편집기에서 <b>앱줄_원장으로_옮기기</b> 를 먼저 한 번 실행하세요.</div>`;
+        save.textContent = '먼저 옮기기';
+        return;
+      }
+
+      const rows = res.books || [];
+      // 시트 제품명은 '[분류] 제목' 이라 분류까지 보고 앱 책과 맞춘다 (제목이 겹치는 책이 있다)
+      const bySheet = new Map();
+      rows.forEach(r => {
+        const { cat, title } = stripCat(r.제품명);
+        bySheet.set(bookKey(title, cat), sheetNum(r.현재재고));
+      });
+
+      const missing = [];
+      gaps = [];
+      books.forEach(b => {
+        // 택배비는 재고 개념이 아니다. 원장에서 구분이 '택배비'라 시트 현재재고 수식이 세지 않으므로
+        // (입고도 출고도 아니다) 앱 재고와 영영 벌어진다 — 맞추려 들면 조정 줄만 계속 쌓인다.
+        if (String(b.title).includes('택배비')) return;
+        const k = bookKey(b.title, catOf(b));
+        if (!bySheet.has(k)) { missing.push(b.title); return; }
+        const sheetStock = bySheet.get(k);
+        if (sheetStock === null) return;               // 시트 쪽이 수식 오류 — 건너뛴다
+        const delta = (b.stock || 0) - sheetStock;
+        if (delta) gaps.push({ book: b, sheetStock, delta });
+      });
+
+      const up = gaps.filter(g => g.delta > 0), down = gaps.filter(g => g.delta < 0);
+      const lines = g => g.slice(0, 30).map(x =>
+        `${esc(x.book.title)} ${x.sheetStock}→${x.book.stock}`).join(', ') + (g.length > 30 ? ' …' : '');
+
+      $('yState').innerHTML = gaps.length === 0
+        ? '<div class="info-box" style="margin:0">시트 재고와 앱 재고가 <b>이미 같습니다.</b> 할 일이 없습니다.</div>'
+        : `<div class="info-box" style="margin:0">
+             차이가 있는 책 <b>${gaps.length}종</b> — 원장에 재고조정 줄 ${gaps.length}개를 남깁니다.<br>
+             ${up.length ? `시트를 <b>늘림</b> ${up.length}종<div class="sub" style="max-height:60px;overflow:auto">${lines(up)}</div>` : ''}
+             ${down.length ? `시트를 <b>줄임</b> ${down.length}종<div class="sub" style="max-height:60px;overflow:auto">${lines(down)}</div>` : ''}
+           </div>`;
+      $('yPreview').innerHTML = missing.length ? `<div class="warn-box" style="margin:10px 0 0">
+        <b>시트 재고관리 탭에 없는 앱 책 ${missing.length}종</b> — 시트에 그 책 줄이 없어 맞출 수 없습니다.
+        시트에 먼저 추가한 뒤 다시 실행하세요.
+        <div class="sub" style="max-height:60px;overflow:auto;color:inherit">${esc(missing.slice(0, 40).join(', '))}${missing.length > 40 ? ' …' : ''}</div></div>` : '';
+
+      save.disabled = gaps.length === 0;
+      save.textContent = gaps.length ? `${gaps.length}종 조정 줄 남기기` : '맞출 것 없음';
+    } catch (e) {
+      console.error('시트 재고 읽기 실패', e);
+      $('yState').innerHTML = `<div class="warn-box" style="margin:0">시트를 읽지 못했습니다 · ${esc(e.message || '연결 확인')}</div>`;
+      save.textContent = '실패';
+    }
+  })();
+
+  save.onclick = () => {
+    save.disabled = true; save.textContent = '보내는 중…';
+    const now = new Date().toISOString();
+    gaps.forEach(g => queueAdjust(g.book.id, {
+      title: g.book.title, category: catOf(g.book), delta: g.delta,
+      note: '앱 재고에 맞춤', time: now,
+    }));
+    closeModal();
+    toast(`${gaps.length}종의 조정 줄을 시트로 보냅니다.`, 'good');
+  };
+}
+
+/* ================= 시트에서 판매 가져오기 (시트 → 앱) =================
+   앱을 만든 뒤에도 며칠은 계산대에서 시트에 손으로 적었다. 그 매출이 앱에는 없다.
+   원장에서 '기록ID 가 빈 줄' = 손으로 적은 줄이므로, 기간을 정해 그것만 거래로 만들어 온다.
+   가져온 뒤에는 그 줄에 기록ID 를 찍어 두 번 가져오지 않게 한다.
+
+   흐름은 원래 앱 → 시트 한 방향이다. 이건 그 원칙의 예외가 아니라 '앱이 없던 며칠'을
+   메우는 일회성 도구다. 그래서 기간을 사람이 직접 정하고, 미리보기를 반드시 거친다. */
+const SHEET_PAY = /^\s*(현금|계좌이체)\s*(?:\(\s*([^)]*)\s*\))?\s*$/;
+
+function importSalesModal() {
+  /* 기본 기간: 앱의 첫 거래가 있는 **달의 1일** ~ 오늘.
+     '첫 거래 30일 전' 같은 기본값은 위험하다 — 앱을 쓰기 시작한 달 이전은 전부 손기록이라
+     기간을 조금만 넓혀도 옛 매출 수백 건이 딸려 온다 (2026-07에만 778줄). */
+  const first = transactions.length ? new Date(transactions[transactions.length - 1].time) : new Date();
+  const from = new Date(first.getFullYear(), first.getMonth(), 1);
+
+  openModal(`
+    <h3>📥 시트에서 판매 가져오기</h3>
+    <div class="info-box">
+      원장 <b>입출고기록</b>에서 <b>앱이 모르는 줄</b>(기록ID 가 빈 줄 = 손으로 적은 줄)만
+      찾아 앱의 매출 기록으로 만듭니다. 가져온 줄에는 표시를 남겨 <b>두 번 가져오지 않습니다.</b><br>
+      기간을 너무 넓게 잡으면 앱을 만들기 전의 옛 매출까지 딸려 옵니다.
+    </div>
+    <div class="field-row">
+      <div class="field"><label>시작 날짜</label><input type="date" id="pFrom" value="${ymd(from)}"></div>
+      <div class="field"><label>끝 날짜</label><input type="date" id="pTo" value="${ymd(new Date())}"></div>
+    </div>
+    <div class="field">
+      <button class="btn ghost" id="pFetch" style="width:100%">🔻 이 기간에서 찾아보기</button>
+    </div>
+    <div class="field">
+      <label class="chkline"><input type="checkbox" id="pStock"> 재고도 함께 차감
+        <span class="dim">(기본 꺼짐)</span></label>
+      <div class="info-box" style="margin:6px 0 0">
+        2026-08-10에 시트의 현재재고를 앱으로 이미 가져왔습니다. 그 며칠치 판매는
+        <b>앱 재고에 이미 반영돼 있어서</b>, 켜면 두 번 깎입니다.
+        재고가 아직 안 맞는 게 확실할 때만 켜세요.
+      </div>
+    </div>
+    <div id="pPreview"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn primary" id="mSave" disabled>먼저 찾아보기</button>
+    </div>`, true);
+
+  $('mCancel').onclick = closeModal;
+  const save = $('mSave');
+  let plan = null;
+
+  $('pFetch').onclick = async () => {
+    const btn = $('pFetch');
+    btn.disabled = true; btn.textContent = '시트에서 읽는 중…';
+    try {
+      const out = await askSheet({ action: 'rows', from: $('pFrom').value, to: $('pTo').value });
+      plan = planSheetImport(out.rows || []);
+      renderImportPreview(plan);
+    } catch (e) {
+      console.error('시트 줄 읽기 실패', e);
+      $('pPreview').innerHTML = `<div class="warn-box">읽지 못했습니다 · ${esc(e.message || '연결 확인')}</div>`;
+    } finally {
+      btn.disabled = false; btn.textContent = '🔻 이 기간에서 다시 찾아보기';
+    }
+  };
+
+  function renderImportPreview(p) {
+    const money = p.txs.reduce((s, t) => s + t.data.received, 0);
+    const skipLines = Object.entries(p.skipped)
+      .map(([why, n]) => `${esc(why)} ${n}줄`).join(' · ');
+    const days = p.txs.map(t => t.data.time.slice(0, 10)).sort();
+    // 앱을 쓰기 시작하기 훨씬 전까지 긁어 왔으면 사람이 알아채야 한다
+    const appFirst = transactions.length
+      ? new Date(transactions[transactions.length - 1].time).toISOString().slice(0, 10) : null;
+    const tooOld = appFirst && days.length && days[0] < appFirst.slice(0, 8) + '01';
+    $('pPreview').innerHTML = `
+      <div class="info-box" style="margin-top:10px">
+        가져올 판매 <b>${p.txs.length}건</b> · ${p.lines}줄 · 합계 <b>${won(money)}</b><br>
+        ${days.length ? `찾은 날짜 <b>${esc(days[0])}</b> ~ <b>${esc(days[days.length - 1])}</b><br>` : ''}
+        ${skipLines ? `가져오지 않는 줄: ${skipLines}` : '건너뛴 줄 없음'}
+      </div>
+      ${tooOld ? `<div class="warn-box" style="margin:10px 0 0">
+        <b>앱을 쓰기 시작한 달(${esc(appFirst.slice(0, 7))}) 이전 날짜까지 딸려 왔습니다.</b>
+        그 앞은 전부 손으로 적어 온 옛 매출이라 가져올 대상이 아닙니다 —
+        시작 날짜를 <b>${esc(appFirst.slice(0, 8) + '01')}</b> 로 좁히세요.</div>` : ''}
+      ${p.unknown.length ? `<div class="warn-box" style="margin:10px 0 0">
+        <b>앱에 없는 책 ${p.unknown.length}종</b> — 매출 금액은 그대로 들어가지만
+        재고·순위에는 잡히지 않습니다. 필요하면 먼저 📋 가져오기로 상품을 맞추세요.
+        <div class="sub" style="max-height:60px;overflow:auto;color:inherit">${esc(p.unknown.join(', '))}</div></div>` : ''}
+      ${p.txs.length ? `<div class="info-box" style="margin:10px 0 0;max-height:150px;overflow:auto">
+        ${p.txs.slice(0, 40).map(t => `${esc(t.data.time.slice(0, 10))} ·
+          ${esc(t.data.method)}${t.data.customer ? ' · ' + esc(t.data.customer) : ''} ·
+          ${t.data.qty}권 · ${won(t.data.received)}`).join('<br>')}
+        ${p.txs.length > 40 ? '<br>…' : ''}</div>` : ''}`;
+    save.disabled = p.txs.length === 0;
+    save.textContent = p.txs.length ? `${p.txs.length}건 가져오기` : '가져올 것 없음';
+  }
+
+  save.onclick = async () => {
+    const withStock = $('pStock').checked;
+    save.disabled = true; save.textContent = '가져오는 중…';
+    try {
+      const marks = [], logs = [];
+      await runBatched(plan.txs, (batch, t) => {
+        const ref = doc(txCol);
+        batch.set(ref, t.data);
+        t.rows.forEach(r => marks.push({
+          row: r.row, key: 'tx:' + ref.id,
+          날짜: r.날짜, 제품명: r.제품명, 수량: Number(r.수량) || 0,
+        }));
+        if (!withStock) return;
+        t.data.items.forEach(i => {
+          const b = findBook(i.title, i.category);
+          if (!b) return;
+          batch.update(doc(booksCol, b.id), { stock: increment(-i.qty), sold: increment(i.qty) });
+          logs.push({ bookId: b.id, title: b.title, reason: '판매',
+                      before: b.stock, after: b.stock - i.qty, txId: ref.id, note: '시트에서 가져옴' });
+        });
+      }, 100);
+      writeLogs(logs);
+      // 시트 줄에 '가져갔음' 표시 — 못 보내면 큐에 남아 자동으로 재시도된다
+      queueSheetMark(marks);
+      closeModal();
+      toast(`시트에서 ${plan.txs.length}건을 가져왔습니다.`, 'good');
+    } catch (e) {
+      console.error('시트 판매 가져오기 실패', e);
+      save.disabled = false; save.textContent = '다시 시도';
+      toast('가져오기 실패 · ' + (e.message || '연결 확인'), 'bad');
+    }
+  };
+}
+
+/* 원장 줄 목록 → 앱 거래 목록. 화면에 그대로 미리보기로 뿌리고, 승인하면 그대로 저장한다.
+   같은 날짜 · 같은 결제방식 · 같은 고객명이면 한 거래로 묶는다.
+   고객명이 없는 현금 줄은 누구 것인지 알 수 없어 줄마다 한 건으로 둔다
+   (합계는 어느 쪽이든 같고, 나누는 편이 남의 구매를 섞는 것보다 안전하다). */
+function planSheetImport(rows) {
+  const skipped = {}, groups = new Map(), unknown = new Set();
+  const skip = why => { skipped[why] = (skipped[why] || 0) + 1; };
+  let lines = 0;
+
+  rows.forEach(r => {
+    const kind = String(r.구분 || '').trim();
+    if (kind !== '출고' && kind !== '택배비') { skip(kind ? `${kind}(판매 아님)` : '구분 비어 있음'); return; }
+    const pay = SHEET_PAY.exec(String(r.결제 || ''));
+    if (!pay) { skip(r.결제 ? `${r.결제}(결제수단 아님)` : '결제방식 비어 있음'); return; }
+    const qty = Math.abs(Math.round(Number(r.수량) || 0));
+    const amount = Math.round(Number(r.출고금액) || 0);
+    if (!qty) { skip('수량 0'); return; }
+
+    const method = pay[1], label = (pay[2] || '').trim() || null;
+    const key = `${r.날짜}|${method}|${label || ''}|${r.고객 || ''}`;
+    // 고객명이 없으면 묶을 근거가 없다 — 줄마다 따로 둔다
+    const gk = r.고객 ? key : `${key}|#${r.row}`;
+    if (!groups.has(gk)) groups.set(gk, { method, label, rows: [] });
+    groups.get(gk).rows.push({ ...r, _qty: qty, _amount: amount });
+    lines++;
+  });
+
+  const txs = [];
+  groups.forEach(g => {
+    const items = g.rows.map(r => {
+      const { cat, title } = stripCat(r.제품명);
+      const b = findBook(title, cat);
+      if (!b) unknown.add(r.제품명);
+      // 정가는 앱의 판매가를 쓴다 — 할인액을 역산하려면 정가가 필요하기 때문.
+      // 앱에 없는 책은 받은 금액을 그대로 정가로 본다(할인 0).
+      const price = b ? b.price : (r._qty ? Math.round(r._amount / r._qty) : 0);
+      return { title, category: cat, qty: r._qty, price, amount: price * r._qty, _net: r._amount };
+    });
+    const total = items.reduce((s, i) => s + i.amount, 0);
+    const received = items.reduce((s, i) => s + i._net, 0);
+    const discount = Math.max(total - received, 0);
+    const head = g.rows[0];
+    txs.push({
+      rows: g.rows,
+      data: {
+        // 시트에는 시각이 없다. 그날 낮 12시로 두어 날짜가 시간대 때문에 밀리지 않게 한다
+        time: new Date(`${head.날짜}T12:00:00`).toISOString(),
+        items: items.map(({ _net, ...i }) => i),
+        qty: items.reduce((s, i) => s + i.qty, 0),
+        total, discount, discountPct: null, payable: total - discount, received,
+        // 앱의 판매가가 그 사이에 바뀌었으면 정가·받은 금액이 안 맞을 수 있다.
+        // 매출로 세는 건 언제나 received 이고, 어긋난 만큼은 diff 에 남는다.
+        diff: received - (total - discount),
+        method: g.method,
+        split: null,
+        discountLabel: discount > 0 ? (g.label || '할인') : null,
+        customer: head.고객 || null,
+        phone: head.연락처 || null,
+        address: head.주소 || null,
+        source: 'sheet',            // 시트에서 가져온 거래 — 다시 시트로 보내지 않는다
+      },
+    });
+  });
+
+  txs.sort((a, b) => a.data.time.localeCompare(b.data.time));
+  return { txs, lines, skipped, unknown: [...unknown] };
 }
 
 /* 웹앱 주소·토큰은 Firestore meta/sheet 에 저장한다.

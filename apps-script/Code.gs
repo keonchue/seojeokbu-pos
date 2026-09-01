@@ -62,7 +62,7 @@
 /* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
    앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
    주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
-var MIRROR_VERSION = '2026-09-01b';
+var MIRROR_VERSION = '2026-09-01c';
 
 // ── 원본 원장. 앱이 거래를 쓰는 곳은 여기 하나뿐이다 (새 책 줄만 재고관리에도) ──
 var LEDGER_TAB = '입출고기록';
@@ -264,7 +264,17 @@ function appendRecords(sheet, entries) {
   });
 
   var start = Math.max(lastFilledRow(sheet, h) + 1, h.row + 1);
-  sheet.getRange(start, 1, values.length, width).setValues(values);
+  var target = sheet.getRange(start, 1, values.length, width);
+  try {
+    target.setValues(values);
+  } catch (err) {
+    /* setValues 는 통째로 적용되지 않는다 — 데이터 확인 규칙에 걸리면
+       그 칸 앞까지는 이미 써진 채 멈춘다. 실제로 2026-09-01 에 원장 1690행이
+       날짜만 들어간 채 남았고, 사람 눈에는 그저 이상한 빈 줄로 보였다.
+       다음에 다시 보낼 거라 지우고 나가는 편이 장부가 깨끗하다. */
+    try { target.clearContent(); } catch (e) {}
+    throw err;
+  }
   return values.length;
 }
 
@@ -619,6 +629,12 @@ function addBooks(ss, books) {
   if (!books || !books.length) return { added: 0, skipped: 0, failed: failed };
 
   var sheet = sheetByName(ss, STOCK_TAB);
+
+  /* 원장 제품명 드롭다운이 '값 나열' 이면 먼저 '재고관리 목록 보기' 로 바꾼다.
+     이걸 안 해 두면 아래에서 줄을 아무리 잘 만들어도 원장이 그 이름을 거절한다.
+     실패해도 책 줄 만드는 건 계속한다 — 규칙을 손으로 풀어놓았을 수도 있기 때문. */
+  try { useStockListForNames(ss); } catch (e) { failed.push('제품명 규칙 — ' + (e.message || e)); }
+
   books.forEach(function (b) {
     var name = String((b && b.제품명) || '').trim();
     if (!name) return;
@@ -638,6 +654,10 @@ function addBooks(ss, books) {
       failed.push(name + ' — ' + (e.message || e));
     }
   });
+
+  /* 방금 만든 줄이 시트에 실제로 반영된 뒤에 원장을 건드려야 한다.
+     그렇지 않으면 드롭다운이 보는 목록에 이 책이 아직 없어 새 이름이 거절될 수 있다. */
+  if (added) SpreadsheetApp.flush();
   return { added: added, skipped: skipped, failed: failed };
 }
 
@@ -653,6 +673,16 @@ function addBooks(ss, books) {
    드롭다운도 그대로 남는다. 스크립트 편집기에서 한 번만 실행하면 된다. */
 function 제품명목록_재고관리를_보게하기() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  return useStockListForNames(ss)
+    ? '원장 제품명 규칙을 "' + STOCK_TAB + '" 목록 보기로 바꿨습니다. 이제 앱이 새 책을 등록하면 목록에 저절로 들어갑니다.'
+    : '이미 "' + STOCK_TAB + '" 목록을 보고 있어서 그대로 두었습니다.';
+}
+
+/* 원장 제품명 칸의 드롭다운을 `재고관리` 목록 참조로 바꿔 놓는다.
+   이미 그렇게 돼 있으면 아무것도 안 하고 false 를 돌려준다(몇 번을 불러도 안전).
+   책을 보내는 요청마다 자동으로 불린다 — 사람이 한 번 실행해 주기를 기다리면
+   그 전까지는 새 책 이름이 계속 거절된다. (2026-09-01 에 실제로 그래서 1690행이 반쪽만 썼다) */
+function useStockListForNames(ss) {
   var ledger = sheetByName(ss, LEDGER_TAB);
   var stock = sheetByName(ss, STOCK_TAB);
   var h = findHeader(ledger);
@@ -660,6 +690,8 @@ function 제품명목록_재고관리를_보게하기() {
   if (!sh) throw new Error('"' + STOCK_TAB + '" 탭에서 머리글을 찾지 못했습니다.');
 
   var nameCol = h.col.제품명;
+  if (namesAlreadyFromStock(ledger, h.row + 1, nameCol)) return false;
+
   var last = Math.max(ledger.getMaxRows(), h.row + 1);
   var src = stock.getRange(sh.row + 2, sh.at.제품명 + 1, stock.getMaxRows() - sh.row - 1, 1);
 
@@ -668,9 +700,20 @@ function 제품명목록_재고관리를_보게하기() {
     .setAllowInvalid(false)
     .build();
   ledger.getRange(h.row + 1, nameCol, last - h.row, 1).setDataValidation(rule);
+  return true;
+}
 
-  return '원장 제품명 규칙을 "' + STOCK_TAB + '" 목록 보기로 바꿨습니다 ('
-       + (last - h.row) + '줄). 이제 앱이 새 책을 등록하면 목록에 저절로 들어갑니다.';
+// 지금 규칙이 벌써 `재고관리` 열을 가리키는가. 값을 나열한 규칙이면 false.
+function namesAlreadyFromStock(ledger, firstRow, nameCol) {
+  var rule = ledger.getRange(firstRow, nameCol).getDataValidation();
+  if (!rule) return false;
+  if (rule.getCriteriaType() !== SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE) return false;
+  try {
+    var rng = rule.getCriteriaValues()[0];
+    return !!rng && rng.getSheet().getName() === STOCK_TAB;
+  } catch (e) {
+    return false;
+  }
 }
 
 /* ===================== 중복 방지 ===================== */

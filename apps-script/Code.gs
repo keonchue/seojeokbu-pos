@@ -17,9 +17,14 @@
  *  엑셀 피벗 캐시가 무한 열 참조를 못 담아서 그럴 뿐, 시트 쪽 설정은 B:I 다.
  *  2026-08-31 에 피벗 편집기로 직접 확인함 — 내보낸 파일만 보고 판단하지 말 것)
  *
- * 그래서 앱은 **원장에만** 적는다. 화면 탭에 직접 쓰면 그 줄은 원장에 없어서
+ * 그래서 앱은 거래를 **원장에만** 적는다. 화면 탭에 직접 쓰면 그 줄은 원장에 없어서
  * 재고·집계 어디에도 안 잡히고(고아 줄), FILTER 가 자랄 자리를 막아 탭 전체를
  * #REF! 로 날려 버린다. (2026-08-31 이전 코드가 실제로 그러고 있었다)
+ *
+ * 예외는 **새 책 등록**뿐이다(2026-09-01). `재고관리` 와 `안전재고관리` 는 FILTER 화면이
+ * 아니라 사람이 관리하는 기준정보 목록이고, 원장에 거래가 쌓여도 새 책 줄이 저절로
+ * 생기지는 않는다. 줄이 없으면 그 책은 현재재고·상태 판정에서 통째로 빠진다.
+ * 두 탭 다 가나다 순이라 맨 밑이 아니라 순서 맞는 자리에 끼워 넣는다 (`addBooks`).
  *
  * 원장의 표기 관습 — 이걸 따라야 위 수식이 맞는다:
  *   판매      구분 출고   수량 +n   출고단가·출고금액 양수   결제방식 현금 / 계좌이체(지역할인)
@@ -57,9 +62,9 @@
 /* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
    앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
    주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
-var MIRROR_VERSION = '2026-08-31a';
+var MIRROR_VERSION = '2026-09-01a';
 
-// ── 원본 원장. 앱이 쓰는 곳은 여기 하나뿐이다 ─────────────────────────────
+// ── 원본 원장. 앱이 거래를 쓰는 곳은 여기 하나뿐이다 (새 책 줄만 재고관리에도) ──
 var LEDGER_TAB = '입출고기록';
 
 /* 예전(2026-08-31 이전) 코드가 줄을 붙이던 화면 탭들.
@@ -121,8 +126,9 @@ function doPost(e) {
     var items = body.items || [];
     var deletes = body.deletes || [];
     var marks = body.marks || [];
-    if (!items.length && !deletes.length && !marks.length) {
-      return json({ ok: true, written: 0, skipped: 0, removed: 0, marked: 0 });
+    var books = body.books || [];
+    if (!items.length && !deletes.length && !marks.length && !books.length) {
+      return json({ ok: true, written: 0, skipped: 0, removed: 0, marked: 0, added: 0 });
     }
 
     return withLock(function (ss) {
@@ -132,6 +138,11 @@ function doPost(e) {
       out.marked = m.marked;
       if (m.mismatched.length) out.mismatched = m.mismatched;
       if (m.busy.length) out.busy = m.busy;
+      // 새 책은 기준정보 탭에도 한 줄 (원장 기록과 달리 실패해도 나머지는 그대로 간다)
+      var bk = addBooks(ss, books);
+      out.added = bk.added;
+      out.bookSkipped = bk.skipped;
+      if (bk.failed.length) out.bookErrors = bk.failed;
       return out;
     });
   } catch (err) {
@@ -427,6 +438,28 @@ function markRows(ss, marks) {
 
 var STOCK_TAB = '재고관리';
 
+/* 재고관리 탭의 머리글 줄과 열 자리를 찾는다 (읽기·쓰기가 같이 쓴다).
+   이 탭은 제품명 칸에 머리글이 없다. 그래서 '단가' 열을 찾고 그 왼쪽을 제품명으로 본다.
+   찾은 자리는 0부터 세는 번호다 — 시트에 넘길 때는 +1 할 것. */
+function stockHeader(sheet) {
+  var lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+  if (!lastRow || !lastCol) return null;
+  var grid = sheet.getRange(1, 1, lastRow, lastCol).getDisplayValues();
+
+  for (var r = 0; r < Math.min(HEADER_SCAN_ROWS, grid.length); r++) {
+    var cells = grid[r].map(function (v) { return String(v).trim(); });
+    var price = cells.indexOf('단가');
+    if (price < 1 || cells.indexOf('안전재고') === -1) continue;
+    return {
+      row: r, grid: grid, lastRow: lastRow, lastCol: lastCol,
+      at: { 제품명: price - 1, 단가: price,
+            안전재고: cells.indexOf('안전재고'), 현재재고: cells.indexOf('현재재고'),
+            상태: cells.indexOf('상태') },
+    };
+  }
+  return null;
+}
+
 function readStockTab(ss) {
   var sheet = ss.getSheetByName(STOCK_TAB);
   if (!sheet) return { ok: false, error: '"' + STOCK_TAB + '" 탭을 찾을 수 없습니다.' };
@@ -434,22 +467,11 @@ function readStockTab(ss) {
   var lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
   if (!lastRow || !lastCol) return { ok: false, error: '"' + STOCK_TAB + '" 탭이 비어 있습니다.' };
 
-  var grid = sheet.getRange(1, 1, lastRow, lastCol).getDisplayValues();
-
-  // 이 탭은 제품명 칸에 머리글이 없다. 그래서 '단가' 열을 찾고 그 왼쪽을 제품명으로 본다.
-  var head = -1, at = null;
-  for (var r = 0; r < Math.min(HEADER_SCAN_ROWS, grid.length); r++) {
-    var cells = grid[r].map(function (v) { return String(v).trim(); });
-    var price = cells.indexOf('단가');
-    if (price < 1 || cells.indexOf('안전재고') === -1) continue;
-    head = r;
-    at = { 제품명: price - 1, 단가: price,
-           안전재고: cells.indexOf('안전재고'), 현재재고: cells.indexOf('현재재고') };
-    break;
-  }
-  if (head === -1) {
+  var h = stockHeader(sheet);
+  if (!h) {
     return { ok: false, error: '"' + STOCK_TAB + '" 탭에서 단가·안전재고 머리글을 찾지 못했습니다.' };
   }
+  var grid = h.grid, head = h.row, at = h.at;
 
   // 수식이 만든 #N/A 같은 오류값은 빈칸으로 넘긴다 (앱에서 '건드리지 않음'으로 해석된다)
   var books = [];
@@ -483,6 +505,137 @@ function countStrayRows(ss) {
          .getValues().forEach(function (r) { if (String(r[0]).trim()) n++; });
   });
   return n;
+}
+
+/* ===================== 앱 → 시트 (새 책을 기준정보에 추가) =====================
+   원장과 달리 `재고관리` 는 사람이 관리하는 목록이고 **가나다 순으로 정렬돼 있다.**
+   그래서 맨 밑에 붙이지 않고 순서에 맞는 자리에 끼워 넣는다.
+   안전재고·현재재고·상태는 줄마다 같은 수식이고 A열만 상대참조로 다르다. 그래서 수식을
+   여기서 지어내지 않고 **이웃 줄에서 복사해 온다** — 나중에 시트에서 수식을 고쳐도
+   이 코드를 같이 고칠 필요가 없다. */
+var SAFETY_TAB = '안전재고관리';
+
+/* 시트가 쓰는 가나다 정렬을 그대로 흉내 낸다.
+   2026-09-01 에 재고관리 212종·안전재고관리 213종 전부와 맞춰 본 규칙:
+   **공백·기호·숫자 < 한글 < 영문**. (그래서 '할인성경 (비닐 x)' 가 '(비닐ㅇ)' 보다 앞이고,
+   'ESV 영어성경' 은 '히브리어 원어성경' 뒤에 온다. 코드포인트 순으로 하면 둘 다 뒤집힌다) */
+function charRank(ch) {
+  var o = ch.charCodeAt(0);
+  if ((o >= 0xAC00 && o <= 0xD7A3) ||     // 가~힣
+      (o >= 0x3131 && o <= 0x318E) ||     // ㄱ ㅇ 같은 낱자
+      (o >= 0x1100 && o <= 0x11FF)) return 1;
+  if ((o >= 65 && o <= 90) || (o >= 97 && o <= 122) || o > 0x7F) return 2;   // 영문·그 밖의 글자
+  return 0;                                                                  // 공백·기호·숫자
+}
+function koCompare(a, b) {
+  a = String(a); b = String(b);
+  var n = Math.min(a.length, b.length);
+  for (var i = 0; i < n; i++) {
+    var ra = charRank(a.charAt(i)), rb = charRank(b.charAt(i));
+    if (ra !== rb) return ra - rb;
+    var ca = a.charCodeAt(i), cb = b.charCodeAt(i);
+    if (ca !== cb) return ca - cb;
+  }
+  return a.length - b.length;
+}
+
+/* 이름 목록에서 새 이름이 들어갈 자리(1부터 세는 줄 번호)를 찾는다.
+   이미 같은 이름이 있으면 -1 — 사람이 적어 둔 단가·안전재고를 덮어쓰면 안 되기 때문이다. */
+function placeFor(names, name, first) {
+  for (var i = 0; i < names.length; i++) {
+    if (names[i] === name) return -1;
+  }
+  for (var j = 0; j < names.length; j++) {
+    if (koCompare(names[j], name) > 0) return first + j;
+  }
+  return first + names.length;
+}
+
+/* 한 줄 끼워 넣고, 이웃 줄에서 수식·서식을 복사해 온다. 새 줄 번호를 돌려준다. */
+function insertSorted(sheet, headRow, nameCol, width, names, name) {
+  var at = placeFor(names, name, headRow + 1);
+  if (at < 0) return -1;
+
+  var appended = at > headRow + names.length;
+  if (!appended) sheet.insertRowBefore(at);
+  if (names.length) {
+    // 복사해 올 이웃: 윗줄이 있으면 윗줄, 새 줄이 맨 앞이면 방금 밀려난 아랫줄
+    var src = (at > headRow + 1) ? at - 1 : at + 1;
+    sheet.getRange(src, 1, 1, width).copyTo(sheet.getRange(at, 1, 1, width));
+  }
+  sheet.getRange(at, nameCol).setValue(name);
+  return at;
+}
+
+/* `안전재고관리` 는 제품명·안전재고 두 칸짜리 단순한 표다. 재고관리의 안전재고 칸이
+   이 탭을 VLOOKUP 하므로, 여기 줄이 없으면 새 책의 안전재고가 #N/A 로 뜬다. */
+function addSafetyRow(ss, name, safety) {
+  var sheet = ss.getSheetByName(SAFETY_TAB);
+  if (!sheet) return false;
+  var lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+  if (!lastRow || !lastCol) return false;
+
+  var grid = sheet.getRange(1, 1, Math.min(HEADER_SCAN_ROWS, lastRow), lastCol).getDisplayValues();
+  var head = -1, nameAt = -1, safeAt = -1;
+  for (var r = 0; r < grid.length; r++) {
+    var cells = grid[r].map(function (v) { return String(v).trim(); });
+    var s = cells.indexOf('안전재고');
+    if (s === -1) continue;
+    head = r; safeAt = s;
+    nameAt = cells.indexOf('제품명');
+    if (nameAt === -1) nameAt = (s > 0) ? s - 1 : 0;
+    break;
+  }
+  if (head === -1) return false;
+
+  var names = readNames(sheet, head + 1, nameAt + 1, lastRow);
+  var at = insertSorted(sheet, head + 1, nameAt + 1,
+                        Math.max(nameAt, safeAt) + 1, names, name);
+  if (at < 0) return false;
+  sheet.getRange(at, safeAt + 1).setValue(Number(safety) || 0);
+  return true;
+}
+
+/* 제품명 열에 실제로 적혀 있는 이름들 (머리글 아래부터, 빈 줄에서 끊는다) */
+function readNames(sheet, headRow, nameCol, lastRow) {
+  if (lastRow <= headRow) return [];
+  var vals = sheet.getRange(headRow + 1, nameCol, lastRow - headRow, 1).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var v = String(vals[i][0]).trim();
+    if (!v) break;              // 목록은 중간에 비지 않는다. 빈 줄부터는 여백이다
+    out.push(v);
+  }
+  return out;
+}
+
+/* 앱에서 새로 등록한 책을 재고관리(+안전재고관리)에 한 줄씩 만든다.
+   이미 있는 이름은 건너뛴다 — 사람이 손본 단가를 앱 값으로 덮어쓰지 않기 위해서다. */
+function addBooks(ss, books) {
+  var added = 0, skipped = 0, failed = [];
+  if (!books || !books.length) return { added: 0, skipped: 0, failed: failed };
+
+  var sheet = sheetByName(ss, STOCK_TAB);
+  books.forEach(function (b) {
+    var name = String((b && b.제품명) || '').trim();
+    if (!name) return;
+    try {
+      var h = stockHeader(sheet);
+      if (!h) throw new Error('단가·안전재고 머리글을 찾지 못했습니다.');
+      var width = Math.max(h.at.제품명, h.at.단가, h.at.안전재고,
+                           h.at.현재재고, h.at.상태) + 1;
+      var names = readNames(sheet, h.row + 1, h.at.제품명 + 1, sheet.getLastRow());
+      var at = insertSorted(sheet, h.row + 1, h.at.제품명 + 1, width, names, name);
+      if (at < 0) { skipped++; return; }
+      var price = Number(b.단가);
+      sheet.getRange(at, h.at.단가 + 1).setValue(isNaN(price) ? '' : price);
+      addSafetyRow(ss, name, b.안전재고);
+      added++;
+    } catch (e) {
+      failed.push(name + ' — ' + (e.message || e));
+    }
+  });
+  return { added: added, skipped: skipped, failed: failed };
 }
 
 /* ===================== 중복 방지 ===================== */

@@ -2587,7 +2587,10 @@ function addBookModal() {
     <div class="field-row">
       <div class="field"><label>판매가 (원)</label><input id="mPrice" inputmode="numeric" placeholder="28000"></div>
       <div class="field"><label>입고단가 (원 · 선택)</label><input id="mCost" inputmode="numeric" placeholder="21000"></div>
+      <div class="field" style="flex:0 0 88px"><label>할인률 (%)</label>
+        <input id="mDisc" inputmode="decimal" placeholder="30"></div>
     </div>
+    <div class="sub" id="mMargin" style="margin:-6px 0 12px"></div>
     <div class="field-row">
       <div class="field"><label>초기 재고 (권)</label><input id="mStock" inputmode="numeric" placeholder="100"></div>
       <div class="field"><label>안전재고 (권)</label><input id="mSafety" inputmode="numeric" placeholder="0"></div>
@@ -2598,6 +2601,47 @@ function addBookModal() {
       <button class="btn green" id="mSave">등록</button>
     </div>`);
   $('mCancel').onclick = closeModal;
+
+  /* 판매가 ↔ 입고단가 ↔ 할인률 서로 맞춰 주기.
+     이 가게는 정가와 입고단가가 원래 같고, 대량 매입으로 받는 할인만큼이 이익이다.
+     그래서 손에 쥔 값은 보통 '할인률' 쪽이다 — 그걸 적으면 입고단가를 대신 계산해 준다.
+     반대로 입고단가를 직접 적으면 할인률을 되돌려 보여 준다.
+     (할인률 자체는 저장하지 않는다. 판매가와 입고단가만 있으면 언제든 다시 나오는 값이라,
+      따로 저장해 두면 나중에 판매가만 고쳤을 때 서로 안 맞는 옛 값이 남는다.
+      대신 이력에는 그때 받은 할인률을 글로 남긴다) */
+  const priceEl = $('mPrice'), costEl = $('mCost'), discEl = $('mDisc');
+  const wonOf = el => parseInt(digits(el.value), 10);
+  const pctOf = el => {
+    const n = parseFloat(String(el.value ?? '').replace(/[^0-9.]/g, ''));
+    return isFinite(n) ? n : NaN;
+  };
+  const showMargin = () => {
+    const price = wonOf(priceEl), cost = wonOf(costEl), el = $('mMargin');
+    if (isNaN(price) || isNaN(cost) || price <= 0) { el.textContent = ''; return; }
+    el.textContent = (cost > price)
+      ? `⚠ 입고단가가 판매가보다 ${won(cost - price)} 높습니다`
+      : `권당 이익 ${won(price - cost)}`;
+  };
+  const fromDisc = () => {
+    const price = wonOf(priceEl), d = pctOf(discEl);
+    if (!isNaN(price) && price > 0 && !isNaN(d) && d >= 0 && d <= 100) {
+      costEl.value = String(Math.round(price * (1 - d / 100)));
+    }
+    showMargin();
+  };
+  const fromCost = () => {
+    const price = wonOf(priceEl), cost = wonOf(costEl);
+    if (!isNaN(price) && price > 0 && !isNaN(cost)) {
+      discEl.value = String(Math.round((1 - cost / price) * 1000) / 10);
+    }
+    showMargin();
+  };
+  discEl.addEventListener('input', fromDisc);
+  costEl.addEventListener('input', fromCost);
+  priceEl.addEventListener('input', () => {
+    if (String(discEl.value).trim()) fromDisc(); else showMargin();
+  });
+
   $('mSave').onclick = () => {
     const title = $('mTitle').value.trim();
     const price = parseInt(digits($('mPrice').value), 10);
@@ -2615,7 +2659,12 @@ function addBookModal() {
       supplier: supplier || null,
       createdAt: Date.now(),
     }).catch(e => { console.error(e); toast('등록 실패 · 연결 확인', 'bad'); });
-    writeLogs([{ bookId: ref.id, title, reason: '등록', before: 0, after: stock, note: `판매가 ${price}원` }]);
+    const disc = pctOf(discEl);
+    writeLogs([{ bookId: ref.id, title, reason: '등록', before: 0, after: stock,
+      note: [`판매가 ${won(price)}`,
+             !isNaN(cost) ? `입고단가 ${won(cost)}` : '',
+             (!isNaN(cost) && !isNaN(disc)) ? `${disc}% 할인` : '',
+            ].filter(Boolean).join(' · ') }]);
     // 초기 재고도 시트 원장에 남긴다 (안 그러면 시트에는 이 책이 0권으로 남는다).
     // 입고단가를 적었으면 새로 사 온 책이니 금액이 있는 '입고' 줄로 보낸다. 단가가 없으면
     // 매장에 있던 재고를 옮겨 담는 것이라 예전처럼 금액 없는 '재고조정' 줄로 남긴다.

@@ -2589,18 +2589,28 @@ function addBookModal() {
     if (!title || !price || isNaN(stock)) { toast('제목 · 판매가 · 초기 재고를 입력하세요.', 'bad'); return; }
     const cost = parseInt(digits($('mCost').value), 10);
     const safety = parseInt(digits($('mSafety').value), 10);
+    const supplier = $('mSupplier').value.trim();
     const ref = doc(booksCol);
     setDoc(ref, {
       title, price, stock, sold: 0,
       category: $('mCat').value,
       cost: isNaN(cost) ? null : cost,
       safety: isNaN(safety) ? 0 : safety,
-      supplier: $('mSupplier').value.trim() || null,
+      supplier: supplier || null,
       createdAt: Date.now(),
     }).catch(e => { console.error(e); toast('등록 실패 · 연결 확인', 'bad'); });
     writeLogs([{ bookId: ref.id, title, reason: '등록', before: 0, after: stock, note: `판매가 ${price}원` }]);
-    // 초기 재고도 시트 원장에 남긴다 (안 그러면 시트에는 이 책이 0권으로 남는다)
-    queueAdjust(ref.id, { title, category: $('mCat').value, delta: stock, note: '신규 등록' });
+    // 초기 재고도 시트 원장에 남긴다 (안 그러면 시트에는 이 책이 0권으로 남는다).
+    // 입고단가를 적었으면 새로 사 온 책이니 금액이 있는 '입고' 줄로 보낸다. 단가가 없으면
+    // 매장에 있던 재고를 옮겨 담는 것이라 예전처럼 금액 없는 '재고조정' 줄로 남긴다.
+    if (stock > 0 && !isNaN(cost)) {
+      const now = new Date().toISOString();
+      queueForSheet(`stock:${ref.id}:${now}`, 'stock', [stockRecord({
+        title, category: $('mCat').value, qty: stock, cost, supplier, time: now,
+      })]);
+    } else {
+      queueAdjust(ref.id, { title, category: $('mCat').value, delta: stock, note: '신규 등록' });
+    }
     closeModal(); toast('새 책을 등록했습니다.', 'good');
   };
   setTimeout(() => $('mTitle').focus(), 60);

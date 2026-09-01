@@ -62,7 +62,7 @@
 /* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
    앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
    주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
-var MIRROR_VERSION = '2026-09-01a';
+var MIRROR_VERSION = '2026-09-01b';
 
 // ── 원본 원장. 앱이 거래를 쓰는 곳은 여기 하나뿐이다 (새 책 줄만 재고관리에도) ──
 var LEDGER_TAB = '입출고기록';
@@ -132,14 +132,17 @@ function doPost(e) {
     }
 
     return withLock(function (ss) {
+      /* 새 책 줄을 원장 기록보다 **먼저** 만든다. 원장 C열(제품명)에 드롭다운 규칙이 걸려
+         있어서, 목록에 없는 이름을 적으면 시트가 그 줄을 통째로 거절한다. 규칙을
+         `재고관리` 범위로 걸어 두면 이 순서일 때만 새 책의 첫 입고 줄이 통과한다.
+         (거꾸로 하면 첫 줄이 거절 → 배치 전체 실패 → 책 줄도 못 만들어서 영영 안 풀린다) */
+      var bk = addBooks(ss, books);
       var out = writeItems(ss, items);
       out.removed = deleteKeys(ss, deletes);
       var m = markRows(ss, marks);
       out.marked = m.marked;
       if (m.mismatched.length) out.mismatched = m.mismatched;
       if (m.busy.length) out.busy = m.busy;
-      // 새 책은 기준정보 탭에도 한 줄 (원장 기록과 달리 실패해도 나머지는 그대로 간다)
-      var bk = addBooks(ss, books);
       out.added = bk.added;
       out.bookSkipped = bk.skipped;
       if (bk.failed.length) out.bookErrors = bk.failed;
@@ -636,6 +639,38 @@ function addBooks(ss, books) {
     }
   });
   return { added: added, skipped: skipped, failed: failed };
+}
+
+/* ===== 일회성: 원장 제품명 드롭다운을 '재고관리 목록 보기'로 바꾼다 =====
+   원장 C2:C 에는 제품명이 **값으로 통째로 나열된** 드롭다운 규칙이 걸려 있다(4407자).
+   그래서 목록에 없는 이름이 들어오면 시트가 그 줄을 거절한다 —
+   "C1690 셀에 입력하신 데이터는 … 데이터 확인 규칙을 위반합니다".
+   앱이 보내는 줄 하나가 거절되면 그 배치 전체가 실패하므로, 새 책 한 권 때문에
+   **판매 기록까지 시트로 못 간다.** (2026-09-01 에 실제로 큐가 막혀 있었다)
+
+   규칙을 `재고관리` 의 제품명 열을 보도록 바꾸면 목록이 알아서 자란다 —
+   앱이 새 책을 등록할 때 그 탭에 줄을 먼저 만들기 때문이다. 손으로 적을 때 쓰는
+   드롭다운도 그대로 남는다. 스크립트 편집기에서 한 번만 실행하면 된다. */
+function 제품명목록_재고관리를_보게하기() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ledger = sheetByName(ss, LEDGER_TAB);
+  var stock = sheetByName(ss, STOCK_TAB);
+  var h = findHeader(ledger);
+  var sh = stockHeader(stock);
+  if (!sh) throw new Error('"' + STOCK_TAB + '" 탭에서 머리글을 찾지 못했습니다.');
+
+  var nameCol = h.col.제품명;
+  var last = Math.max(ledger.getMaxRows(), h.row + 1);
+  var src = stock.getRange(sh.row + 2, sh.at.제품명 + 1, stock.getMaxRows() - sh.row - 1, 1);
+
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInRange(src, true)      // true = 드롭다운 보이기
+    .setAllowInvalid(false)
+    .build();
+  ledger.getRange(h.row + 1, nameCol, last - h.row, 1).setDataValidation(rule);
+
+  return '원장 제품명 규칙을 "' + STOCK_TAB + '" 목록 보기로 바꿨습니다 ('
+       + (last - h.row) + '줄). 이제 앱이 새 책을 등록하면 목록에 저절로 들어갑니다.';
 }
 
 /* ===================== 중복 방지 ===================== */

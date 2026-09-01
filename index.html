@@ -2310,7 +2310,7 @@ const QUEUE_KEY = 'sheetQueue';
 /* Apps Script 쪽 코드는 git push 로 배포되지 않는다 — 구글에서 따로 '새 버전' 배포를 해야 한다.
    그 단계를 잊으면 조용히 옛 코드가 돌기 때문에, 앱이 배포된 버전을 물어보고 알려준다.
    apps-script/Code.gs 를 고칠 때 MIRROR_VERSION 과 이 값을 같이 올린다. */
-const SHEET_MIRROR_VERSION = '2026-09-01a';
+const SHEET_MIRROR_VERSION = '2026-09-01b';
 let sheetMirrorVersion = null;      // 실제로 배포돼 있는 버전 (확인 전이면 null)
 
 const sheetMirrorStale = () =>
@@ -2364,6 +2364,21 @@ function queueSheetDelete(key) {
   setSheetQueue(q);
   renderSheetBadge();
   flushSheet();
+}
+
+/* 책을 지우면 그 책 때문에 큐에 남아 있던 줄도 같이 뺀다.
+   안 그러면 없는 책의 입고·조정 줄이 큐에 영영 남고, 시트가 그 줄을 거절하면
+   **배치 전체가 실패해 판매 기록까지 시트로 못 간다.**
+   (2026-09-01 에 실제로 그랬다 — 테스트로 등록했다 지운 책 한 권이 큐를 막고 있었다)
+   거래(tx:)는 건드리지 않는다. 책을 지워도 이미 판 기록은 남아야 하기 때문이다. */
+function dropQueuedFor(bookId) {
+  const mine = k => k === `book:${bookId}` ||
+                    k.startsWith(`adj:${bookId}:`) || k.startsWith(`stock:${bookId}:`);
+  const q = sheetQueue();
+  const left = q.filter(x => !mine(x.key));
+  if (left.length === q.length) return;
+  setSheetQueue(left);
+  renderSheetBadge();
 }
 
 /* 새로 등록한 책을 시트의 기준정보(재고관리·안전재고관리)에도 한 줄 만든다.
@@ -2803,6 +2818,7 @@ function deleteBook(b) {
   $('mCancel').onclick = closeModal;
   $('mSave').onclick = () => {
     cart = cart.filter(c => c.id !== b.id);
+    dropQueuedFor(b.id);
     deleteDoc(doc(booksCol, b.id))
       .catch(e => { console.error(e); toast('삭제 실패 · 연결 확인', 'bad'); });
     writeLogs([{ bookId: b.id, title: b.title, reason: '삭제', before: b.stock, after: 0 }]);

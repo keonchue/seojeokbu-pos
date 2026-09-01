@@ -72,11 +72,16 @@ self.addEventListener('message', e => {
 
 // 네트워크를 기다리되, 너무 느리면 캐시본으로 즉시 넘어간다.
 // (인터넷이 '끊긴' 것보다 '느린' 상황이 매대에서는 더 위험하다)
+//
+// cache:'no-store' 가 꼭 필요하다. 이게 없으면 네트워크 우선이어도 그 fetch 가 브라우저
+// HTTP 캐시에 먼저 걸린다. GitHub Pages 가 `Cache-Control: max-age=600` 을 보내므로
+// 배포한 지 10분 안에는 새로고침을 해도 옛 파일이 그대로 나왔다.
+// (2026-09-01 에 실제로 겪음 — 새 화면이 안 떠서 캐시 우회 주소로 열어야 보였다)
 async function networkFirst(req, fallbackKey) {
   const cache = await caches.open(CACHE);
   try {
     const res = await Promise.race([
-      fetch(req),
+      fetch(req, { cache: 'no-store' }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), NET_TIMEOUT)),
     ]);
     if (res && res.ok) cache.put(fallbackKey || req, res.clone());

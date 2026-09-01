@@ -62,7 +62,7 @@
 /* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
    앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
    주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
-var MIRROR_VERSION = '2026-09-01c';
+var MIRROR_VERSION = '2026-09-01d';
 
 // ── 원본 원장. 앱이 거래를 쓰는 곳은 여기 하나뿐이다 (새 책 줄만 재고관리에도) ──
 var LEDGER_TAB = '입출고기록';
@@ -127,8 +127,9 @@ function doPost(e) {
     var deletes = body.deletes || [];
     var marks = body.marks || [];
     var books = body.books || [];
-    if (!items.length && !deletes.length && !marks.length && !books.length) {
-      return json({ ok: true, written: 0, skipped: 0, removed: 0, marked: 0, added: 0 });
+    var unbooks = body.unbooks || [];
+    if (!items.length && !deletes.length && !marks.length && !books.length && !unbooks.length) {
+      return json({ ok: true, written: 0, skipped: 0, removed: 0, marked: 0, added: 0, dropped: 0 });
     }
 
     return withLock(function (ss) {
@@ -146,6 +147,13 @@ function doPost(e) {
       out.added = bk.added;
       out.bookSkipped = bk.skipped;
       if (bk.failed.length) out.bookErrors = bk.failed;
+
+      /* 지운 책 치우기는 **맨 마지막**이다. 같은 묶음에 그 책의 줄이 아직 들어 있을 수 있는데,
+         먼저 치우면 뒤이어 writeItems 가 방금 지운 줄을 되살려 놓는다. */
+      var rm = removeBooks(ss, unbooks);
+      out.dropped = rm.dropped;
+      if (rm.kept.length) out.bookKept = rm.kept;
+      if (rm.failed.length) out.dropErrors = rm.failed;
       return out;
     });
   } catch (err) {
@@ -584,29 +592,33 @@ function insertSorted(sheet, headRow, nameCol, width, names, name) {
    이 탭을 VLOOKUP 하므로, 여기 줄이 없으면 새 책의 안전재고가 #N/A 로 뜬다. */
 function addSafetyRow(ss, name, safety) {
   var sheet = ss.getSheetByName(SAFETY_TAB);
-  if (!sheet) return false;
+  var h = safetyHeader(sheet);
+  if (!h) return false;
+
+  var names = readNames(sheet, h.row + 1, h.at.제품명 + 1, h.lastRow);
+  var at = insertSorted(sheet, h.row + 1, h.at.제품명 + 1,
+                        Math.max(h.at.제품명, h.at.안전재고) + 1, names, name);
+  if (at < 0) return false;
+  sheet.getRange(at, h.at.안전재고 + 1).setValue(Number(safety) || 0);
+  return true;
+}
+
+// 안전재고관리 머리글 찾기 (`row`·`at` 은 0부터 센다 — stockHeader 와 같은 규칙)
+function safetyHeader(sheet) {
+  if (!sheet) return null;
   var lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
-  if (!lastRow || !lastCol) return false;
+  if (!lastRow || !lastCol) return null;
 
   var grid = sheet.getRange(1, 1, Math.min(HEADER_SCAN_ROWS, lastRow), lastCol).getDisplayValues();
-  var head = -1, nameAt = -1, safeAt = -1;
   for (var r = 0; r < grid.length; r++) {
     var cells = grid[r].map(function (v) { return String(v).trim(); });
     var s = cells.indexOf('안전재고');
     if (s === -1) continue;
-    head = r; safeAt = s;
-    nameAt = cells.indexOf('제품명');
-    if (nameAt === -1) nameAt = (s > 0) ? s - 1 : 0;
-    break;
+    var n = cells.indexOf('제품명');
+    if (n === -1) n = (s > 0) ? s - 1 : 0;
+    return { row: r, lastRow: lastRow, at: { 제품명: n, 안전재고: s } };
   }
-  if (head === -1) return false;
-
-  var names = readNames(sheet, head + 1, nameAt + 1, lastRow);
-  var at = insertSorted(sheet, head + 1, nameAt + 1,
-                        Math.max(nameAt, safeAt) + 1, names, name);
-  if (at < 0) return false;
-  sheet.getRange(at, safeAt + 1).setValue(Number(safety) || 0);
-  return true;
+  return null;
 }
 
 /* 제품명 열에 실제로 적혀 있는 이름들 (머리글 아래부터, 빈 줄에서 끊는다) */
@@ -659,6 +671,74 @@ function addBooks(ss, books) {
      그렇지 않으면 드롭다운이 보는 목록에 이 책이 아직 없어 새 이름이 거절될 수 있다. */
   if (added) SpreadsheetApp.flush();
   return { added: added, skipped: skipped, failed: failed };
+}
+
+/* 앱에서 책을 지웠을 때 시트의 기준정보 줄(재고관리·안전재고관리)까지 치운다.
+   잘못 등록했거나 테스트로 만든 책이 시트에 영영 남는 걸 막기 위한 것이다.
+
+   ⚠ **지우는 조건이 좁다.** 그 제품명으로 원장에 남은 줄이 **전부 이 책의 등록·조정 줄일 때만**
+   치운다(`stock:<책id>:` / `adj:<책id>:`). 판매(`tx:`)가 한 줄이라도 있거나 사람이 손으로 적은
+   줄이 있으면 **아무것도 안 지운다** — 그건 실제 거래가 있었다는 뜻이고, 재고관리 줄을 없애면
+   그 거래가 현재재고·상태에서 빠지고 손기록 줄의 출고단가 VLOOKUP 이 #N/A 로 깨진다.
+   그래서 "앱이 만든 것만 앱이 되돌린다"가 유일한 안전한 규칙이다. */
+function removeBooks(ss, unbooks) {
+  var out = { dropped: 0, kept: [], failed: [] };
+  if (!unbooks || !unbooks.length) return out;
+
+  var ledger = sheetByName(ss, LEDGER_TAB);
+
+  unbooks.forEach(function (u) {
+    var name = String((u && u.제품명) || '').trim();
+    var id = String((u && u.bookId) || '').trim();
+    if (!name) return;
+    try {
+      /* 줄을 지우면 아래 행 번호가 밀리므로 책마다 새로 읽는다.
+         한 번에 여러 권을 지우는 일은 드물어서 이 편이 안전하고 단순하다. */
+      var h = findHeader(ledger);
+      var last = ledger.getLastRow();
+      if (last <= h.row || !h.col.기록ID) { out.kept.push(name); return; }
+
+      var n = last - h.row;
+      var names = ledger.getRange(h.row + 1, h.col.제품명, n, 1).getValues();
+      var keys = ledger.getRange(h.row + 1, h.col.기록ID, n, 1).getValues();
+
+      var mine = [], others = 0;
+      for (var i = 0; i < n; i++) {
+        if (String(names[i][0]).trim() !== name) continue;
+        var k = String(keys[i][0]);
+        if (id && (k.indexOf('stock:' + id + ':') === 0 || k.indexOf('adj:' + id + ':') === 0)) {
+          mine.push(h.row + 1 + i);
+        } else {
+          others++;
+        }
+      }
+      if (others) { out.kept.push(name); return; }   // 거래가 있던 책 — 손대지 않는다
+
+      for (var j = mine.length - 1; j >= 0; j--) ledger.deleteRow(mine[j]);  // 아래에서 위로
+
+      var stock = ss.getSheetByName(STOCK_TAB), safe = ss.getSheetByName(SAFETY_TAB);
+      var a = dropNamedRow(stock, stockHeader(stock), name);
+      var c = dropNamedRow(safe, safetyHeader(safe), name);
+      // 셋 다 없었으면 애초에 시트에 간 적이 없는 책이다 — 지웠다고 세지 않는다
+      if (a || c || mine.length) out.dropped++;
+    } catch (e) {
+      out.failed.push(name + ' — ' + (e.message || e));
+    }
+  });
+  return out;
+}
+
+// 제품명이 일치하는 줄 하나를 지운다 (stockHeader/safetyHeader 둘 다 `row`·`at` 이 0부터)
+function dropNamedRow(sheet, h, name) {
+  if (!sheet || !h) return false;
+  var last = sheet.getLastRow();
+  if (last <= h.row + 1) return false;
+  var col = h.at.제품명 + 1;
+  var vals = sheet.getRange(h.row + 2, col, last - h.row - 1, 1).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]).trim() === name) { sheet.deleteRow(h.row + 2 + i); return true; }
+  }
+  return false;
 }
 
 /* ===== 일회성: 원장 제품명 드롭다운을 '재고관리 목록 보기'로 바꾼다 =====

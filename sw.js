@@ -111,11 +111,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  const isVendor = url.hostname === 'www.gstatic.com';
+  /* 글꼴도 주소가 곧 내용이라 캐시 우선으로 둔다. 안 그러면 오프라인 첫 화면에서
+     글꼴만 시스템 글꼴로 튀어 글자 폭이 달라지고 표가 흔들린다. */
+  const isVendor = url.hostname === 'www.gstatic.com'
+                || url.hostname === 'fonts.googleapis.com'
+                || url.hostname === 'fonts.gstatic.com';
   const isOwn = url.origin === self.location.origin;
   if (!isVendor && !isOwn) return;
 
-  // Firebase SDK: 주소가 곧 버전이라 내용이 바뀌지 않는다 → 캐시 우선(빠름)
+  // Firebase SDK·글꼴: 주소가 곧 버전이라 내용이 바뀌지 않는다 → 캐시 우선(빠름)
   if (isVendor) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE);

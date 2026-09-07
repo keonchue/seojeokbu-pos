@@ -6,6 +6,11 @@
 <title>서적부 POS</title>
 <meta name="description" content="서적부 판매·재고 관리 포스">
 
+<!-- 글꼴 — 못 받아와도 시스템 글꼴로 내려가므로 앱은 그대로 뜬다 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+
 <!-- PWA (홈화면 설치 / 오프라인 실행) -->
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#16386a">
@@ -19,655 +24,855 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --blue: #1f4e8c;
-    --blue-dark: #16386a;
-    --blue-light: #2f6fc4;
-    --blue-wash: #e8f0fb;
-    --green: #1f9d55;
-    --green-dark: #167a41;
-    --green-wash: #e4f4ea;
-    --red: #d64545;
-    --red-wash: #fbe9e9;
-    --amber: #a6720c;
-    --amber-wash: #fdf1d8;
-    --bg: #eef1f6;
+    /* ═══════════ 계산대 장부 ═══════════
+       바탕은 종이, 크롬(머리·탭·액션바)은 잉크. 색은 장식이 아니라 뜻이다:
+       초록=현금·매출, 파랑=계좌이체·주요동작, 빨강=할인·환불·반품, 앰버=분할·재고경고.
+       바탕을 차가운 청회색에서 따뜻한 종이색으로 옮겨, 파랑이 '배경'이 아니라
+       '지금 누를 것'으로 읽히게 했다. */
+
+    /* 남색 — 크롬(머리·탭·바). 검정보다 종이 바탕과 사이가 좋고,
+       파랑 계열 안에서 명도만 달리해 위계를 만든다. */
+    --ink: #16233f;
+    --ink-2: #1e3054;
+    --ink-3: #33456b;
+    --on-ink: #eef2f9;
+    --on-ink-dim: #93a3c0;
+
+    /* 종이 — 바탕과 면 */
+    --bg: #f4f2ee;
     --surface: #ffffff;
-    --gray: #eef1f5;
-    --line: #dde2ea;
-    --line-soft: #e9edf3;
-    --text: #1c2530;
-    --muted: #6b7787;
-    --r-sm: 8px;
-    --r-md: 12px;
-    --r-lg: 16px;
+    --surface-2: #faf8f5;
+    --gray: #eeebe5;
+    --line: #e0dcd4;
+    --line-soft: #eeebe4;
+    --text: #1a2233;
+    --muted: #6a7385;
+
+    /* 뜻이 있는 색 */
+    --blue: #1b50c4;
+    --blue-dark: #123a95;
+    --blue-light: #3a70e0;
+    --blue-wash: #e8effc;
+    --green: #10794b;
+    --green-dark: #0b5c39;
+    --green-wash: #e2f2e9;
+    --red: #c2352c;
+    --red-wash: #fbeae8;
+    --amber: #8f6008;
+    --amber-wash: #fbf0d8;
+
+    --r-sm: 9px;
+    --r-md: 13px;
+    --r-lg: 18px;
     --r-pill: 999px;
-    --sh-1: 0 1px 2px rgba(24,40,66,.06);
-    --sh-2: 0 2px 10px rgba(24,40,66,.07);
-    --sh-3: 0 18px 48px rgba(16,28,48,.28);
+
+    /* 그림자는 언제나 아래로 떨어진다 — 빛은 위에 있다 */
+    --sh-1: 0 1px 2px rgba(23,29,39,.06), 0 1px 1px rgba(23,29,39,.04);
+    --sh-2: 0 2px 4px rgba(23,29,39,.06), 0 6px 16px rgba(23,29,39,.08);
+    --sh-3: 0 24px 60px rgba(12,18,28,.32), 0 2px 8px rgba(12,18,28,.18);
+
     --tap: 44px;
-    --safe-b: env(safe-area-inset-bottom, 0px);
-
-    /* 글자 크기 — 반 단계(11.5·12.5·13.5)를 없애고 단계를 굵직하게 잡는다.
-       업무 화면은 요소가 많아서 대비를 과장하면 오히려 안 읽힌다. */
-    --fs-2xs: 12px;   /* 배지·보조 설명 */
-    --fs-xs:  13px;   /* 표 머리글·필터·칩 */
-    --fs-sm:  14px;   /* 본문·표 내용·버튼 */
-    --fs-md:  15px;   /* 장바구니 줄·합계 */
-    --fs-lg:  17px;   /* 소제목 */
-    --fs-xl:  19px;   /* 패널 제목 */
-    --fs-2xl: 24px;   /* 통계 숫자 */
-    --fs-3xl: 30px;   /* 대표 숫자 */
-
-    /* 간격 — 4의 배수로 통일 */
-    --sp-1: 4px;
-    --sp-2: 8px;
-    --sp-3: 12px;
-    --sp-4: 16px;
-    --sp-5: 20px;
-    --sp-6: 24px;
-
-    /* 알약형 컨트롤(분류 칩·기간 버튼)의 공통 높이 */
     --pill-h: 38px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --bar-h: 68px;              /* 항상 보이는 액션 바 */
+
+    /* 글자 크기 — 반 단계(11.5·12.5·13.5)를 쓰지 않는다. 단계가 굵직해야 위계가 선다.
+       자간과 행간은 크기마다 다르다. 하나로 고정하면 어느 크기에선가 반드시 틀린다:
+       글자가 커질수록 사이가 벌어져 보여 자간을 좁히고, 작아질수록 붙어 보여 넓힌다.
+       행간은 반대로 — 큰 글자는 좁게, 본문은 넉넉하게. */
+    --fs-2xs: 12px;   --tr-2xs: .012em;  --lh-2xs: 1.45;
+    --fs-xs: 13px;    --tr-xs: .006em;   --lh-xs: 1.5;
+    --fs-sm: 14px;    --tr-sm: 0;        --lh-sm: 1.55;
+    --fs-md: 15px;    --tr-md: -.002em;  --lh-md: 1.5;
+    --fs-lg: 17px;    --tr-lg: -.012em;  --lh-lg: 1.35;
+    --fs-xl: 20px;    --tr-xl: -.018em;  --lh-xl: 1.25;
+    --fs-2xl: 26px;   --tr-2xl: -.024em; --lh-2xl: 1.15;
+    --fs-3xl: 34px;   --tr-3xl: -.03em;  --lh-3xl: 1.05;
+
+    /* 누르는 느낌 — 버튼은 두께가 있는 물건이다.
+       평소엔 아래에 2px 짜리 '옆면'이 보이고, 누르면 그 두께만큼 내려앉는다. */
+    /* 누르는 순간은 지연이 0에 가까워야 '직접 만진다'는 느낌이 산다.
+       놓는 쪽은 길게 — 그래야 '튕겨 오른다'가 아니라 '놓았다'로 읽힌다. */
+    --press-in: 45ms linear;
+    --press-out: 220ms cubic-bezier(.2,.9,.3,1);
+    /* 서랍이 미끄러지는 곡선 — 감쇠 0.8 · 응답 0.3 (애플의 drawer 값) 에 가깝게 */
+    --slide: 320ms cubic-bezier(.22,1.02,.36,1);
   }
-  html, body {
-    height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
-                 "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif;
-    color: var(--text);
+
+  html, body { height: 100%; }
+  body {
+    /* 기본 시스템 글꼴(윈도우에서는 맑은 고딕)은 '아무것도 고르지 않은' 얼굴이다.
+       IBM Plex Sans KR 은 자소가 네모지고 획 끝이 정직해 장부·계산대에 어울리고,
+       숫자 폭이 안정적이라 금액을 세로로 훑기 좋다. 못 받아오면 시스템 글꼴로 내려간다. */
+    font-family: 'IBM Plex Sans KR', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont,
+                 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
     background: var(--bg);
-    -webkit-user-select: none; user-select: none;
-    -webkit-text-size-adjust: 100%;
-    line-height: 1.45;
+    color: var(--text);
+    font-size: var(--fs-sm);
+    line-height: var(--lh-sm);
+    letter-spacing: var(--tr-sm);
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    display: flex; flex-direction: column;
+    overflow: hidden;
   }
-  body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
-  input, button { font-family: inherit; }
-  input { -webkit-user-select: text; user-select: text; }
-  .num, .val, .amt, table td { font-variant-numeric: tabular-nums; }
-  :focus-visible { outline: 3px solid #7aa9e8; outline-offset: 2px; border-radius: 4px; }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
-
-  /* 브라우저가 알아서 그리는 것들도 앱 색을 따르게 한다 */
-  ::selection { background: var(--blue-wash); color: var(--blue-dark); }
-  input { caret-color: var(--blue-light); }
-  input[type=checkbox], input[type=radio] { accent-color: var(--blue); }
-  .panel, .table-wrap, .cart-items, .ret-list { scrollbar-color: #c3ccd9 transparent; scrollbar-width: thin; }
-  .panel::-webkit-scrollbar, .table-wrap::-webkit-scrollbar,
-  .cart-items::-webkit-scrollbar, .ret-list::-webkit-scrollbar { width: 10px; height: 10px; }
-  .panel::-webkit-scrollbar-thumb, .table-wrap::-webkit-scrollbar-thumb,
-  .cart-items::-webkit-scrollbar-thumb, .ret-list::-webkit-scrollbar-thumb {
-    background: #c3ccd9; border-radius: var(--r-pill); border: 3px solid transparent; background-clip: content-box;
+  /* 크기 단계마다 자간·행간을 한 벌로 붙인다 — 크기만 바꾸고 나머지를 두면 위계가 안 선다 */
+  .stat .lbl, .cat-badge, .pill, .book-btn .bs, .cats button .n,
+  .chart-sub, .chart-x span, .stat .sub, .log-when, .ret-sub, .sp-hint,
+  thead th, tbody td::before, .customer label, .field label, .mobile-bar .mb-qty {
+    font-size: var(--fs-2xs); letter-spacing: var(--tr-2xs); line-height: var(--lh-2xs);
   }
-  .panel::-webkit-scrollbar-track, .table-wrap::-webkit-scrollbar-track,
-  .cart-items::-webkit-scrollbar-track, .ret-list::-webkit-scrollbar-track { background: transparent; }
+  .filters .count, .cats button, .period button, .mini-btn, .modal p.desc,
+  .warn-box, .info-box, .log-row, .biz-card .biz-sub, .chkline, .header-note {
+    letter-spacing: var(--tr-xs); line-height: var(--lh-xs);
+  }
+  .btn, .search, .cart-row, .ret-title, .cart-empty { letter-spacing: var(--tr-sm); }
+  .sum-row, .book-btn .bt, .sp-row, .customer input { letter-spacing: var(--tr-md); line-height: var(--lh-md); }
+  .panel-head h2, .modal h3, .biz-card h2, .book-btn .bp, .sum-row.total,
+  .stat .val, .stat.hero .val, .mobile-bar .mb-amt, .login-brand, header .brand {
+    text-wrap: balance;
+  }
+  .panel-head h2 { letter-spacing: var(--tr-xl); line-height: var(--lh-xl); }
+  .modal h3, .book-btn .bp { letter-spacing: var(--tr-lg); line-height: var(--lh-lg); }
+  .stat .val { letter-spacing: var(--tr-2xl); line-height: var(--lh-2xl); }
+  .stat.hero .val, .mobile-bar .mb-amt { letter-spacing: var(--tr-3xl); line-height: var(--lh-3xl); }
 
-  /* ---------- Header ---------- */
+  /* 돈은 자리수가 맞아야 눈으로 훑을 수 있다 */
+  .val, .amt, .bp, .num, .mb-amt, .sp-v, .log-delta, .clock,
+  .sum-row, .stat .val, td.num, .biz-last .big {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* 우리가 그리지 않은 브라우저 표면도 이 디자인에 속한다 */
+  ::selection { background: #cfe0fb; color: var(--blue-dark); }
+  input, textarea, select { caret-color: var(--blue); }
+  :focus-visible {
+    outline: 2px solid var(--blue-light);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .panel, .table-wrap, .cart-items, .ret-list, .log-list, .product-pane, .modal {
+    scrollbar-width: thin; scrollbar-color: #c8c2b6 transparent;
+  }
+  .panel::-webkit-scrollbar, .table-wrap::-webkit-scrollbar, .modal::-webkit-scrollbar,
+  .cart-items::-webkit-scrollbar, .ret-list::-webkit-scrollbar,
+  .log-list::-webkit-scrollbar, .product-pane::-webkit-scrollbar { width: 11px; height: 11px; }
+  .panel::-webkit-scrollbar-thumb, .table-wrap::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb,
+  .cart-items::-webkit-scrollbar-thumb, .ret-list::-webkit-scrollbar-thumb,
+  .log-list::-webkit-scrollbar-thumb, .product-pane::-webkit-scrollbar-thumb {
+    background: #c8c2b6; border-radius: var(--r-pill); border: 3px solid transparent; background-clip: content-box;
+  }
+  .panel::-webkit-scrollbar-track, .table-wrap::-webkit-scrollbar-track, .modal::-webkit-scrollbar-track,
+  .cart-items::-webkit-scrollbar-track, .ret-list::-webkit-scrollbar-track,
+  .log-list::-webkit-scrollbar-track, .product-pane::-webkit-scrollbar-track { background: transparent; }
+
+  /* ═══════════ 누름 ═══════════
+     쓰는 사람이 계산대에서 하루에 수백 번 누른다. 눌렸는지가 손끝과 눈 모두에
+     즉시 잡혀야 한다. 두께 → 내려앉음 → 되올라옴. 되올라오는 쪽을 길게 둬야
+     '튕겨 오른다'가 아니라 '놓았다'로 읽힌다. */
+  button, .btn, .book-btn, .mini-btn, .icon-btn, .biz-chip,
+  .cats button, .period button, .tabs button, .pay-methods button,
+  .disc-toggle button, .cart-row .qty button, .cart-row .del button,
+  .ret-qty button, .mb-open, .pay-actions .clear, .pay-actions .checkout {
+    font-family: inherit;
+    transition: transform var(--press-out), box-shadow var(--press-out),
+                background var(--press-out), border-color var(--press-out), color var(--press-out);
+    touch-action: manipulation;
+  }
+  button:active:not(:disabled), .btn:active:not(:disabled), .book-btn:active:not(.out),
+  .mini-btn:active:not(:disabled), .icon-btn:active, .biz-chip:active,
+  .cats button:active, .period button:active, .pay-methods button:active,
+  .disc-toggle button:active, .cart-row .qty button:active, .cart-row .del button:active,
+  .ret-qty button:active, .mb-open:active:not(:disabled),
+  .pay-actions .clear:active, .pay-actions .checkout:active:not(:disabled) {
+    transition-duration: var(--press-in);
+    transform: translateY(2px);
+  }
+  /* 두께가 있는 버튼들 — 눌리면 옆면이 사라진다 */
+  .btn.primary, .btn.green, .btn.solid-danger, .pay-actions .checkout,
+  .pay-actions .clear, .mb-open, .login-card button, #updateBar button {
+    box-shadow: 0 2px 0 var(--btn-edge, rgba(0,0,0,.22)), var(--sh-1);
+  }
+  .btn.primary:active:not(:disabled), .btn.green:active:not(:disabled),
+  .btn.solid-danger:active:not(:disabled), .pay-actions .checkout:active:not(:disabled),
+  .pay-actions .clear:active, .mb-open:active:not(:disabled),
+  .login-card button:active:not(:disabled), #updateBar button:active {
+    box-shadow: 0 0 0 var(--btn-edge, rgba(0,0,0,.22));
+  }
+  @media (hover: hover) {
+    .btn.primary:hover:not(:disabled) { background: var(--blue-light); }
+    .btn.green:hover:not(:disabled), .pay-actions .checkout:hover:not(:disabled) { filter: brightness(1.08); }
+    .btn.ghost:hover:not(:disabled) { background: var(--surface-2); border-color: #cfc9bd; }
+    .btn.danger:hover:not(:disabled) { background: var(--red-wash); }
+    .mini-btn:hover:not(:disabled) { background: var(--surface-2); border-color: #cfc9bd; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    button:active, .btn:active, .book-btn:active { transform: none !important; }
+  }
+  /* 투명한 재료를 불편해하는 설정에서는 불투명하게 — 흐림은 끄고 배경을 채운다 */
+  @media (prefers-reduced-transparency: reduce) {
+    .mobile-bar { background: var(--ink); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
+  /* 대비를 높게 쓰는 설정에서는 경계를 분명히 */
+  @media (prefers-contrast: more) {
+    .mobile-bar { background: var(--ink); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .book-btn, .table-wrap, .modal, .cart-pane { border-color: var(--ink-3); }
+    .stat { border-left-color: var(--ink-3); }
+    .cat-badge, .pill { color: var(--text); }
+  }
+
+  /* ═══════════ Header ═══════════ */
   header {
-    background: var(--blue-dark);
-    color: #fff;
+    background: var(--ink);
+    color: var(--on-ink);
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 0 16px; height: 56px; flex-shrink: 0;
+    padding: 0 18px; flex-shrink: 0;
     padding-top: env(safe-area-inset-top, 0px);
-    height: calc(56px + env(safe-area-inset-top, 0px));
+    height: calc(54px + env(safe-area-inset-top, 0px));
   }
-  header .brand { font-size: 18px; font-weight: 800; letter-spacing: -.2px; white-space: nowrap; }
-  header .brand span { color: #9ec3f0; font-weight: 500; font-size: 12px; margin-left: 7px; }
-  header .info { font-size: 13px; color: #cfe0f5; display: flex; gap: 14px; align-items: center; }
-  /* 폰에서 '매출 44,000원' 이 세 줄로 갈라지던 것을 막는다 */
+  header .brand { font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--tr-lg); white-space: nowrap; }
+  header .brand span { color: var(--on-ink-dim); font-weight: 500; font-size: var(--fs-2xs); margin-left: 8px; }
+  header .info { font-size: var(--fs-xs); color: var(--on-ink-dim); display: flex; gap: 14px; align-items: center; }
   header .info > div { white-space: nowrap; }
   header .info b { color: #fff; font-weight: 700; }
-  /* 시계는 숫자 폭이 고정돼야 초가 바뀔 때 옆 글자가 안 흔들린다 */
   header .clock { font-variant-numeric: tabular-nums; }
 
-  /* ---------- 개업 / 마감 ---------- */
+  /* ═══════════ 개업 / 마감 ═══════════ */
   .biz-chip {
-    border: 1px solid transparent; border-radius: 999px; padding: 4px 11px;
-    font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
-    font-family: inherit; transition: filter .15s;
+    border: 1px solid transparent; border-radius: var(--r-pill); padding: 5px 12px;
+    font-size: var(--fs-2xs); font-weight: 700; cursor: pointer; white-space: nowrap;
   }
-  .biz-chip:hover { filter: brightness(1.15); }
-  .biz-chip.on  { background: rgba(126,231,168,.2); border-color: rgba(126,231,168,.5); color: #cdf5df; }
-  .biz-chip.off { background: rgba(255,196,120,.2); border-color: rgba(255,196,120,.55); color: #ffe2bd; }
+  .biz-chip.on  { background: rgba(84,214,150,.16); border-color: rgba(84,214,150,.42); color: #a7ebc7; }
+  .biz-chip.off { background: rgba(255,190,110,.16); border-color: rgba(255,190,110,.45); color: #ffd8a8; }
   #bizScreen {
-    position: fixed; inset: 0; z-index: 480; background: linear-gradient(160deg, #1f4e8c, #16386a);
+    position: fixed; inset: 0; z-index: 480; background: var(--ink);
     display: none; align-items: center; justify-content: center; padding: 20px;
   }
   .biz-card {
-    background: #fff; border-radius: var(--r-lg); padding: 32px 28px; width: 380px; max-width: 100%;
-    text-align: center; box-shadow: 0 18px 50px rgba(0,0,0,.3);
+    background: var(--surface); border-radius: var(--r-lg); padding: 34px 30px; width: 390px; max-width: 100%;
+    text-align: center; box-shadow: var(--sh-3);
   }
-  .biz-card .biz-icon { font-size: 40px; line-height: 1; }
-  .biz-card h2 { margin: 12px 0 6px; font-size: 21px; }
-  .biz-card .biz-sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; line-height: 1.6; }
-  .biz-card .btn { width: 100%; }
+  .biz-card .biz-icon { font-size: 38px; line-height: 1; }
+  .biz-card h2 { margin: 14px 0 6px; font-size: var(--fs-xl); letter-spacing: var(--tr-xl); }
+  .biz-card .biz-sub { color: var(--muted); font-size: var(--fs-xs); margin: 0 0 20px; line-height: 1.65; }
+  .biz-card .btn { width: 100%; min-height: 50px; font-size: var(--fs-md); }
   .biz-card .btn + .btn { margin-top: 8px; }
   .biz-last {
-    background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md);
-    padding: 12px 14px; margin-bottom: 18px; font-size: 13px; text-align: left; line-height: 1.7;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: 14px 16px; margin-bottom: 20px; font-size: var(--fs-xs); text-align: left; line-height: 1.7;
   }
-  .biz-last .big { font-size: 19px; font-weight: 800; }
+  .biz-last .big { font-size: var(--fs-xl); font-weight: 800; }
   .close-sum { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; }
-  .close-sum .row { display: flex; justify-content: space-between; font-size: 14px; }
-  .close-sum .row.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 9px; font-size: 17px; font-weight: 800; }
+  .close-sum .row { display: flex; justify-content: space-between; font-size: var(--fs-sm); }
+  .close-sum .row.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 9px; font-size: var(--fs-lg); font-weight: 800; }
   .close-sum .row .dim { color: var(--muted); }
   .icon-btn {
-    background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.28);
+    background: rgba(255,255,255,.10); color: #fff; border: 1px solid rgba(255,255,255,.20);
     border-radius: var(--r-sm); min-width: 38px; height: 34px; padding: 0 11px;
-    font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex;
+    font-size: var(--fs-xs); font-weight: 700; cursor: pointer; display: inline-flex;
     align-items: center; justify-content: center; gap: 5px;
   }
-  .icon-btn:hover { background: rgba(255,255,255,.22); }
+  @media (hover: hover) { .icon-btn:hover { background: rgba(255,255,255,.2); } }
 
-  /* 연결 상태 배지 */
   .sync {
-    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
-    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
-    padding: 5px 10px; border-radius: 20px; white-space: nowrap; color: #dbe8f8;
+    display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: 700;
+    background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.18);
+    padding: 5px 11px; border-radius: var(--r-pill); white-space: nowrap; color: #cbd6e6;
   }
-  .sync .dot { width: 8px; height: 8px; border-radius: 50%; background: #8fe0ad; flex-shrink: 0; }
-  .sync.warn { background: rgba(255,211,78,.18); border-color: rgba(255,211,78,.45); color: #ffe9a8; }
-  .sync.warn .dot { background: #ffd34e; animation: pulse 1.4s ease-in-out infinite; }
-  .sync.off { background: rgba(255,138,138,.2); border-color: rgba(255,138,138,.5); color: #ffd2d2; }
-  .sync.off .dot { background: #ff8a8a; }
-  @keyframes pulse { 50% { opacity: .35; } }
+  .sync .dot { width: 8px; height: 8px; border-radius: 50%; background: #54d696; flex-shrink: 0; }
+  .sync.warn { background: rgba(255,206,90,.15); border-color: rgba(255,206,90,.4); color: #ffe3a3; }
+  .sync.warn .dot { background: #ffce5a; animation: pulse 1.4s ease-in-out infinite; }
+  .sync.off { background: rgba(255,130,130,.16); border-color: rgba(255,130,130,.42); color: #ffd0d0; }
+  .sync.off .dot { background: #ff8282; }
+  @keyframes pulse { 50% { opacity: .3; } }
 
-  /* ---------- Login ---------- */
+  /* ═══════════ Login ═══════════ */
   #loginScreen {
-    position: fixed; inset: 0; z-index: 500; background: linear-gradient(160deg, #1f4e8c, #16386a);
+    position: fixed; inset: 0; z-index: 500; background: var(--ink);
     display: flex; align-items: center; justify-content: center; padding: 20px;
   }
   .login-card {
-    background: #fff; border-radius: var(--r-lg); padding: 34px 30px; width: 350px; max-width: 100%;
+    background: var(--surface); border-radius: var(--r-lg); padding: 36px 32px; width: 360px; max-width: 100%;
     box-shadow: var(--sh-3); display: flex; flex-direction: column;
   }
-  .login-brand { font-size: 23px; font-weight: 800; color: var(--blue-dark); text-align: center; }
-  .login-sub { font-size: 13px; color: var(--muted); text-align: center; margin: 8px 0 22px; }
+  .login-brand { font-size: var(--fs-2xl); font-weight: 700; color: var(--text); text-align: center; letter-spacing: var(--tr-2xl); }
+  .login-sub { font-size: var(--fs-xs); color: var(--muted); text-align: center; margin: 8px 0 24px; }
   .login-card input {
-    padding: 14px; border: 2px solid var(--line); border-radius: 10px; font-size: 16px; margin-bottom: 10px;
+    padding: 14px; border: 2px solid var(--line); border-radius: var(--r-sm); font-size: 16px;
+    margin-bottom: 10px; background: var(--surface-2); color: inherit;
   }
-  .login-card input:focus { outline: none; border-color: var(--blue-light); }
+  .login-card input:focus { outline: none; border-color: var(--blue); background: #fff; }
   .login-card button {
-    padding: 15px 0; border: none; border-radius: 10px; background: var(--blue); color: #fff;
-    font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 6px;
+    padding: 15px 0; border: none; border-radius: var(--r-sm); background: var(--blue); color: #fff;
+    font-size: var(--fs-md); font-weight: 800; cursor: pointer; margin-top: 6px;
+    --btn-edge: #0e3287;
   }
-  .login-card button:hover { background: var(--blue-dark); }
-  .login-card button:disabled { background: #91a6c4; cursor: progress; }
-  .login-err { color: var(--red); font-size: 13px; font-weight: 700; text-align: center; min-height: 18px; margin-top: 12px; }
+  .login-card button:disabled { background: #93a4c6; cursor: progress; }
+  .login-err { color: var(--red); font-size: var(--fs-xs); font-weight: 700; text-align: center; min-height: 18px; margin-top: 12px; }
 
-  /* ---------- Tabs ---------- */
-  .tabs { display: flex; background: var(--blue); flex-shrink: 0; }
+  /* ═══════════ Tabs ═══════════ */
+  .tabs { display: flex; background: var(--ink-2); flex-shrink: 0; }
   .tabs button {
-    flex: 1; border: none; background: transparent; color: #bcd3f0;
-    font-size: 14.5px; font-weight: 700; padding: 12px 4px; cursor: pointer;
-    border-bottom: 3px solid transparent; min-height: var(--tap); white-space: nowrap;
+    flex: 1; border: none; background: transparent; color: var(--on-ink-dim);
+    font-size: var(--fs-sm); font-weight: 600; padding: 13px 4px; cursor: pointer;
+    min-height: var(--tap); white-space: nowrap; position: relative; letter-spacing: var(--tr-sm);
   }
-  .tabs button.active { color: #fff; background: var(--blue-light); border-bottom-color: #ffd34e; }
+  .tabs button::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+    background: transparent; transition: background var(--press-out);
+  }
+  .tabs button.active { color: #fff; background: rgba(255,255,255,.06); }
+  .tabs button.active::after { background: #ffcb45; }
+  @media (hover: hover) { .tabs button:not(.active):hover { color: #dbe2ec; background: rgba(255,255,255,.03); } }
 
   main { flex: 1; overflow: hidden; }
   .view { display: none; height: 100%; }
   .view.active { display: flex; }
 
-  /* ---------- POS ---------- */
+  /* ═══════════ 장바구니 — 어느 화면 폭에서든 아래에서 올라오는 판 ═══════════
+     책 그리드가 화면을 가득 쓰고, 담기 시작하면 판이 올라온다.
+     넓은 화면에서는 오른쪽에 붙어 그리드를 덮지 않는다. */
+  /* 장바구니는 왼쪽에 세로로 꽉 찬 판이다. 계산 중에는 담긴 것이 늘 통째로 보여야 하고,
+     스크롤로 찾아 내려가는 일이 없어야 한다. 열고 닫히기는 하되 옆으로 미끄러진다. */
   .cart-pane {
-    width: 40%; min-width: 350px; max-width: 460px; background: var(--surface);
-    display: flex; flex-direction: column; border-right: 1px solid var(--line);
+    position: fixed; left: 0; bottom: 0; z-index: 95;
+    /* 머리·탭 아래에서 시작한다 — 판이 앱 머리를 덮으면 어디에 있는지가 사라진다 */
+    top: calc(54px + 48px + env(safe-area-inset-top, 0px));
+    width: 400px; max-width: 100%;
+    background: var(--surface);
+    display: flex; flex-direction: column;
+    border-right: 1px solid var(--line);
+    box-shadow: 6px 0 28px rgba(16,26,48,.14);
+    transform: translateX(-100%);
+    transition: transform var(--slide);
+    padding-bottom: var(--safe-b);
   }
+  .cart-pane.open { transform: translateX(0); }
   .cart-head {
     display: grid; grid-template-columns: 1fr 84px 108px 44px;
-    background: var(--blue); color: #fff; font-size: 13px; font-weight: 700;
-    padding: 11px 14px; gap: 6px;
+    background: var(--ink-2); color: #fff; font-size: var(--fs-xs); font-weight: 600;
+    padding: 13px 16px; gap: 6px; position: relative; align-items: center;
   }
   .cart-head span:nth-child(2){ text-align:center; }
   .cart-head span:nth-child(3){ text-align:right; }
-  /* 시트 닫기 버튼은 장바구니가 '올라오는 시트'로 동작하는 좁은 화면에서만 쓴다 */
-  .cart-head .sheet-close { display: none; }
-  .cart-items { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .cart-head .sheet-close {
+    display: block;
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: rgba(255,255,255,.14); border: none; color: #fff; width: 30px; height: 30px;
+    border-radius: 50%; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  .cart-items { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
+  .cart-empty { flex: 1; }
   .cart-row {
     display: grid; grid-template-columns: 1fr 84px 108px 44px; gap: 6px;
-    align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line-soft);
-    font-size: 14px;
+    align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--line-soft);
+    font-size: var(--fs-sm);
   }
-  .cart-row .title { font-weight: 600; line-height: 1.3; }
+  .cart-row .title { font-weight: 600; line-height: 1.35; }
   .cart-row .qty { display: flex; align-items: center; justify-content: center; gap: 4px; }
   .cart-row .qty button {
     width: 28px; height: 28px; border: 1px solid var(--line); background: var(--gray);
-    border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: 700; line-height: 1;
+    border-radius: 7px; cursor: pointer; font-size: 15px; font-weight: 700; line-height: 1; color: var(--text);
   }
   .cart-row .qty span { min-width: 20px; text-align: center; font-weight: 700; }
   .cart-row .amt { text-align: right; font-weight: 700; }
   .cart-row .del { text-align: center; }
   .cart-row .del button {
     width: 30px; height: 30px; border: none; background: var(--red-wash); color: var(--red);
-    border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 700;
+    border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700;
   }
-  /* 빈 장바구니 — 데스크톱에서는 세로로 긴 칸이라 글이 위에 붙어 있으면 아래가 버려진 공간처럼 보인다 */
   .cart-empty {
     height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 24px 20px; text-align: center; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6;
+    padding: 28px 20px; text-align: center; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6;
   }
 
-  .summary { border-top: 1px solid var(--line); padding: 12px 14px; background: #f8fafc; }
-  .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 2px; font-size: 15px; }
-  .sum-row.total { font-size: 21px; font-weight: 800; color: var(--blue-dark); border-top: 1px dashed var(--line); margin-top: 6px; padding-top: 11px; }
+  .summary { border-top: 1px solid var(--line); padding: 13px 16px; background: var(--surface-2); }
+  .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 2px; font-size: var(--fs-md); }
+  .sum-row.total { font-size: 22px; font-weight: 700; color: var(--text); border-top: 1px solid var(--line); margin-top: 7px; padding-top: 12px; letter-spacing: var(--tr-2xl); }
   .sum-row .k { color: var(--muted); }
   .sum-row .disc-input { display: flex; align-items: center; gap: 6px; }
-  .sum-row .disc-input input { width: 92px; text-align: right; padding: 8px 9px; border: 2px solid var(--line); border-radius: 7px; font-size: 15px; font-weight: 700; color: var(--red); background:#fff; }
-  .sum-row .disc-input em { font-style: normal; color: var(--muted); font-size: 14px; width: 14px; }
-  .disc-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
-  .disc-toggle button { border: none; background: #fff; color: var(--muted); font-size: 13px; font-weight: 700; padding: 8px 11px; cursor: pointer; }
-  .disc-toggle button.on { background: var(--blue); color: #fff; }
+  .sum-row .disc-input input { width: 92px; text-align: right; padding: 8px 10px; border: 2px solid var(--line); border-radius: 8px; font-size: var(--fs-md); font-weight: 700; color: var(--red); background:#fff; }
+  .sum-row .disc-input input:focus { outline: none; border-color: var(--red); }
+  .sum-row .disc-input em { font-style: normal; color: var(--muted); font-size: var(--fs-sm); width: 14px; }
+  .disc-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .disc-toggle button { border: none; background: #fff; color: var(--muted); font-size: var(--fs-xs); font-weight: 700; padding: 8px 12px; cursor: pointer; }
+  .disc-toggle button.on { background: var(--ink-2); color: #fff; }
   .sum-row.disc-calc { padding: 0 2px 4px; margin-top: -4px; min-height: 18px; }
-  .sum-row.disc-calc #discCalc { color: var(--red); font-size: 13px; font-weight: 700; }
+  .sum-row.disc-calc #discCalc { color: var(--red); font-size: var(--fs-xs); font-weight: 700; }
 
-  .pay-methods { display: flex; gap: 6px; padding: 0 14px 10px; }
+  .pay-methods { display: flex; gap: 6px; padding: 0 16px 10px; }
   .pay-methods button {
     flex: 1; min-height: var(--tap); border: 2px solid var(--line); background: #fff; padding: 0 4px;
     border-radius: var(--r-sm); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; color: var(--muted);
     white-space: nowrap;
   }
   .pay-methods button.sel { border-color: var(--blue); background: var(--blue-wash); color: var(--blue-dark); }
+  .pay-methods button[data-method="현금"].sel { border-color: var(--green); background: var(--green-wash); color: var(--green-dark); }
   .pay-methods button[data-method="분할"].sel { border-color: var(--amber); background: var(--amber-wash); color: var(--amber); }
 
-  /* 분할결제 — 현금만 입력받고 계좌이체는 자동으로 채운다 */
-  .split-pay { padding: 0 14px 10px; }
+  .split-pay { padding: 0 16px 10px; }
   .split-pay.hide { display: none; }
-  .sp-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 2px; font-size: 15px; }
+  .sp-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 2px; font-size: var(--fs-md); }
   .sp-row .sp-k { color: var(--muted); font-weight: 700; }
   .sp-row input {
-    width: 118px; text-align: right; padding: 9px 10px; border: 2px solid var(--line);
-    border-radius: 7px; font-size: 16px; font-weight: 800; color: var(--green-dark); background: #fff;
+    width: 118px; text-align: right; padding: 9px 11px; border: 2px solid var(--line);
+    border-radius: 8px; font-size: 16px; font-weight: 800; color: var(--green-dark); background: #fff;
   }
   .sp-row input:focus { outline: none; border-color: var(--green); }
-  .sp-row em { font-style: normal; color: var(--muted); font-size: 14px; margin-left: 5px; }
+  .sp-row em { font-style: normal; color: var(--muted); font-size: var(--fs-sm); margin-left: 5px; }
   .sp-row .sp-v { font-size: 16px; font-weight: 800; color: var(--blue-dark); }
   .sp-row .sp-v.bad { color: var(--red); }
-  .sp-hint { font-size: 12px; color: var(--muted); padding: 2px 2px 0; }
+  .sp-hint { font-size: var(--fs-2xs); color: var(--muted); padding: 2px 2px 0; }
   .sp-hint.bad { color: var(--red); font-weight: 700; }
-  /* 반품 모달의 수단별 환불 입력 — 장바구니의 분할결제와 같은 모양을 쓴다 */
-  .sp-row.total { border-top: 1px dashed var(--line); margin-top: 5px; padding-top: 9px; }
+  .sp-row.total { border-top: 1px solid var(--line); margin-top: 5px; padding-top: 9px; }
   #mRefundCash, #mRefundTr { width: 130px; }
   #mRefundTr { color: var(--blue-dark); }
-  #mRefundTr:focus { border-color: var(--blue-light); }
+  #mRefundTr:focus { border-color: var(--blue); }
 
-  .customer { padding: 0 14px 10px; }
+  .customer { padding: 0 16px 10px; }
   .customer.hide { display: none; }
-  .customer label { font-size: 12.5px; color: var(--muted); display:block; margin-bottom:5px; }
+  .customer label { font-size: var(--fs-2xs); color: var(--muted); display:block; margin-bottom:5px; font-weight: 600; }
   .customer input {
     width: 100%; padding: 11px 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
-    font-size: 16px; font-weight: 700;
+    font-size: 16px; font-weight: 700; background: #fff; color: inherit;
   }
-  .customer input:focus { outline: none; border-color: var(--blue-light); }
+  .customer input:focus { outline: none; border-color: var(--blue); }
   .customer label + input + label, .contact-extra label { margin-top: 8px; }
   .more-toggle {
-    margin-top: 7px; background: none; border: none; padding: 0; cursor: pointer;
-    font-size: 12.5px; font-weight: 700; color: var(--blue-dark);
+    margin-top: 8px; background: none; border: none; padding: 0; cursor: pointer;
+    font-size: var(--fs-2xs); font-weight: 700; color: var(--blue);
   }
   .contact-extra.hide { display: none; }
 
-  .pay-actions { display: flex; gap: 8px; padding: 0 14px 14px; }
+  .pay-actions { display: flex; gap: 8px; padding: 0 16px 16px; }
   .pay-actions .clear {
-    flex: 0 0 30%; min-height: 54px; border: none; border-radius: var(--r-sm); background: #e6e9ee;
-    color: #55606e; font-size: 16px; font-weight: 700; cursor: pointer;
+    flex: 0 0 30%; min-height: 52px; border: none; border-radius: var(--r-sm); background: var(--gray);
+    color: var(--ink-3); font-size: var(--fs-md); font-weight: 700; cursor: pointer;
+    --btn-edge: #d5d0c5;
   }
   .pay-actions .checkout {
-    flex: 1; min-height: 54px; border: none; border-radius: var(--r-sm); background: var(--green);
-    color: #fff; font-size: 18px; font-weight: 800; cursor: pointer;
+    flex: 1; min-height: 52px; border: none; border-radius: var(--r-sm); background: var(--green);
+    color: #fff; font-size: var(--fs-lg); font-weight: 700; cursor: pointer; letter-spacing: var(--tr-lg);
+    --btn-edge: #08472c;
   }
-  .pay-actions .checkout:disabled { background: #b7c2ce; cursor: not-allowed; }
+  .pay-actions .checkout:disabled { background: #b9bfc4; cursor: not-allowed; box-shadow: none; --btn-edge: transparent; }
 
-  /* 상품 그리드 */
-  .product-pane { flex: 1; padding: 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  .product-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-  .product-head h3 { font-size: 14px; color: var(--muted); font-weight: 700; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px; }
+  /* ═══════════ 상품 그리드 ═══════════ */
+  .product-pane { flex: 1; padding: 18px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+                  padding-bottom: calc(var(--bar-h) + var(--safe-b) + 18px); }
+  /* 장바구니가 왼쪽에 서 있는 동안은 화면 전체가 그만큼 비켜 준다 — 책이 가려지지 않게.
+     여백은 일부러 애니메이션하지 않는다: 책이 212종이라 padding 을 굴리면 그리드가
+     매 프레임 다시 계산돼 판이 미끄러지는 동안 화면이 끊긴다. 판만 움직이고 자리는 즉시 잡는다. */
+  @media (min-width: 900px) {
+    body.cart-open main { padding-left: 400px; }
+    body.cart-open .mobile-bar { padding-left: calc(400px + 18px); }
+  }
+  .product-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .product-head h3 { font-size: var(--fs-sm); color: var(--muted); font-weight: 700; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(208px, 1fr)); gap: 12px; }
   .book-btn {
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
-    padding: 16px 14px; cursor: pointer; text-align: left; position: relative;
-    box-shadow: var(--sh-1); transition: transform .06s, border-color .12s, box-shadow .12s;
-    display: flex; flex-direction: column; gap: 8px; min-height: 112px; color: inherit;
+    padding: 16px 15px; cursor: pointer; text-align: left; position: relative;
+    box-shadow: var(--sh-1);
+    display: flex; flex-direction: column; gap: 8px; min-height: 116px; color: inherit;
   }
-  .book-btn:hover { border-color: var(--blue-light); box-shadow: var(--sh-2); }
-  .book-btn:active { transform: scale(.975); }
-  .book-btn.out { opacity: .48; cursor: not-allowed; }
-  /* 재고가 세 자리('재고 100')면 배지가 넓어져 제목을 파고든다 — 자리를 넉넉히 비워 둔다.
-     제목은 두 줄 자리를 미리 잡는다. 한 줄짜리 책만 아래가 텅 비어 보이던 것을 없앤다.
-     줄 수를 제한하지는 않는다 — 성경은 '(인디고블루)' 처럼 구분되는 부분이 제목 끝에 있어서
-     잘리면 어느 책인지 못 고른다. */
+  @media (hover: hover) {
+    .book-btn:hover:not(.out) { border-color: var(--blue-light); box-shadow: var(--sh-2); }
+  }
+  .book-btn:active:not(.out) { box-shadow: none; border-color: var(--blue); }
+  .book-btn.out { opacity: .45; cursor: not-allowed; }
   .book-btn .bt {
     font-size: var(--fs-md); font-weight: 700; line-height: 1.35;
     min-height: calc(2 * 1.35em);
   }
   /* 배지 자리는 첫 줄에서만 비운다. 제목 전체를 밀어내면 좁은 카드에서 글자 폭이 절반으로
-     줄어 '42HB 단본 / 성경 (인디고 / 블루)' 처럼 잘게 쪼개진다. */
+     줄어 '42HB 단본 / 성경 (인디고 / 블루)' 처럼 잘게 쪼개진다. 제목은 절대 자르지 않는다. */
   .book-btn .bt::before { content: ''; float: right; width: 62px; height: 1.35em; }
-  .book-btn .bp { font-size: var(--fs-lg); font-weight: 800; color: var(--blue-dark); margin-top: auto; padding-top: 10px; }
+  .book-btn .bp { font-size: var(--fs-lg); font-weight: 700; color: var(--text); margin-top: auto; padding-top: 10px; }
+  /* 재고도 칩을 씌우지 않는다. 카드마다 회색 알약이 하나씩 떠 있으면 그게 먼저 보인다.
+     숫자만 두고 상태는 색으로 말한다 — 평소엔 흐리게, 모자라면 앰버, 품절이면 빨강. */
   .book-btn .bs {
-    position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: 700;
-    background: var(--gray); color: var(--muted); padding: 3px 8px; border-radius: var(--r-pill);
-    white-space: nowrap;
+    position: absolute; top: 14px; right: 15px; font-size: var(--fs-2xs); font-weight: 700;
+    color: var(--muted); white-space: nowrap; background: none; padding: 0; border-radius: 0;
+    font-variant-numeric: tabular-nums;
   }
-  .book-btn .bs.low { background: var(--amber-wash); color: var(--amber); }
-  .book-btn .bs.zero { background: var(--red-wash); color: var(--red); }
+  .book-btn .bs.low  { color: var(--amber); }
+  .book-btn .bs.zero { color: var(--red); }
 
-  /* 모바일 하단 결제 바 (작은 화면에서만) */
-  .mobile-bar { display: none; }
-  .sheet-backdrop { display: none; }
+  /* ═══════════ 항상 보이는 액션 바 ═══════════
+     어느 화면에서든 바닥에 '지금 할 일'이 고정돼 있다. 폰 세로에서는 이게 엄지 자리다. */
+  /* 바닥 바는 불투명한 띠가 아니라 내용 위에 떠 있는 재료다 — 책이 그 아래로 지나간다.
+     경계는 1px 선이 아니라, 내용이 바에 닿는 자리에서 옅게 흐려지는 가장자리로 만든다. */
+  .mobile-bar {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 93;
+    background: rgba(22,35,63,.82);
+    backdrop-filter: blur(18px) saturate(170%);
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+    color: var(--on-ink);
+    box-shadow: 0 -1px 0 rgba(255,255,255,.10) inset, 0 -12px 28px rgba(12,20,40,.14);
+    padding: 0 18px; gap: 14px; align-items: center;
+    height: calc(var(--bar-h) + var(--safe-b));
+    padding-bottom: var(--safe-b);
+  }
+  .mobile-bar .mb-sum { flex: 1; min-width: 0; }
+  .mobile-bar .mb-qty { font-size: var(--fs-2xs); color: var(--on-ink-dim); font-weight: 600; }
+  .mobile-bar .mb-amt { font-size: 26px; font-weight: 700; color: #fff; }
+  .mobile-bar .mb-open {
+    border: none; background: var(--green); color: #fff; border-radius: var(--r-sm);
+    min-height: 48px; padding: 0 24px; font-size: var(--fs-md); font-weight: 800; cursor: pointer;
+    --btn-edge: #08472c;
+  }
+  .mobile-bar .mb-open:disabled { background: #3a4353; color: #8b95a6; box-shadow: none; --btn-edge: transparent; cursor: not-allowed; }
 
-  /* ---------- 패널 공통 ---------- */
-  .panel { flex: 1; padding: 20px; overflow-y: auto; width: 100%; -webkit-overflow-scrolling: touch; }
-  .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
-  .panel-head h2 { font-size: var(--fs-xl); letter-spacing: -.3px; }
+  .sheet-backdrop {
+    display: block; position: fixed; inset: 0; background: rgba(16,22,32,.5);
+    z-index: 94; opacity: 0; pointer-events: none; transition: opacity .22s;
+  }
+  .sheet-backdrop.show { opacity: 1; pointer-events: auto; }
+
+  /* ═══════════ 패널 공통 ═══════════ */
+  .panel { flex: 1; padding: 22px; overflow-y: auto; width: 100%; -webkit-overflow-scrolling: touch;
+           padding-bottom: calc(var(--bar-h) + var(--safe-b) + 22px); }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+  .panel-head h2 { font-size: var(--fs-xl); }
   .panel-head .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .btn {
     padding: 0 16px; min-height: 40px; border: none; border-radius: var(--r-sm); font-size: var(--fs-sm);
-    font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   }
-  .btn.primary { background: var(--blue); color: #fff; }
-  .btn.green { background: var(--green); color: #fff; }
-  .btn.ghost { background: #fff; border: 1px solid var(--line); color: var(--text); }
-  .btn.danger { background: #fff; border: 1px solid #f0c0c0; color: var(--red); }
-  .btn.solid-danger { background: var(--red); color: #fff; }
-  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.primary { background: var(--blue); color: #fff; --btn-edge: #0e3287; }
+  .btn.green { background: var(--green); color: #fff; --btn-edge: #08472c; }
+  .btn.ghost { background: #fff; border: 1px solid var(--line); color: var(--text); box-shadow: var(--sh-1); }
+  .btn.ghost:active { box-shadow: none; }
+  .btn.danger { background: #fff; border: 1px solid #eec4c0; color: var(--red); box-shadow: var(--sh-1); }
+  .btn.danger:active { box-shadow: none; }
+  .btn.solid-danger { background: var(--red); color: #fff; --btn-edge: #8d221b; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; --btn-edge: transparent; }
 
-  /* ---------- 검색 / 필터 ---------- */
+  /* ═══════════ 검색 / 필터 ═══════════ */
   .search {
-    height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-sm);
+    height: 40px; padding: 0 13px; border: 1px solid var(--line); border-radius: var(--r-sm);
     font-size: var(--fs-sm); background: #fff; color: inherit; min-width: 0;
   }
-  .search:focus { outline: none; border-color: var(--blue-light); box-shadow: 0 0 0 3px var(--blue-wash); }
-  .filters {
-    display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px;
-  }
+  .search:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-wash); }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
   .filters .search { flex: 1 1 240px; }
   .filters input[type=date], .filters select {
-    height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm);
+    height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--r-sm);
     font-size: var(--fs-xs); background: #fff; color: inherit;
   }
   .filters .sep { color: var(--muted); font-size: var(--fs-xs); }
   .filters .chk {
-    display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px;
+    display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 13px;
     border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff;
     font-size: var(--fs-xs); font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap;
   }
   .filters .chk input { width: 15px; height: 15px; accent-color: var(--blue); cursor: pointer; }
-  .filters .count { font-size: 13px; color: var(--muted); font-weight: 700; margin-left: auto; white-space: nowrap; }
-  .filters .count b { color: var(--blue-dark); }
-  .filters.on .search { border-color: var(--blue-light); }
-  @media (max-width: 620px) {
-    .filters .count { margin-left: 0; width: 100%; }
-    .filters input[type=date] { flex: 1 1 42%; }
-    .filters select { flex: 1 1 42%; }
+  .filters .count { font-size: var(--fs-xs); color: var(--muted); font-weight: 700; margin-left: auto; white-space: nowrap; }
+  .filters .count b { color: var(--text); }
+  .filters.on .search { border-color: var(--blue); }
 
-    /* 기간 직접 지정은 날짜 두 칸 + 적용 이라 한 줄에 안 들어간다.
-       접히지 않으면 '적용' 이 화면 밖으로 밀려 눌리지 않는다. */
-    .period .custom { flex-wrap: wrap; width: 100%; margin-left: 0; }
-    .period .custom input { flex: 1 1 40%; min-width: 0; }
-    .period .custom button { flex: 1 1 100%; min-height: var(--tap); }
-  }
-
-  /* ---------- 카테고리 칩 ---------- */
-  .cats { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  /* ═══════════ 분류 칩 ═══════════ */
+  .cats { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
   .cats button {
-    padding: 0 14px; min-height: var(--pill-h); border: 1px solid var(--line); background: #fff;
+    padding: 0 15px; min-height: var(--pill-h); border: 1px solid var(--line); background: #fff;
     border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; color: var(--muted);
   }
-  .cats button.on { background: var(--blue); border-color: var(--blue); color: #fff; }
-  .cats button .n { font-weight: 600; opacity: .7; margin-left: 4px; font-size: 12px; }
+  .cats button.on { background: var(--ink-2); border-color: var(--ink-2); color: #fff; }
+  .cats button .n { font-weight: 600; opacity: .65; margin-left: 5px; font-size: var(--fs-2xs); }
+  /* 분류는 알약에 담지 않는다. 색 채운 둥근 칩은 어느 UI 키트에나 있는 얼굴이고,
+     제목 옆에 붙으면 제목보다 먼저 눈에 든다. 장부의 방주(傍註)처럼
+     앞에 색 눈금 하나 세우고 글자만 남긴다 — 조용하지만 색으로 바로 갈린다. */
   .cat-badge {
-    display: inline-block; padding: 2px 7px; border-radius: var(--r-pill); font-size: var(--fs-2xs); font-weight: 700;
-    background: var(--gray); color: var(--muted); margin-right: 6px; vertical-align: middle;
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: var(--fs-2xs); font-weight: 700; color: var(--muted);
+    margin-right: 9px; vertical-align: middle; letter-spacing: .01em;
+    background: none; padding: 0; border-radius: 0;
   }
-  .cat-badge.c-bible   { background: var(--blue-wash);  color: var(--blue-dark); }
-  /* 개역한글도 성경이라 같은 파랑을 쓰되, 채움 대신 테두리로 갈래를 가른다 */
-  .cat-badge.c-bible2  { background: var(--surface); color: var(--blue-light);
-                         box-shadow: inset 0 0 0 1px var(--blue-wash); }
-  .cat-badge.c-kids    { background: var(--amber-wash); color: var(--amber); }
-  .cat-badge.c-general { background: var(--green-wash); color: var(--green-dark); }
+  .cat-badge::before {
+    content: ''; width: 3px; height: 11px; border-radius: 1px;
+    background: currentColor; opacity: .85; flex: none;
+  }
+  .cat-badge.c-bible   { color: var(--blue); }
+  /* 개역한글도 성경이라 같은 파랑을 쓰되, 눈금을 반만 채워 갈래를 가른다 */
+  .cat-badge.c-bible2  { color: var(--blue-light); }
+  .cat-badge.c-bible2::before { background: linear-gradient(var(--blue-light) 50%, transparent 50%); }
+  .cat-badge.c-kids    { color: var(--amber); }
+  .cat-badge.c-general { color: var(--green-dark); }
+  .cat-badge.c-etc     { color: var(--muted); }
 
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px,1fr)); gap: 12px; margin-bottom: 18px; }
-  .stat { background: var(--surface); border-radius: var(--r-md); padding: 16px; border: 1px solid var(--line); box-shadow: var(--sh-1); }
-  .stat .lbl { font-size: var(--fs-xs); color: var(--muted); margin-bottom: 5px; font-weight: 600; }
-  .stat .val { font-size: var(--fs-2xl); font-weight: 800; color: var(--blue-dark); letter-spacing: -.5px; }
+  /* ═══════════ 통계 카드 ═══════════ */
+  /* 숫자는 카드에 담지 않는다. 흰 상자 + 옅은 테두리 + 큰 숫자는 어느 대시보드에나
+     붙어 있는 기성품 얼굴이라, 이 앱이 무엇인지 하나도 말해 주지 않는다.
+     대신 장부의 숫자 단처럼 종이 위에 세로 괘선으로만 갈라 놓는다. */
+  .cards {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(158px,1fr));
+    gap: 0; margin-bottom: 22px;
+    border-top: 2px solid var(--ink); border-bottom: 1px solid var(--line);
+  }
+  .stat { padding: 14px 18px 15px; border-left: 1px solid var(--line-soft); background: transparent; }
+  .stat:first-child { border-left: none; padding-left: 0; }
+  .stat .lbl {
+    font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 7px; font-weight: 600;
+    letter-spacing: .02em;
+  }
+  .stat .val { font-size: var(--fs-2xl); font-weight: 700; color: var(--text); }
   .stat .val.green { color: var(--green-dark); }
   .stat .val.red { color: var(--red); }
-  .stat .sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 5px; line-height: 1.45; }
-  .stat .sub .warn-text { color: var(--amber); font-weight: 700; }
   .stat .val.muted { color: var(--muted); }
+  .stat .sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 6px; line-height: 1.45; }
+  .stat .sub .warn-text { color: var(--amber); font-weight: 700; }
   /* 대표 숫자는 글자가 큰 만큼 자리도 두 칸을 쓴다 — 안 그러면 '1,842,000 / 원' 으로 갈라진다 */
   .stat.hero { grid-column: span 2; }
-  .stat.hero .val { font-size: var(--fs-3xl); }
+  .stat.hero .val { font-size: var(--fs-3xl); font-weight: 700; }
+  .stat.hero .lbl { color: var(--ink-3); font-weight: 700; }
 
-  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--r-md); }
-  table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--line); }
-  thead th { background: var(--blue); color: #fff; font-size: var(--fs-xs); padding: 11px 14px; text-align: left; font-weight: 700; white-space: nowrap; }
-  /* 데이터 표는 '내역' 칸 하나만 접히고 나머지는 안 접힌다.
-     안 그러면 고객 이름이 '김진/현', 금액이 '110,000/원', 배지가 '계좌이/체' 로 갈라진다. */
-  tbody td { padding: 11px 14px; border-top: 1px solid var(--line-soft); font-size: var(--fs-sm); white-space: nowrap; }
-  tbody td.cell-main { white-space: normal; width: 100%; }
-  tbody tr:hover { background: #f8fafc; }
-  .num { text-align: right; }
-  .center { text-align: center; }
-  .pill { display:inline-block; padding: 3px 10px; border-radius: var(--r-pill); font-size: var(--fs-2xs); font-weight: 700; white-space: nowrap; }
-  .pill.cash { background: var(--green-wash); color: var(--green-dark); }
-  .pill.transfer { background: var(--blue-wash); color: var(--blue-dark); }
-  .pill.diff { background: var(--red-wash); color: var(--red); }
-  .pill.mute { background: #e9edf3; color: #7b8695; }
-  .pill.warn { background: var(--amber-wash); color: var(--amber); }
-  /* 입출고 구분 — 출고는 돈이 들어오고, 입고는 돈이 나간다 */
-  .pill.out { background: var(--green-wash); color: var(--green-dark); }
-  .pill.in  { background: var(--amber-wash); color: var(--amber); }
-  tr.row-return > td { background: #fdf5f5; }
-  .sub { font-size: var(--fs-2xs); color: var(--muted); font-weight: 600; margin-top: 3px; }
-  .dim { color: var(--muted); opacity: .6; }
-  .pay-lines { display: inline-flex; flex-direction: column; gap: 4px; align-items: stretch; }
-  .pay-lines .pill { text-align: center; }
+  /* ═══════════ 표 ═══════════ */
+  .table-wrap { overflow-x: auto; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); box-shadow: var(--sh-1); }
+  table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+  thead th {
+    background: var(--surface-2); color: var(--muted); font-size: var(--fs-2xs); font-weight: 700;
+    text-align: left; padding: 11px 14px; white-space: nowrap; border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 2;
+  }
+  th.num, td.num { text-align: right; }
+  th.center, td.center { text-align: center; }
+  tbody td { padding: 12px 14px; border-top: 1px solid var(--line-soft); white-space: nowrap; vertical-align: middle; }
+  tbody tr:first-child td { border-top: none; }
+  tbody td.cell-main { white-space: normal; line-height: 1.45; }
+  @media (hover: hover) { tbody tr:hover td { background: var(--surface-2); } }
   .mini-btn {
-    padding: 0 11px; min-height: 36px; border: 1px solid var(--line); background:#fff;
-    border-radius: var(--r-sm); cursor:pointer; font-size: var(--fs-xs); font-weight:700; color: inherit;
+    height: 30px; padding: 0 11px; border: 1px solid var(--line); background: #fff; border-radius: 8px;
+    font-size: var(--fs-2xs); font-weight: 700; cursor: pointer; color: var(--text);
     display: inline-flex; align-items: center; justify-content: center;
   }
   .mini-btn + .mini-btn { margin-left: 5px; }
-  .mini-btn.plus { color: var(--green-dark); border-color:#bfe3cc; }
-  .mini-btn.del { color: var(--red); border-color: #f0c0c0; }
-  .empty-row td { text-align:center; color: var(--muted); padding: 34px; }
-  .more-wrap { text-align: center; margin-top: 14px; }
+  .mini-btn.plus { color: var(--green-dark); border-color:#b6ddc6; }
+  .mini-btn.del { color: var(--red); border-color: #eec4c0; }
+  .empty-row td { text-align:center; color: var(--muted); padding: 38px 20px; white-space: normal; line-height: 1.6; }
+  .more-wrap { text-align: center; margin-top: 16px; }
+  tr.row-return > td { background: #fdf4f3; }
+  .dim { color: var(--muted); opacity: .65; }
 
-  /* ---------- 리포트 ---------- */
-  .period { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  /* 표식은 밑줄 한 겹으로. 채운 알약을 줄마다 깔면 표가 사탕 상자가 된다. */
+  .pill {
+    display:inline-block; padding: 2px 1px 3px; font-size: var(--fs-2xs); font-weight: 700;
+    white-space: nowrap; border-bottom: 2px solid currentColor; border-radius: 0;
+  }
+  .pill.cash { color: var(--green-dark); }
+  .pill.transfer { color: var(--blue); }
+  .pill.diff { color: var(--red); }
+  .pill.mute { color: var(--muted); border-bottom-color: var(--line); }
+  .pill.warn { color: var(--amber); }
+  .pill.out { color: var(--green-dark); }
+  .pill.in  { color: var(--amber); }
+  .pay-lines { display: flex; flex-direction: column; gap: 3px; }
+  .pay-lines .pill { text-align: center; }
+
+  /* ═══════════ 리포트 ═══════════ */
+  .period { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
   .period button {
-    padding: 0 14px; min-height: var(--pill-h); border: 1px solid var(--line); background: #fff;
+    padding: 0 15px; min-height: var(--pill-h); border: 1px solid var(--line); background: #fff;
     border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; color: var(--muted);
   }
-  .period button.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .period button.on { background: var(--ink-2); border-color: var(--ink-2); color: #fff; }
   .period .custom { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
   .period .custom input {
-    padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13.5px; background: #fff; color: inherit;
+    padding: 8px 11px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-xs); background: #fff; color: inherit;
   }
-  .period .custom span { color: var(--muted); font-size: 13px; }
+  .period .custom span { color: var(--muted); font-size: var(--fs-xs); }
 
-  .chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 18px; box-shadow: var(--sh-1); margin-bottom: 18px; }
-  .chart-title { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
-  .chart-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 20px; box-shadow: var(--sh-1); margin-bottom: 20px; }
+  .chart-title { font-size: var(--fs-sm); font-weight: 700; margin-bottom: 3px; }
+  .chart-sub { font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 18px; }
   .chart { position: relative; }
   .chart-plot {
-    display: flex; align-items: flex-end; gap: 2px; height: 160px;
+    display: flex; align-items: flex-end; gap: 2px; height: 170px;
     border-bottom: 1px solid var(--line); padding-bottom: 0;
   }
   .chart-col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; cursor: default; position: relative; }
   .chart-col .bar {
-    background: var(--blue-light); border-radius: 4px 4px 0 0; min-height: 2px;
-    transition: background .1s;
+    background: #9db8e8; border-radius: 4px 4px 0 0; min-height: 2px;
+    transition: background .12s;
   }
-  .chart-col.peak .bar { background: var(--blue-dark); }
-  .chart-col:hover .bar { background: var(--blue-dark); }
+  .chart-col.peak .bar { background: var(--blue); }
+  @media (hover: hover) { .chart-col:hover .bar { background: var(--blue-dark); } }
   .chart-col .peak-label {
-    position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px;
+    position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 6px;
     font-size: 11px; font-weight: 700; color: var(--blue-dark); white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
-  .chart-x { display: flex; gap: 2px; margin-top: 7px; }
-  .chart-x span { flex: 1; min-width: 0; text-align: center; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .chart-x { display: flex; gap: 2px; margin-top: 8px; }
+  .chart-x span { flex: 1; min-width: 0; text-align: center; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; }
   .chart-tip {
-    position: absolute; pointer-events: none; opacity: 0; transition: opacity .1s;
-    background: var(--text); color: #fff; font-size: 12px; font-weight: 700;
-    padding: 7px 11px; border-radius: 8px; white-space: nowrap; z-index: 5; transform: translate(-50%, -100%);
-    box-shadow: var(--sh-2);
+    position: absolute; pointer-events: none; opacity: 0; transition: opacity .12s;
+    background: var(--ink); color: #fff; font-size: var(--fs-2xs); font-weight: 700;
+    padding: 8px 12px; border-radius: 8px; white-space: nowrap; z-index: 5; transform: translate(-50%, -100%);
+    box-shadow: var(--sh-2); font-variant-numeric: tabular-nums;
   }
   .chart-tip.show { opacity: 1; }
-  .chart-tip .t-d { color: #b9c6d6; font-weight: 600; display: block; font-size: 11px; }
-  .chart-empty { height: 160px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13.5px; }
+  .chart-tip .t-d { color: #a8b4c6; font-weight: 600; display: block; font-size: 11px; }
+  .chart-empty { height: 170px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: var(--fs-sm); }
 
-  /* ---------- Modal ---------- */
+  /* ═══════════ Modal ═══════════ */
   .overlay {
-    position: fixed; inset: 0; background: rgba(20,30,45,.52); display: none;
+    position: fixed; inset: 0; background: rgba(16,22,32,.55); display: none;
     align-items: center; justify-content: center; z-index: 100; padding: 16px;
     overscroll-behavior: contain;
   }
   .overlay.show { display: flex; }
   .modal {
-    background: #fff; border-radius: var(--r-lg); width: 400px; max-width: 100%;
-    max-height: calc(100dvh - 32px); overflow-y: auto; padding: 22px; box-shadow: var(--sh-3);
+    background: var(--surface); border-radius: var(--r-lg); width: 420px; max-width: 100%;
+    max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px; box-shadow: var(--sh-3);
   }
-  .modal.wide { width: 620px; }
-  .modal h3 { font-size: 17px; margin-bottom: 14px; }
-  .modal p.desc { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; }
-  .field { margin-bottom: 13px; }
-  .field label { display:block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
+  .modal.wide { width: 640px; }
+  .modal h3 { font-size: var(--fs-lg); margin-bottom: 15px; }
+  .modal p.desc { font-size: var(--fs-xs); color: var(--muted); margin-bottom: 15px; line-height: 1.65; }
+  .field { margin-bottom: 14px; }
+  .field label { display:block; font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 6px; font-weight: 700; }
   .field input {
     width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm); font-size: 16px;
+    background: #fff; color: inherit;
   }
-  .field input:focus, .field select:focus { outline: none; border-color: var(--blue-light); }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--blue); }
   .field select {
     width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
     font-size: 16px; background: #fff; color: inherit; font-weight: 700;
   }
   .field textarea {
     width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
-    font-size: 13px; font-family: ui-monospace, Menlo, Consolas, monospace; resize: vertical;
-    line-height: 1.5; color: inherit; background: #fff;
+    font-size: var(--fs-xs); font-family: ui-monospace, Menlo, Consolas, monospace; resize: vertical;
+    line-height: 1.55; color: inherit; background: #fff;
   }
-  .field textarea:focus { outline: none; border-color: var(--blue-light); }
+  .field textarea:focus { outline: none; border-color: var(--blue); }
   .chkline {
-    display: flex; align-items: center; gap: 8px; padding: 7px 0;
-    font-size: 13.5px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; gap: 9px; padding: 8px 0;
+    font-size: var(--fs-xs); font-weight: 700; cursor: pointer;
   }
-  .chkline input { width: 16px; height: 16px; accent-color: var(--blue); cursor: pointer; }
+  .chkline input { width: 17px; height: 17px; accent-color: var(--blue); cursor: pointer; flex-shrink: 0; }
   .field-row { display: flex; gap: 10px; }
   .field-row .field { flex: 1; min-width: 0; }
-  .modal-actions { display:flex; gap: 8px; margin-top: 8px; }
-  .modal-actions .btn { flex: 1; min-height: 46px; }
-  .warn-box { background: var(--red-wash); border: 1px solid #f0c0c0; border-radius: var(--r-sm); padding: 12px 14px; font-size: 13px; color: #8f2f2f; line-height: 1.6; margin-bottom: 14px; }
-  .info-box { background: var(--blue-wash); border: 1px solid #c9dcf5; border-radius: var(--r-sm); padding: 12px 14px; font-size: 13px; color: var(--blue-dark); line-height: 1.6; margin-bottom: 14px; }
-  .ret-list { max-height: 280px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
-  .ret-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); }
+  .modal-actions { display:flex; gap: 8px; margin-top: 10px; }
+  .modal-actions .btn { flex: 1; min-height: 48px; font-size: var(--fs-md); }
+  .warn-box { background: var(--red-wash); border: 1px solid #eec4c0; border-radius: var(--r-sm); padding: 13px 15px; font-size: var(--fs-xs); color: #8c2921; line-height: 1.65; margin-bottom: 15px; }
+  .info-box { background: var(--blue-wash); border: 1px solid #c9dcf5; border-radius: var(--r-sm); padding: 13px 15px; font-size: var(--fs-xs); color: var(--blue-dark); line-height: 1.65; margin-bottom: 15px; }
+  .ret-list { max-height: 290px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
+  .ret-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; border-bottom: 1px solid var(--line-soft); }
   .ret-row:last-child { border-bottom: none; }
-  .ret-title { font-size: 14px; font-weight: 700; }
-  .ret-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .ret-title { font-size: var(--fs-sm); font-weight: 700; line-height: 1.4; }
+  .ret-sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 3px; }
   .ret-qty { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .ret-qty button { width: 34px; height: 34px; border: 1px solid var(--line); background: var(--gray); border-radius: 7px; cursor: pointer; font-size: 16px; font-weight: 700; line-height: 1; }
-  .ret-qty input { width: 50px; text-align: center; padding: 7px 4px; border: 2px solid var(--line); border-radius: 7px; font-size: 15px; font-weight: 700; }
-  .pick-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 12px; border-bottom: 1px solid var(--line-soft); }
+  .ret-qty button { width: 34px; height: 34px; border: 1px solid var(--line); background: var(--gray); border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 700; line-height: 1; color: var(--text); }
+  .ret-qty input { width: 52px; text-align: center; padding: 7px 4px; border: 2px solid var(--line); border-radius: 8px; font-size: var(--fs-md); font-weight: 700; }
+  .pick-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 13px; border-bottom: 1px solid var(--line-soft); }
   .pick-row:last-child { border-bottom: none; }
-  .log-list { max-height: 340px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
-  .log-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+  .log-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
+  .log-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 11px 13px; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-xs); }
   .log-row:last-child { border-bottom: none; }
-  .log-when { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+  .log-when { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
   .log-delta { font-weight: 800; white-space: nowrap; }
   .log-delta.up { color: var(--green-dark); }
   .log-delta.down { color: var(--red); }
   .log-delta.flat { color: var(--muted); }
 
-  /* ---------- Toast / 업데이트 배너 ---------- */
+  /* ═══════════ Toast / 업데이트 배너 ═══════════ */
   #toast {
-    position: fixed; bottom: calc(24px + var(--safe-b)); left: 50%; transform: translateX(-50%) translateY(20px);
-    background: var(--text); color: #fff; padding: 13px 22px; border-radius: 30px; font-size: 15px;
-    font-weight: 700; opacity: 0; transition: all .25s; z-index: 300; pointer-events: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100vw - 32px); text-align: center;
+    position: fixed; bottom: calc(var(--bar-h) + var(--safe-b) + 18px); left: 50%;
+    transform: translateX(-50%) translateY(16px);
+    background: var(--ink); color: #fff; padding: 14px 24px; border-radius: var(--r-pill); font-size: var(--fs-md);
+    font-weight: 700; opacity: 0; transition: opacity .22s, transform .22s; z-index: 300; pointer-events: none;
+    box-shadow: var(--sh-3); max-width: calc(100vw - 32px); text-align: center;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   #toast.good { background: var(--green-dark); }
   #toast.bad { background: var(--red); }
   #updateBar {
     display: none; align-items: center; justify-content: center; gap: 12px;
-    background: #ffd34e; color: #4a3708; font-size: 13.5px; font-weight: 700;
-    padding: 9px 14px; flex-shrink: 0;
+    background: #ffcb45; color: #3d2d05; font-size: var(--fs-xs); font-weight: 700;
+    padding: 10px 14px; flex-shrink: 0;
   }
   #updateBar.show { display: flex; }
-  #updateBar button { border: none; background: #4a3708; color: #ffd34e; border-radius: 6px; padding: 7px 13px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  #updateBar button { border: none; background: #3d2d05; color: #ffcb45; border-radius: 7px; padding: 7px 14px; font-size: var(--fs-xs); font-weight: 700; cursor: pointer; --btn-edge: #241b03; }
 
   /* ═══════════ 태블릿 / 휴대폰 ═══════════ */
   @media (max-width: 899px) {
-    /* 폰에서는 입력 글자가 16px 미만이면 iOS 가 화면을 확대해 버린다.
-       계산대에서 책을 검색할 때마다 화면이 튀던 원인이라 작은 화면에서만 16px 로 올린다. */
+    /* 폰에서 입력 글자가 16px 미만이면 iOS 가 화면을 확대해 버린다 — 책을 검색할 때마다 화면이 튄다 */
     input, select, textarea, .search,
     .filters input[type=date], .filters select, .period .custom input { font-size: 16px; }
 
-    /* 손가락으로 누르는 것들은 --tap(44px) 을 지킨다 */
     .cats button, .period button { min-height: var(--tap); padding: 0 16px; }
     .mini-btn { min-height: var(--tap); padding: 0 14px; }
 
     body { height: 100dvh; }
-    header { padding: 0 12px; padding-top: env(safe-area-inset-top, 0px); }
+    header { padding: 0 14px; height: calc(52px + env(safe-area-inset-top, 0px)); }
+    header .brand { font-size: var(--fs-md); }
     header .brand span { display: none; }
-    header .info { gap: 8px; font-size: 12px; }
+    header .info { gap: 8px; font-size: var(--fs-2xs); }
     header .info .hide-sm { display: none; }
     .tabs { overflow-x: auto; scrollbar-width: none; }
     .tabs::-webkit-scrollbar { display: none; }
-    .tabs button { flex: 1 0 auto; padding: 12px 16px; font-size: 14px; }
+    .tabs button { flex: 1 0 auto; padding: 12px 15px; font-size: var(--fs-xs); }
 
-    /* 판매 화면: 상품이 전체 화면, 장바구니는 아래에서 올라오는 시트 */
     #pos.view.active { flex-direction: column; }
-    .product-pane { padding: 14px; padding-bottom: calc(84px + var(--safe-b)); }
-    .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+    .product-pane { padding: 14px; padding-bottom: calc(var(--bar-h) + var(--safe-b) + 14px); }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 10px; }
 
+    /* 폰에서는 왼쪽 기둥을 세울 자리가 없다 — 아래에서 올라와 화면을 덮는 판이 된다 */
     .cart-pane {
-      position: fixed; left: 0; right: 0; bottom: 0; top: auto;
-      width: 100%; min-width: 0; max-width: none; max-height: 88dvh;
-      border-right: none; border-radius: var(--r-lg) var(--r-lg) 0 0;
-      box-shadow: 0 -12px 40px rgba(16,28,48,.3); z-index: 95;
-      transform: translateY(105%); transition: transform .22s ease;
-      padding-bottom: var(--safe-b);
+      width: 100%; max-width: none; top: auto; max-height: 88dvh;
+      border-right: none; border-top: 1px solid var(--line);
+      border-radius: var(--r-lg) var(--r-lg) 0 0;
+      transform: translateY(calc(100% + 8px));
+      box-shadow: 0 -14px 44px rgba(12,20,40,.28);
     }
     .cart-pane.open { transform: translateY(0); }
-    .cart-head { border-radius: var(--r-lg) var(--r-lg) 0 0; position: relative; }
-    .cart-head .sheet-close {
-      display: block;
-      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-      background: rgba(255,255,255,.18); border: none; color: #fff; width: 30px; height: 30px;
-      border-radius: 50%; font-size: 15px; font-weight: 700; cursor: pointer;
-    }
+    .cart-head { border-radius: var(--r-lg) var(--r-lg) 0 0; }
     .cart-items { max-height: 34dvh; }
 
-    .sheet-backdrop {
-      display: block; position: fixed; inset: 0; background: rgba(20,30,45,.45);
-      z-index: 94; opacity: 0; pointer-events: none; transition: opacity .2s;
-    }
-    .sheet-backdrop.show { opacity: 1; pointer-events: auto; }
+    .panel { padding: 14px; padding-bottom: calc(var(--bar-h) + var(--safe-b) + 14px); }
+    .panel-head h2 { font-size: var(--fs-lg); }
+    .cards { grid-template-columns: repeat(auto-fit, minmax(148px,1fr)); gap: 10px; }
+    .stat { padding: 13px 14px; }
+    .stat .val { font-size: 22px; }
+    .stat.hero .val { font-size: 27px; }
 
-    .mobile-bar {
-      display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 93;
-      background: var(--surface); border-top: 1px solid var(--line);
-      box-shadow: 0 -4px 18px rgba(16,28,48,.1);
-      padding: 10px 14px calc(10px + var(--safe-b)); gap: 12px; align-items: center;
-    }
-    .mobile-bar .mb-sum { flex: 1; min-width: 0; }
-    .mobile-bar .mb-qty { font-size: 12px; color: var(--muted); font-weight: 600; }
-    .mobile-bar .mb-amt { font-size: 20px; font-weight: 800; color: var(--blue-dark); }
-    .mobile-bar .mb-open {
-      border: none; background: var(--green); color: #fff; border-radius: var(--r-sm);
-      min-height: 48px; padding: 0 22px; font-size: 16px; font-weight: 800; cursor: pointer;
-    }
-    .mobile-bar .mb-open:disabled { background: #b7c2ce; }
+    .mobile-bar { padding: 0 14px; }
+    .mobile-bar .mb-amt { font-size: 21px; }
+    .mobile-bar .mb-open { padding: 0 18px; }
+  }
 
-    .panel { padding: 14px; }
-    .panel-head h2 { font-size: 17px; }
-    .cards { grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 10px; }
-    .stat { padding: 13px; }
-    .stat .val { font-size: 21px; }
-    .stat.hero .val { font-size: 25px; }
+  @media (max-width: 620px) {
+    /* 분류 칩이 세 줄로 접히면 첫 화면에서 책이 두 줄밖에 안 보인다.
+       탭처럼 한 줄로 눕히고 옆으로 밀어 본다 — 스크롤 막대는 감춘다. */
+    .cats {
+      flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+      margin-left: -14px; margin-right: -14px; padding: 2px 14px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .cats::-webkit-scrollbar { display: none; }
+    .cats button { flex: 0 0 auto; }
+    .filters .count { margin-left: 0; width: 100%; }
+    .filters input[type=date] { flex: 1 1 42%; }
+    .filters select { flex: 1 1 100%; }
+    /* 기간 직접 지정은 날짜 두 칸 + 적용이라 한 줄에 안 들어간다.
+       접히지 않으면 '적용' 이 화면 밖으로 밀려 눌리지 않는다. */
+    .period .custom { flex-wrap: wrap; width: 100%; margin-left: 0; }
+    .period .custom input { flex: 1 1 40%; min-width: 0; }
+    .period .custom button { flex: 1 1 100%; min-height: var(--tap); }
+    .modal { padding: 18px; border-radius: var(--r-md); }
+    .modal-actions { position: sticky; bottom: 0; background: var(--surface);
+                     padding-top: 12px; margin-top: 12px; box-shadow: 0 -8px 12px -8px rgba(23,29,39,.18); }
+    .field-row { flex-wrap: wrap; }
+    .field-row .field { flex: 1 1 100%; }
+    .stat.hero { grid-column: span 2; }
   }
 
   /* 표 → 카드 (좁은 화면) */
   @media (max-width: 780px) {
-    .table-wrap { border-radius: 0; overflow: visible; }
+    .table-wrap { border-radius: 0; overflow: visible; border: none; background: transparent; box-shadow: none; }
     table { border: none; background: transparent; border-radius: 0; }
     thead { display: none; }
     tbody, tbody tr, tbody td { display: block; width: 100%; }
@@ -675,35 +880,45 @@
       background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
       margin-bottom: 10px; padding: 4px 0; box-shadow: var(--sh-1);
     }
-    tbody tr:hover { background: var(--surface); }
+    tbody tr:hover td { background: transparent; }
+    tbody tr:first-child td { border-top: none; }
     tbody td {
       border-top: none; display: flex; align-items: center; justify-content: space-between;
-      gap: 14px; padding: 8px 14px; text-align: right;
+      gap: 14px; padding: 9px 14px; text-align: right; white-space: normal;
     }
     tbody td + td { border-top: 1px solid var(--line-soft); }
     tbody td::before {
-      content: attr(data-label); color: var(--muted); font-weight: 700; font-size: 12px;
+      content: attr(data-label); color: var(--muted); font-weight: 700; font-size: var(--fs-2xs);
       text-align: left; flex: 0 0 auto; white-space: nowrap;
     }
-    tbody td.cell-main { font-size: 15px; }
+    tbody td.cell-main { font-size: var(--fs-md); font-weight: 600; }
     tbody td.cell-main::before { content: none; }
     tbody td.cell-main { justify-content: flex-start; text-align: left; }
     tbody td:empty { display: none; }
     .empty-row td { display: block; text-align: center; }
     .empty-row td::before { content: none; }
     .mini-btn + .mini-btn { margin-left: 6px; }
+    tr.row-return > td { background: transparent; }
+    tr.row-return { border-color: #eec4c0; background: #fdf4f3; }
   }
 
-  /* 아주 좁은 화면에서는 카드가 150px 남짓이라 배지 자리(62px)를 떼면 첫 줄에 글자가 안 남는다.
-     이때는 겹치지 말고 배지를 제목 위에 따로 올린다 — 카드가 조금 높아지는 대신 제목이 안 쪼개진다. */
-  @media (max-width: 380px) {
+  /* 아주 좁은 화면 — 카드가 150px 남짓이라 배지 자리(62px)를 떼면 첫 줄에 글자가 안 남는다.
+     이때는 겹치지 말고 배지를 제목 위에 따로 올린다. 제목은 여전히 안 자른다. */
+  @media (max-width: 400px) {
     .book-btn .bs { position: static; align-self: flex-end; }
     .book-btn .bt::before { content: none; }
-  }
-
-  @media (max-width: 420px) {
-    .cart-head, .cart-row { grid-template-columns: 1fr 76px 92px 40px; }
-    .period button { flex: 1 0 auto; }
+    .book-btn { min-height: 104px; padding: 13px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 9px; }
+    .cards { grid-template-columns: 1fr 1fr; }
+    .stat.hero { grid-column: span 2; }
+    .cart-head, .cart-row { grid-template-columns: 1fr 72px 88px 38px; }
+    .cart-row { padding: 10px 12px; }
+    .summary, .pay-methods, .customer, .split-pay, .pay-actions { padding-left: 12px; padding-right: 12px; }
+    .mobile-bar { gap: 10px; padding: 0 12px; }
+    .mobile-bar .mb-amt { font-size: 19px; }
+    .mobile-bar .mb-open { padding: 0 15px; font-size: var(--fs-sm); }
+    .panel-head .actions { width: 100%; }
+    .panel-head .actions .btn { flex: 1; }
   }
 </style>
 </head>
@@ -1368,9 +1583,13 @@ function renderCart() {
 }
 
 function renderMobileBar(totalQty) {
-  $('mbQty').textContent = totalQty ? `담긴 책 ${totalQty}권` : '담긴 책 없음';
-  $('mbAmt').textContent = won(payableAmount());
-  $('mbOpen').disabled = cart.length === 0;
+  renderActionBar();
+  /* 첫 권을 담으면 장바구니가 스스로 올라온다 — 예전 화면에서 늘 보이던 자리를
+     대신한다. 비면 다시 내려간다. 계산대에서 여는 손짓이 하나도 늘지 않게. */
+  if (currentView() === 'pos') {
+    if (cart.length && !cartOpenedOnce) { openSheet(); cartOpenedOnce = true; }
+    if (!cart.length) { closeSheet(); cartOpenedOnce = false; }
+  }
 }
 
 function cartTotal() {
@@ -1429,7 +1648,7 @@ function updateTotals() {
   $('sumPayable').textContent = won(cartTotal() - disc);
   $('discCalc').textContent =
     (discountMode === 'percent' && disc > 0) ? `${discountPct()}% → −${won(disc)}` : '';
-  $('mbAmt').textContent = won(cartTotal() - disc);
+  if (currentView() === 'pos') $('mbAmt').textContent = won(cartTotal() - disc);
 
   // 할인이 걸렸을 때만 '할인 종류'를 묻는다 → 시트 결제방식 열에 계좌이체(지역할인) 형태로 들어감
   const dw = $('discLabelWrap');
@@ -1461,12 +1680,14 @@ function addToCart(id) {
   const inCart = cart.find(c => c.id === id);
   if ((inCart ? inCart.qty : 0) >= b.stock) { toast('재고가 부족합니다.', 'bad'); return; }
   if (inCart) inCart.qty++; else cart.push({ id, qty: 1 });
+  playAddSound();
   renderCart();
 }
 function changeQty(id, d) {
   const c = cart.find(x => x.id === id); if (!c) return;
   const b = bookById(id);
   if (d > 0 && b && c.qty >= b.stock) { toast('재고가 부족합니다.', 'bad'); return; }
+  if (d > 0) playAddSound();
   c.qty += d;
   if (c.qty <= 0) cart = cart.filter(x => x.id !== id);
   renderCart();
@@ -1965,6 +2186,7 @@ function renderSales() {
   const more = $('salesMore');
   more.style.display = merged.length > salesShown ? '' : 'none';
   more.textContent = `더 보기 (${merged.length - salesShown}건 남음)`;
+  if (currentView() === 'sales') renderActionBar();
 }
 
 function fmtDateTime(iso) {
@@ -2259,6 +2481,7 @@ function renderReport() {
 
   renderChart(list);
   renderRank(list);
+  if (currentView() === 'report') renderActionBar();
 }
 
 /* 일별 매출 막대 — 단일 계열이라 범례 없음, 최고값만 직접 라벨 */
@@ -4366,96 +4589,60 @@ function resetAll() {
 
 
 /* ================= 효과음 =================
-   음원 파일을 두지 않고 WebAudio 로 그 자리에서 만든다. 파일이 0바이트라
-   오프라인(PWA)에서도 그대로 나고, 캐시·배포에 아무것도 얹지 않는다.
+   실제 계산대 소리를 쓴다. 음원은 base64 로 이 파일 안에 박아 둔다 —
+   따로 받아 오면 인터넷이 잠깐 끊긴 첫 결제에서 소리가 안 나고, 그때가 하필
+   소리가 가장 필요한 순간이다. 서비스워커 캐시에 기대지 않아도 늘 난다.
 
-   소리는 두 가지다:
-   · 개업 — 가게 문에 달린 종. 5도 위로 두 번 울리는 맑은 '띠링'.
-   · 결제 완료 — 포스기 금고가 열릴 때 나는 '카칭'. 종소리 두 번에
-     서랍이 튀어나오는 소리(잡음 훑기)와 멈추는 둔탁한 소리를 겹친다.
+   · 결제 완료 — 금전등록기 (209578 · zott820, freesound)
+   · 장바구니 담기 — 스캐너 삑 (555061 · magnuswaker, freesound)
 
-   소리는 사람이 누른 다음에만 난다 — 브라우저가 그때만 오디오를 열어 주고,
-   계산대에서 예고 없이 소리가 나면 놀라기 때문. */
-let audioCtx = null;
+   소리는 사람이 누른 다음에만 난다: 브라우저(특히 iOS)가 그때만 오디오를
+   열어 주고, 계산대에서 예고 없이 나면 놀라기 때문. */
+const SFX = {
+  cash: 'data:audio/mpeg;base64,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Ry/p5nzOUrG0vSWY0zq35ZlYyuVkMpWDMhlYzlo9x94s1KUrVxFOKKYpd1kTyF+e8VyVpoaRIlXIiu1qF0k2REZVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//twxLWD0eoM/CeJOcAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==',
+  beep: 'data:audio/mpeg;base64,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',
+};
+
 const soundOn = () => localStorage.getItem('soundOff') !== '1';
+
+/* 소리마다 오디오 조각을 미리 만들어 둔다. 담을 때마다 새로 만들면
+   빠르게 여러 권을 담을 때 앞소리가 끊긴다 — 여러 개를 돌려 쓴다. */
+const _sfxPool = {};
+function sfxNodes(key) {
+  if (!_sfxPool[key]) {
+    _sfxPool[key] = Array.from({ length: 4 }, () => {
+      const a = new Audio(SFX[key]);
+      a.preload = 'auto';
+      return a;
+    });
+    _sfxPool[key].at = 0;
+  }
+  return _sfxPool[key];
+}
+function play(key, volume = 1) {
+  if (!soundOn()) return;
+  try {
+    const pool = sfxNodes(key);
+    const a = pool[pool.at = (pool.at + 1) % pool.length];
+    a.currentTime = 0;
+    a.volume = volume;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});   // 아직 사용자가 아무것도 안 눌렀으면 조용히 넘어간다
+  } catch (e) { /* 소리는 부가 기능이다 — 실패해도 판매를 막지 않는다 */ }
+}
+
+/* 소리·화면·진동은 같은 프레임에 나와야 한 사건으로 느껴진다.
+   하나라도 늦으면 '반응'이 아니라 '알림'으로 읽힌다. 그래서 저장을 기다리지 않고
+   누른 자리에서 바로 낸다. 진동은 되는 기기에서만 (아이폰 사파리는 지원 안 함). */
+const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+const playDrawerSound = () => { play('cash'); buzz([14, 40, 22]); };   // 결제 완료 — 묵직하게
+const playAddSound = () => { play('beep', 0.55); buzz(9); };           // 담기 — 톡
+/* 개업은 가게 문을 여는 순간이라 같은 금전등록기 소리를 조금 작게 쓴다 */
+const playOpenChime = () => { play('cash', 0.7); buzz([10, 30, 10]); };
+
 function setSoundOn(on) {
   localStorage.setItem('soundOff', on ? '0' : '1');
-  if (on) { primeAudio(); beep(); }
-}
-/* 사람이 누른 흐름 안에서 열어야 iOS·사파리가 소리를 허락한다 */
-function primeAudio() {
-  try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
-    if (!audioCtx) audioCtx = new AC();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    return audioCtx;
-  } catch (e) { return null; }
-}
-
-/* 종소리 한 번. 배음을 살짝 어긋나게 얹어야 '삐-' 가 아니라 '띠링' 으로 들린다. */
-function chime(ctx, freq, at, dur = 1.1, gain = 0.16) {
-  [[1, 1], [2.01, 0.5], [3.02, 0.22], [4.7, 0.1]].forEach(([mult, amp]) => {
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.value = freq * mult;
-    g.gain.setValueAtTime(0, at);
-    g.gain.linearRampToValueAtTime(gain * amp, at + 0.006);      // 때리는 순간
-    g.gain.exponentialRampToValueAtTime(0.0001, at + dur * (1 / mult));
-    o.connect(g).connect(ctx.destination);
-    o.start(at); o.stop(at + dur + 0.05);
-  });
-}
-/* 잡음 한 조각 — 서랍이 미끄러져 나오는 소리 */
-function noiseSweep(ctx, at, dur, from, to, gain = 0.09) {
-  const n = Math.floor(ctx.sampleRate * dur);
-  const buf = ctx.createBuffer(1, n, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
-  const src = ctx.createBufferSource(); src.buffer = buf;
-  const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.1;
-  f.frequency.setValueAtTime(from, at);
-  f.frequency.exponentialRampToValueAtTime(to, at + dur);
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(gain, at);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-  src.connect(f).connect(g).connect(ctx.destination);
-  src.start(at); src.stop(at + dur);
-}
-/* 둔탁하게 '툭' — 서랍이 끝까지 나와 멈추는 소리 */
-function thunk(ctx, at, gain = 0.2) {
-  const o = ctx.createOscillator(), g = ctx.createGain();
-  o.type = 'triangle';
-  o.frequency.setValueAtTime(190, at);
-  o.frequency.exponentialRampToValueAtTime(55, at + 0.09);
-  g.gain.setValueAtTime(gain, at);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
-  o.connect(g).connect(ctx.destination);
-  o.start(at); o.stop(at + 0.2);
-}
-
-/* 문에 달린 종 — 개업할 때 */
-function playOpenChime() {
-  if (!soundOn()) return;
-  const ctx = primeAudio(); if (!ctx) return;
-  const t = ctx.currentTime + 0.02;
-  chime(ctx, 1318.5, t, 1.0);          // E6
-  chime(ctx, 1975.5, t + 0.13, 1.5);   // B6 — 5도 위
-}
-/* 금고 열리는 소리 — 결제가 끝났을 때 */
-function playDrawerSound() {
-  if (!soundOn()) return;
-  const ctx = primeAudio(); if (!ctx) return;
-  const t = ctx.currentTime + 0.02;
-  chime(ctx, 1567.9, t, 0.5, 0.14);          // G6 — 카
-  chime(ctx, 2093.0, t + 0.055, 0.75, 0.12); // C7 — 칭
-  noiseSweep(ctx, t + 0.10, 0.17, 1800, 500);
-  thunk(ctx, t + 0.25);
-}
-/* 소리를 켤 때 들려주는 짧은 확인음 */
-function beep() {
-  const ctx = primeAudio(); if (!ctx) return;
-  chime(ctx, 1567.9, ctx.currentTime + 0.02, 0.4, 0.12);
+  if (on) playAddSound();
 }
 
 /* ================= Toast ================= */
@@ -4469,15 +4656,90 @@ function toast(msg, type = '') {
 }
 
 /* ================= 장바구니 시트 (모바일) ================= */
-function openSheet() { $('cartPane').classList.add('open'); $('sheetBackdrop').classList.add('show'); }
-function closeSheet() { $('cartPane').classList.remove('open'); $('sheetBackdrop').classList.remove('show'); }
+/* 장바구니 판을 열어 둔 상태는 탭을 옮겨도 기억한다 — 재고를 확인하고 돌아왔을 때
+   판이 도로 닫혀 있으면 담아 둔 것을 다시 펼쳐야 한다.
+   판매 화면을 벗어나는 동안에는 화면에서만 치우고(표를 가리면 안 되니까),
+   돌아오면 기억해 둔 대로 되돌린다. 사람이 ✕ 로 닫았을 때만 정말 닫힌 것으로 본다. */
+let cartPinned = false;
+let cartOpenedOnce = false;
+function showSheet() {
+  $('cartPane').classList.add('open');
+  // 넓은 화면에서는 판이 왼쪽 기둥이라 화면이 비켜 주고, 좁은 화면에서는 덮으므로 뒤를 어둡게 한다
+  if (window.matchMedia('(max-width: 899px)').matches) $('sheetBackdrop').classList.add('show');
+  else document.body.classList.add('cart-open');
+}
+function hideSheet() {
+  $('cartPane').classList.remove('open');
+  $('sheetBackdrop').classList.remove('show');
+  document.body.classList.remove('cart-open');
+}
+function openSheet() { cartPinned = true; cartOpenedOnce = true; showSheet(); renderActionBar(); }
+function closeSheet() { cartPinned = false; hideSheet(); renderActionBar(); }
 
 /* ================= 이벤트 연결 ================= */
 function switchView(name) {
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === name));
-  $('mobileBar').style.display = name === 'pos' ? '' : 'none';
-  if (name !== 'pos') closeSheet();
+  if (name === 'pos') { if (cartPinned) showSheet(); }
+  else hideSheet();          // 닫는 게 아니라 잠깐 치우는 것 — cartPinned 는 그대로 둔다
+  renderActionBar();
+}
+
+/* ================= 항상 보이는 액션 바 =================
+   어느 화면에 있든 바닥에 '지금 할 일'이 고정돼 있다. 폰 세로에서는 이 자리가
+   엄지 자리라 주 동작이 늘 닿는다. 화면마다 담는 내용이 다르다:
+     판매   — 담긴 권수 · 받을 금액 · 장바구니 열기
+     재고   — 총 재고 · 매입 필요 종수 · 새 책 등록
+     입출고 — 지금 보이는 합계 · CSV 내보내기
+     리포트 — 보고 있는 기간의 매출 · CSV 내보내기 */
+let barAction = null;
+function setBar(sub, main, label, onClick, disabled = false) {
+  $('mbQty').textContent = sub;
+  $('mbAmt').textContent = main;
+  const btn = $('mbOpen');
+  btn.textContent = label;
+  btn.disabled = disabled;
+  barAction = onClick;
+}
+function currentView() {
+  const v = document.querySelector('.view.active');
+  return v ? v.id : 'pos';
+}
+function renderActionBar() {
+  const view = currentView();
+  if (view === 'pos') {
+    const qty = cart.reduce((s, c) => s + c.qty, 0);
+    // 판이 이미 서 있으면 버튼은 닫는 일을 한다 — 같은 자리에서 열고 닫는다
+    const open = $('cartPane').classList.contains('open');
+    setBar(qty ? `담긴 책 ${qty}권` : '담긴 책 없음', won(payableAmount()),
+           open ? '장바구니 닫기' : '장바구니',
+           () => (open ? closeSheet() : openSheet()), cart.length === 0);
+    return;
+  }
+  if (view === 'inventory') {
+    const stock = books.reduce((s, b) => s + b.stock, 0);
+    const low = books.filter(isLow).length;
+    setBar(low ? `매입 필요 ${low}종` : '재고 이상 없음', `${stock.toLocaleString('ko-KR')}권`,
+           '＋ 새 책', addBookModal);
+    return;
+  }
+  if (view === 'sales') {
+    const tx = (flowTab === 'in') ? [] : filteredTransactions();
+    const buy = (flowTab === 'out') ? [] : filteredPurchases();
+    const got = tx.reduce((s, t) => s + t.received, 0);
+    const paid = buy.reduce((s, b) => s + (b.amount || 0), 0);
+    const label = flowTab === 'in' ? '매입 합계' : (flowTab === 'out' ? '매출 합계' : '매출 − 매입');
+    const value = flowTab === 'in' ? paid : (flowTab === 'out' ? got : got - paid);
+    setBar(`${label} · ${tx.length + buy.length}건`, won(value),
+           '⬇ CSV', () => $('exportCsv').click(), tx.length + buy.length === 0);
+    return;
+  }
+  // report
+  const list = periodTx();
+  const revenue = list.reduce((s, t) => s + t.received, 0);
+  const { label } = periodRange();
+  setBar(`${label} 매출 · ${list.length}건`, won(revenue),
+         '⬇ CSV', () => $('exportPeriodCsv').click(), list.length === 0);
 }
 document.querySelectorAll('.tabs button').forEach(btn => {
   btn.onclick = () => switchView(btn.dataset.view);
@@ -4520,7 +4782,7 @@ $('posReturnBtn').onclick = returnPickerModal;
 $('addBookBtn').onclick = addBookModal;
 $('allLogsBtn').onclick = () => logModal(null);
 $('settingsBtn').onclick = settingsModal;
-$('mbOpen').onclick = openSheet;
+$('mbOpen').onclick = () => { if (barAction) barAction(); };
 $('sheetClose').onclick = closeSheet;
 $('sheetBackdrop').onclick = closeSheet;
 $('salesMore').onclick = () => { salesShown += SALES_PAGE; renderSales(); };
@@ -4581,6 +4843,7 @@ function renderAll() {
   renderReport();
   $('hdrRevenue').textContent = won(sessionRevenue());
   renderBiz();
+  renderActionBar();     // 바닥 바는 어느 화면을 보고 있든 그 화면의 숫자를 든다
 }
 
 /* ================= 로그인 / 초기화 ================= */

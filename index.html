@@ -3510,7 +3510,10 @@ function settingsModal() {
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn ghost" id="sSheetPull" style="flex:1">📥 판매 가져오기</button>
-        <button class="btn ghost" id="sSheetStock" style="flex:1">🧮 재고 맞추기</button>
+        <button class="btn ghost" id="sSheetBuy" style="flex:1">📦 입고 가져오기</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn ghost" id="sSheetStock" style="width:100%">🧮 재고 맞추기</button>
       </div>
     </div>
 
@@ -3553,6 +3556,7 @@ function settingsModal() {
   $('sSheetCfg').onclick = sheetConfigModal;
   $('sSheetSend').onclick = () => flushSheet(true);
   $('sSheetPull').onclick = importSalesModal;
+  $('sSheetBuy').onclick = importBuysModal;
   $('sSheetStock').onclick = syncStockModal;
   pingSheetMirror();   // 설정을 열 때마다 시트 쪽 버전을 다시 확인한다
   $('sReset').onclick = resetAll;
@@ -3924,6 +3928,159 @@ function syncStockModal() {
    흐름은 원래 앱 → 시트 한 방향이다. 이건 그 원칙의 예외가 아니라 '앱이 없던 며칠'을
    메우는 일회성 도구다. 그래서 기간을 사람이 직접 정하고, 미리보기를 반드시 거친다. */
 const SHEET_PAY = /^\s*(현금|계좌이체)\s*(?:\(\s*([^)]*)\s*\))?\s*$/;
+
+/* ================= 시트에서 입고 가져오기 (시트 → 앱) =================
+   앱은 2026-09 부터 입고를 숫자로 남긴다. 그 앞의 매입은 시트 원장에만 있다.
+   판매 가져오기와 같은 길을 쓴다 — 기록ID 가 빈 줄(= 손으로 적은 줄)만 읽고,
+   가져간 줄에는 표시를 남겨 두 번 가져오지 않는다.
+
+   재고는 건드리지 않는다. 그 입고는 이미 지금 재고에 녹아 있고, 순수익도 매출원가
+   기준이라 매입 줄과 무관하다. 이 기능이 채우는 것은 '입고 내역'과 '매입 합계'다. */
+const BUY_SKIP_PAY = /재고조정|환불/;
+
+function planBuyImport(rows) {
+  const skipped = {}, buys = [];
+  const skip = why => { skipped[why] = (skipped[why] || 0) + 1; };
+  rows.forEach(r => {
+    const kind = String(r.구분 || '').trim();
+    if (kind !== '입고') { skip(kind ? `${kind}(입고 아님)` : '구분 비어 있음'); return; }
+    const pay = String(r.결제 || '').trim();
+    // 재고조정과 반품(환불)은 '입고'로 적히지만 매입이 아니다
+    if (BUY_SKIP_PAY.test(pay)) { skip(`${pay}(매입 아님)`); return; }
+    const qty = Math.abs(Math.round(Number(r.수량) || 0));
+    if (!qty) { skip('수량 0'); return; }
+    const amount = Math.round(Number(r.입고금액) || 0);
+    const unit = Math.round(Number(r.입고단가) || 0);
+    const { cat, title } = stripCat(r.제품명);
+    const b = findBook(title, cat);
+    const cost = unit || (amount ? Math.round(amount / qty) : null);
+    buys.push({
+      row: r.row, 날짜: r.날짜, 제품명: r.제품명, 수량: qty,
+      title, category: b ? catOf(b) : cat, bookId: b ? b.id : null,
+      qty, cost, amount: amount || (cost != null ? cost * qty : null),
+      supplier: String(r.고객 || '').trim() || null,
+      // 시트에는 시각이 없다. 그날 낮 12시로 둬 시간대 때문에 날짜가 밀리지 않게 한다
+      time: new Date(`${r.날짜}T12:00:00`).toISOString(),
+    });
+  });
+  const noAmount = buys.filter(b => b.amount == null).length;
+  const unknown = [...new Set(buys.filter(b => !b.bookId).map(b => b.제품명))];
+  return { buys, skipped, noAmount, unknown };
+}
+
+function importBuysModal() {
+  const first = stockLogs.length ? new Date(stockLogs[stockLogs.length - 1].time) : new Date();
+  const from = new Date(first.getFullYear(), first.getMonth(), 1);
+
+  openModal(`
+    <h3>📦 시트에서 입고 가져오기</h3>
+    <div class="info-box">
+      원장 <b>입출고기록</b>의 <b>구분이 '입고'</b>인 줄 중 <b>앱이 모르는 줄</b>만 찾아
+      입고 기록으로 만듭니다. 가져온 줄에는 표시를 남겨 <b>두 번 가져오지 않습니다.</b><br>
+      <b>재고는 건드리지 않습니다</b> — 그 입고는 이미 지금 재고에 들어 있습니다.
+      채워지는 것은 <b>입출고 내역의 입고 목록</b>과 <b>매입 합계</b>입니다.<br>
+      결제 칸이 <b>재고조정 · 환불</b>인 줄은 매입이 아니라 건너뜁니다.
+    </div>
+    <div class="field-row">
+      <div class="field"><label>시작 날짜</label><input type="date" id="bFrom" value="${ymd(from)}"></div>
+      <div class="field"><label>끝 날짜</label><input type="date" id="bTo" value="${ymd(new Date())}"></div>
+    </div>
+    <div class="field">
+      <button class="btn ghost" id="bFetch" style="width:100%">🔻 이 기간에서 찾아보기</button>
+    </div>
+    <div class="field">
+      <label class="chkline"><input type="checkbox" id="bCost" checked> 입고단가가 비어 있는 책에 채워 넣기
+        <span class="dim">(순수익 계산에 쓰입니다)</span></label>
+    </div>
+    <div id="bPreview"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn primary" id="mSave" disabled>먼저 찾아보기</button>
+    </div>`, true);
+
+  $('mCancel').onclick = closeModal;
+  const save = $('mSave');
+  let plan = null;
+
+  $('bFetch').onclick = async () => {
+    const btn = $('bFetch');
+    btn.disabled = true; btn.textContent = '시트에서 읽는 중…';
+    try {
+      const out = await askSheet({ action: 'rows', from: $('bFrom').value, to: $('bTo').value });
+      plan = planBuyImport(out.rows || []);
+      const money = plan.buys.reduce((s, b) => s + (b.amount || 0), 0);
+      const skipLines = Object.entries(plan.skipped).map(([w, c]) => `${esc(w)} ${c}줄`).join(' · ');
+      const days = plan.buys.map(b => b.날짜).sort();
+      $('bPreview').innerHTML = `
+        <div class="info-box" style="margin-top:10px">
+          가져올 입고 <b>${plan.buys.length}줄</b> · 매입 합계 <b>${won(money)}</b><br>
+          ${days.length ? `찾은 날짜 <b>${esc(days[0])}</b> ~ <b>${esc(days[days.length - 1])}</b><br>` : ''}
+          ${skipLines ? `가져오지 않는 줄: ${skipLines}` : '건너뛴 줄 없음'}
+        </div>
+        ${plan.noAmount ? `<div class="warn-box" style="margin:10px 0 0">
+          <b>입고금액이 비어 있는 줄 ${plan.noAmount}개</b> — 목록에는 '금액 모름'으로 들어가고
+          매입 합계에는 안 잡힙니다.</div>` : ''}
+        ${plan.unknown.length ? `<div class="warn-box" style="margin:10px 0 0">
+          <b>앱에 없는 책 ${plan.unknown.length}종</b> — 입고 기록은 남지만 그 책의 입고단가는
+          채울 수 없습니다.
+          <div class="sub" style="max-height:60px;overflow:auto;color:inherit">${esc(plan.unknown.join(', '))}</div></div>` : ''}
+        ${plan.buys.length ? `<div class="info-box" style="margin:10px 0 0;max-height:150px;overflow:auto">
+          ${plan.buys.slice(0, 40).map(b => `${esc(b.날짜)} · ${esc(b.title)} ×${b.qty} ·
+            ${b.amount != null ? won(b.amount) : '금액 모름'}${b.supplier ? ' · ' + esc(b.supplier) : ''}`).join('<br>')}
+          ${plan.buys.length > 40 ? '<br>…' : ''}</div>` : ''}`;
+      save.disabled = plan.buys.length === 0;
+      save.textContent = plan.buys.length ? `${plan.buys.length}줄 가져오기` : '가져올 줄 없음';
+    } catch (e) {
+      console.error('시트 입고 읽기 실패', e);
+      $('bPreview').innerHTML = `<div class="warn-box">읽지 못했습니다 · ${esc(e.message || '연결 확인')}</div>`;
+    } finally {
+      btn.disabled = false; btn.textContent = '🔻 이 기간에서 다시 찾아보기';
+    }
+  };
+
+  save.onclick = async () => {
+    if (!plan || !plan.buys.length) return;
+    const fillCost = $('bCost').checked;
+    save.disabled = true; save.textContent = '가져오는 중…';
+    try {
+      const marks = [];
+      await runBatched(plan.buys, (batch, b) => {
+        const ref = doc(logsCol);
+        batch.set(ref, logEntry({
+          bookId: b.bookId, title: b.title, reason: '입고', time: b.time,
+          note: '시트에서 가져옴', category: b.category,
+          qty: b.qty, cost: b.cost, amount: b.amount, supplier: b.supplier,
+          sheetKey: 'buy:' + ref.id,
+        }));
+        marks.push({ row: b.row, key: 'buy:' + ref.id,
+                     날짜: b.날짜, 제품명: b.제품명, 수량: b.수량 });
+      });
+      /* 입고단가가 비어 있는 책만 채운다. 이미 값이 있으면 건드리지 않는다 —
+         앱에서 손으로 맞춰 둔 값이 옛 시트 값으로 덮이면 안 되기 때문. */
+      if (fillCost) {
+        const want = new Map();
+        plan.buys.forEach(b => {
+          if (!b.bookId || b.cost == null) return;
+          const cur = want.get(b.bookId);
+          if (!cur || cur.time < b.time) want.set(b.bookId, b);   // 가장 최근 입고단가
+        });
+        const fill = [...want.values()].filter(b => {
+          const bk = bookById(b.bookId);
+          return bk && !Number.isFinite(bk.cost);
+        });
+        if (fill.length) await runBatched(fill, (batch, b) =>
+          batch.update(doc(booksCol, b.bookId), { cost: b.cost }));
+      }
+      queueSheetMark(marks);
+      closeModal();
+      toast(`시트에서 입고 ${plan.buys.length}줄을 가져왔습니다.`, 'good');
+    } catch (e) {
+      console.error('시트 입고 가져오기 실패', e);
+      save.disabled = false; save.textContent = '다시 시도';
+      toast('가져오기 실패 · ' + (e.message || '연결 확인'), 'bad');
+    }
+  };
+}
 
 function importSalesModal() {
   /* 기본 기간: 앱의 첫 거래가 있는 **달의 1일** ~ 오늘.

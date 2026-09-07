@@ -90,6 +90,22 @@ var HEADER_ALIASES = {
 };
 
 var HEADER_SCAN_ROWS = 8;      // 머리글이 첫 줄이 아닐 수 있어 위쪽 몇 줄을 훑는다
+
+/* ---------- 서식 때문에 생기는 사고 막기 ----------
+   글자를 안 바꾸고 '서식만' 바꿔도 깨지는 게 딱 하나 있다: **셀 병합**.
+   - 머리글을 병합하면 값이 왼쪽 끝 칸에만 들어가서, 이름으로 찾은 열 번호가
+     실제 데이터 열과 어긋난다. 그러면 엉뚱한 칸을 읽고도 아무 말 없이 잘 돌아간다.
+   - 데이터 영역이 병합돼 있으면 setValues() 가 예외를 던져 그 묶음이 통째로 실패한다.
+   조용히 틀리는 것보다 시끄럽게 멈추는 편이 낫다 — 그래서 미리 확인하고 알려준다.
+   (볼드·색·테두리·글꼴·열너비·숨기기·틀고정·조건부서식은 값을 안 건드려 전혀 무관하다) */
+function assertNoMerge(sheet, range, what) {
+  var merged;
+  try { merged = range.getMergedRanges(); } catch (e) { return; }   // 권한 문제면 그냥 넘어간다
+  if (!merged || !merged.length) return;
+  throw new Error('"' + sheet.getName() + '" 탭의 ' + what + '에 **병합된 셀**이 있습니다 ('
+    + merged[0].getA1Notation() + ' 등 ' + merged.length + '곳). 병합을 풀어 주세요 — '
+    + '병합된 칸은 값이 왼쪽 끝에만 들어가 앱이 열을 잘못 읽습니다.');
+}
 var SENT_SHEET = '_전송기록';   // 같은 거래를 두 번 적지 않기 위한 숨김 시트
 var TOKEN_KEY = 'MIRROR_TOKEN';
 
@@ -241,6 +257,7 @@ function findHeader(sheet) {
     });
     var keyAt = cells.indexOf(KEY_HEADER);
     if (keyAt !== -1) col.기록ID = keyAt + 1;
+    assertNoMerge(sheet, sheet.getRange(r + 1, 1, 1, lastCol), '머리글 줄(' + (r + 1) + '행)');
     return { row: r + 1, col: col, width: lastCol, cells: cells };
   }
   throw new Error('"' + sheet.getName() + '" 탭에서 머리글(날짜·제품명) 줄을 찾지 못했습니다.');
@@ -273,6 +290,8 @@ function appendRecords(sheet, entries) {
 
   var start = Math.max(lastFilledRow(sheet, h) + 1, h.row + 1);
   var target = sheet.getRange(start, 1, values.length, width);
+  // 쓸 자리가 병합돼 있으면 setValues 가 중간에 터진다 — 손대기 전에 막는다
+  assertNoMerge(sheet, target, '기록을 붙일 자리(' + start + '행부터)');
   try {
     target.setValues(values);
   } catch (err) {
@@ -471,6 +490,21 @@ function stockHeader(sheet) {
     var cells = grid[r].map(function (v) { return String(v).trim(); });
     var price = cells.indexOf('단가');
     if (price < 1 || cells.indexOf('안전재고') === -1) continue;
+    assertNoMerge(sheet, sheet.getRange(r + 1, 1, 1, lastCol), '머리글 줄(' + (r + 1) + '행)');
+    /* 이 탭은 제품명 칸에 머리글이 없어서 '단가 바로 왼쪽'을 제품명으로 본다.
+       단가 왼쪽에 열을 하나 끼워 넣으면 그 가정이 깨지는데, 그러면 빈 열을 제품명으로
+       읽어 '책이 하나도 없다'고 조용히 답한다. 아래 몇 줄을 실제로 들여다봐 확인한다. */
+    var probe = 0, filled = 0;
+    for (var k = r + 1; k < grid.length && probe < 10; k++) {
+      if (String(grid[k][price] || '').trim() === '') continue;   // 단가가 빈 줄은 건너뛴다
+      probe++;
+      if (String(grid[k][price - 1] || '').trim()) filled++;
+    }
+    if (probe >= 3 && filled === 0) {
+      throw new Error('"' + sheet.getName() + '" 탭의 제품명 열을 찾지 못했습니다. '
+        + '이 탭은 \'단가\' 바로 왼쪽 칸을 제품명으로 봅니다 — 단가 왼쪽에 열을 새로 '
+        + '끼워 넣었다면 그 열을 빼거나, 제품명 칸 머리글에 \'제품명\' 이라고 적어 주세요.');
+    }
     return {
       row: r, grid: grid, lastRow: lastRow, lastCol: lastCol,
       at: { 제품명: price - 1, 단가: price,

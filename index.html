@@ -1531,6 +1531,7 @@ function checkout() {
   // 재고는 increment(원자적)으로, 매출·이력은 새 문서로 → 동시 판매에도 안전
   const txRef = doc(txCol);
   const batch = writeBatch(db);
+  playDrawerSound();          // 누른 그 자리에서 — 저장을 기다리면 소리가 늦다
   lines.forEach(l => {
     batch.update(doc(booksCol, l.book.id), { stock: increment(-l.qty), sold: increment(l.qty) });
   });
@@ -2063,6 +2064,7 @@ function renderBiz() {
 async function openBiz() {
   const btn = $('bizOpenBtn');
   btn.disabled = true; btn.textContent = '개업하는 중…';
+  playOpenChime();
   const now = new Date();
   try {
     await setDoc(doc(db, 'meta', 'session'), {
@@ -3532,6 +3534,9 @@ function settingsModal() {
 
     <div class="field">
       <label>계정</label>
+      <label class="chkline" style="margin-bottom:10px">
+        <input type="checkbox" id="sSound"${soundOn() ? ' checked' : ''}> 효과음
+        <span class="dim">(개업 종소리 · 결제 완료 금고 소리)</span></label>
       <button class="btn ghost" id="sLogout" style="width:100%">로그아웃 (${esc(auth.currentUser ? auth.currentUser.email : '')})</button>
     </div>
 
@@ -3545,6 +3550,7 @@ function settingsModal() {
   $('mCancel').onclick = closeModal;
   $('sBackup').onclick = () => backupNow();
   $('sRestore').onclick = () => $('restoreFile').click();
+  $('sSound').onchange = e => setSoundOn(e.target.checked);
   $('sLogout').onclick = () => { closeModal(); signOut(auth); };
   $('sImport').onclick = importSheetModal;
   $('sBiz').onclick = () => {
@@ -4356,6 +4362,100 @@ function resetAll() {
       } catch (e) { console.error(e); toast('초기화 실패 · 연결 확인', 'bad'); }
     },
   });
+}
+
+
+/* ================= 효과음 =================
+   음원 파일을 두지 않고 WebAudio 로 그 자리에서 만든다. 파일이 0바이트라
+   오프라인(PWA)에서도 그대로 나고, 캐시·배포에 아무것도 얹지 않는다.
+
+   소리는 두 가지다:
+   · 개업 — 가게 문에 달린 종. 5도 위로 두 번 울리는 맑은 '띠링'.
+   · 결제 완료 — 포스기 금고가 열릴 때 나는 '카칭'. 종소리 두 번에
+     서랍이 튀어나오는 소리(잡음 훑기)와 멈추는 둔탁한 소리를 겹친다.
+
+   소리는 사람이 누른 다음에만 난다 — 브라우저가 그때만 오디오를 열어 주고,
+   계산대에서 예고 없이 소리가 나면 놀라기 때문. */
+let audioCtx = null;
+const soundOn = () => localStorage.getItem('soundOff') !== '1';
+function setSoundOn(on) {
+  localStorage.setItem('soundOff', on ? '0' : '1');
+  if (on) { primeAudio(); beep(); }
+}
+/* 사람이 누른 흐름 안에서 열어야 iOS·사파리가 소리를 허락한다 */
+function primeAudio() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  } catch (e) { return null; }
+}
+
+/* 종소리 한 번. 배음을 살짝 어긋나게 얹어야 '삐-' 가 아니라 '띠링' 으로 들린다. */
+function chime(ctx, freq, at, dur = 1.1, gain = 0.16) {
+  [[1, 1], [2.01, 0.5], [3.02, 0.22], [4.7, 0.1]].forEach(([mult, amp]) => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq * mult;
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(gain * amp, at + 0.006);      // 때리는 순간
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur * (1 / mult));
+    o.connect(g).connect(ctx.destination);
+    o.start(at); o.stop(at + dur + 0.05);
+  });
+}
+/* 잡음 한 조각 — 서랍이 미끄러져 나오는 소리 */
+function noiseSweep(ctx, at, dur, from, to, gain = 0.09) {
+  const n = Math.floor(ctx.sampleRate * dur);
+  const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.1;
+  f.frequency.setValueAtTime(from, at);
+  f.frequency.exponentialRampToValueAtTime(to, at + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(gain, at);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  src.connect(f).connect(g).connect(ctx.destination);
+  src.start(at); src.stop(at + dur);
+}
+/* 둔탁하게 '툭' — 서랍이 끝까지 나와 멈추는 소리 */
+function thunk(ctx, at, gain = 0.2) {
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'triangle';
+  o.frequency.setValueAtTime(190, at);
+  o.frequency.exponentialRampToValueAtTime(55, at + 0.09);
+  g.gain.setValueAtTime(gain, at);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+  o.connect(g).connect(ctx.destination);
+  o.start(at); o.stop(at + 0.2);
+}
+
+/* 문에 달린 종 — 개업할 때 */
+function playOpenChime() {
+  if (!soundOn()) return;
+  const ctx = primeAudio(); if (!ctx) return;
+  const t = ctx.currentTime + 0.02;
+  chime(ctx, 1318.5, t, 1.0);          // E6
+  chime(ctx, 1975.5, t + 0.13, 1.5);   // B6 — 5도 위
+}
+/* 금고 열리는 소리 — 결제가 끝났을 때 */
+function playDrawerSound() {
+  if (!soundOn()) return;
+  const ctx = primeAudio(); if (!ctx) return;
+  const t = ctx.currentTime + 0.02;
+  chime(ctx, 1567.9, t, 0.5, 0.14);          // G6 — 카
+  chime(ctx, 2093.0, t + 0.055, 0.75, 0.12); // C7 — 칭
+  noiseSweep(ctx, t + 0.10, 0.17, 1800, 500);
+  thunk(ctx, t + 0.25);
+}
+/* 소리를 켤 때 들려주는 짧은 확인음 */
+function beep() {
+  const ctx = primeAudio(); if (!ctx) return;
+  chime(ctx, 1567.9, ctx.currentTime + 0.02, 0.4, 0.12);
 }
 
 /* ================= Toast ================= */

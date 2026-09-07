@@ -429,6 +429,8 @@
   .stat .val { font-size: var(--fs-2xl); font-weight: 800; color: var(--blue-dark); letter-spacing: -.5px; }
   .stat .val.green { color: var(--green-dark); }
   .stat .val.red { color: var(--red); }
+  .stat .sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 5px; line-height: 1.45; }
+  .stat .sub .warn-text { color: var(--amber); font-weight: 700; }
   .stat .val.muted { color: var(--muted); }
   /* 대표 숫자는 글자가 큰 만큼 자리도 두 칸을 쓴다 — 안 그러면 '1,842,000 / 원' 으로 갈라진다 */
   .stat.hero { grid-column: span 2; }
@@ -450,6 +452,10 @@
   .pill.diff { background: var(--red-wash); color: var(--red); }
   .pill.mute { background: #e9edf3; color: #7b8695; }
   .pill.warn { background: var(--amber-wash); color: var(--amber); }
+  /* 입출고 구분 — 출고는 돈이 들어오고, 입고는 돈이 나간다 */
+  .pill.out { background: var(--green-wash); color: var(--green-dark); }
+  .pill.in  { background: var(--amber-wash); color: var(--amber); }
+  tr.row-return > td { background: #fdf5f5; }
   .sub { font-size: var(--fs-2xs); color: var(--muted); font-weight: 600; margin-top: 3px; }
   .dim { color: var(--muted); opacity: .6; }
   .pay-lines { display: inline-flex; flex-direction: column; gap: 4px; align-items: stretch; }
@@ -745,7 +751,7 @@
 <div class="tabs">
   <button class="active" data-view="pos">🛒 판매</button>
   <button data-view="inventory">📦 재고</button>
-  <button data-view="sales">📊 매출 내역</button>
+  <button data-view="sales">📊 입출고 내역</button>
   <button data-view="report">📈 리포트</button>
 </div>
 
@@ -867,22 +873,24 @@
   <section class="view" id="sales">
     <div class="panel">
       <div class="panel-head">
-        <h2>📊 매출 내역</h2>
+        <h2>📊 입출고 내역</h2>
         <div class="actions">
           <button class="btn ghost" id="exportCsv">⬇ 지금 보이는 목록 CSV</button>
         </div>
       </div>
 
+      <div class="cats" id="flowChips"></div>
+
       <div class="filters" id="salesFilters">
-        <input id="qSales" class="search" type="search" placeholder="🔍 책 제목 · 고객 이름으로 찾기">
+        <input id="qSales" class="search" type="search" placeholder="🔍 책 제목 · 고객 · 거래처로 찾기">
         <input type="date" id="fFrom" title="시작일"><span class="sep">~</span><input type="date" id="fTo" title="종료일">
-        <select id="fMethod">
+        <select id="fMethod" data-only="out">
           <option value="">결제수단 전체</option>
           <option value="현금">현금</option>
           <option value="계좌이체">계좌이체</option>
           <option value="분할">분할결제</option>
         </select>
-        <select id="fType">
+        <select id="fType" data-only="out">
           <option value="">판매+반품</option>
           <option value="sale">판매만</option>
           <option value="return">반품만</option>
@@ -891,21 +899,10 @@
         <span class="count" id="salesCount"></span>
       </div>
 
-      <div class="cards">
-        <div class="stat hero"><div class="lbl">매출 합계 (실수령)</div><div class="val green" id="sReceived">0원</div></div>
-        <div class="stat"><div class="lbl">총 판매 건수</div><div class="val" id="sTxCount">0건</div></div>
-        <div class="stat"><div class="lbl">판매 금액 합계(정가)</div><div class="val" id="sTotal">0원</div></div>
-        <div class="stat"><div class="lbl">할인 합계</div><div class="val red" id="sDiscount">0원</div></div>
-        <div class="stat"><div class="lbl">환불 금액 합계</div><div class="val red" id="sRefund">0원</div></div>
-      </div>
+      <div class="cards" id="salesCards"></div>
       <div class="table-wrap">
         <table>
-          <thead><tr>
-            <th>일시</th><th>구매 내역</th><th>고객</th><th class="num">수량</th>
-            <th class="num">정가 합계</th><th class="num">할인</th><th class="num">결제 금액</th>
-            <th class="center">결제수단</th>
-            <th class="center">관리</th>
-          </tr></thead>
+          <thead id="salesHead"></thead>
           <tbody id="salesBody"></tbody>
         </table>
       </div>
@@ -942,6 +939,10 @@
         <div class="stat"><div class="lbl">💳 계좌이체</div><div class="val" id="rTransfer">0원</div></div>
         <div class="stat"><div class="lbl">할인 합계</div><div class="val red" id="rDisc">0원</div></div>
         <div class="stat"><div class="lbl">환불 금액 합계</div><div class="val red" id="rRefund">0원</div></div>
+        <div class="stat hero"><div class="lbl">순수익 (매출 − 원가)</div>
+          <div class="val green" id="rProfit">0원</div>
+          <div class="sub" id="rProfitSub"></div></div>
+        <div class="stat"><div class="lbl">판매된 책 원가</div><div class="val red" id="rCogs">0원</div></div>
       </div>
 
       <div class="chart-card">
@@ -1003,6 +1004,7 @@ const db = initializeFirestore(app, {
 const booksCol = collection(db, 'books');
 const txCol    = collection(db, 'transactions');
 const logsCol  = collection(db, 'stockLogs');   // 재고·가격 변동 원장
+const LOG_WINDOW = 3000;   // 실시간으로 들고 있을 원장 줄 수 (입고 내역이 여기서 나온다)
 
 /* ================= State ================= */
 const DEFAULT_BOOK = { title: '톨스토이 단편선', price: 28000, stock: 100, sold: 0 };
@@ -1165,8 +1167,10 @@ function startListeners() {
     renderSync(); renderAll();
   }, e => console.error('tx listener', e));
 
-  // 변동 이력은 최근 500건만 (화면 조회용)
-  onSnapshot(query(logsCol, orderBy('time', 'desc'), limit(500)), snap => {
+  /* 변동 이력 창. 입고 내역 화면과 매입 합계가 이 목록 위에서 돌아가므로
+     500건이면 몇 달 만에 옛 입고가 잘려 나간다. 넉넉히 잡되 무한정은 아니다.
+     (reason 으로 걸러 따로 읽으려면 복합 색인을 콘솔에서 만들어야 해서 피했다) */
+  onSnapshot(query(logsCol, orderBy('time', 'desc'), limit(LOG_WINDOW)), snap => {
     stockLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   }, e => console.error('logs listener', e));
 
@@ -1197,11 +1201,13 @@ async function seedIfNeeded() {
 /* ================= 재고 원장 ================= */
 /* 재고·가격이 바뀌는 모든 순간을 stockLogs 에 남긴다.
    reason: 판매 | 반품 | 입고 | 조정 | 등록 | 삭제 | 가격변경   */
-function logEntry({ bookId, title, reason, field = 'stock', before, after, txId = null, note = null }) {
+function logEntry({ bookId, title, reason, field = 'stock', before, after, txId = null, note = null,
+                    time = null, category = null, qty = null, cost = null, amount = null,
+                    supplier = null, sheetKey = null }) {
   const num = v => (typeof v === 'number' && isFinite(v)) ? v : null;
   const b = num(before), a = num(after);
-  return {
-    time: new Date().toISOString(),
+  const e = {
+    time: time || new Date().toISOString(),
     bookId: bookId || null,
     title: title || '',
     reason, field,
@@ -1210,6 +1216,58 @@ function logEntry({ bookId, title, reason, field = 'stock', before, after, txId 
     txId, note,
     by: auth.currentUser ? auth.currentUser.email : null,
   };
+  /* 매입(입고)은 목록·순수익에서 숫자로 다뤄야 해서 메모 글자 말고 필드로도 남긴다.
+     예전 기록에는 이 필드가 없다 — 읽는 쪽(purchaseOf)이 메모에서 풀어 준다.
+     새 컬렉션을 만들지 않는 이유: firestore.rules 가 미리 허용한 경로만 쓸 수 있고,
+     규칙은 git push 로 안 나가서 콘솔에 다시 게시하기 전까지 쓰기가 통째로 막힌다. */
+  if (qty != null || cost != null || amount != null || supplier || category || sheetKey) {
+    e.category = category || null;
+    e.qty = num(qty);
+    e.cost = num(cost);
+    e.amount = num(amount);
+    e.supplier = supplier || null;
+    e.sheetKey = sheetKey || null;      // 시트에서 가져온 줄이면 그 기록ID (두 번 안 가져오려고)
+  }
+  return e;
+}
+
+/* 메모에서 이미 표의 다른 열로 보여 주는 부분(거래처·입고단가·입고금액)을 걷어낸다.
+   안 걷어내면 좁은 메모 칸에 같은 값이 한 번 더 들어가 표가 읽히지 않는다. */
+const purchaseMemo = note => String(note || '')
+  .split('·')
+  .map(x => x.trim())
+  .filter(x => x && !/^(거래처|입고단가|입고금액)\s/.test(x))
+  .join(' · ') || null;
+
+/* 원장 한 줄 → 매입 기록. 구조화된 필드가 있으면 그대로, 없으면 예전 메모 글자에서 푼다.
+   예전 메모 모양: '거래처 성서원 · 입고단가 30,000원 · 입고금액 90,000원' */
+function purchaseOf(l) {
+  if (!l || l.reason !== '입고') return null;
+  const qty = Number.isFinite(l.qty) ? l.qty
+            : (Number.isFinite(l.delta) ? Math.abs(l.delta) : null);
+  if (Number.isFinite(l.amount) || Number.isFinite(l.cost)) {
+    const cost = Number.isFinite(l.cost) ? l.cost
+               : (qty ? Math.round(l.amount / qty) : null);
+    const amount = Number.isFinite(l.amount) ? l.amount
+                 : (qty != null && cost != null ? cost * qty : null);
+    return { id: l.id, time: l.time, bookId: l.bookId, title: l.title,
+             category: l.category || null, qty, cost, amount,
+             supplier: l.supplier || null, note: purchaseMemo(l.note), exact: true };
+  }
+  const note = String(l.note || '');
+  const num = re => { const m = note.match(re); return m ? Number(m[1].replace(/[^\d]/g, '')) : null; };
+  const cost = num(/입고단가\s*([\d,]+)\s*원/);
+  let amount = num(/입고금액\s*([\d,]+)\s*원/);
+  if (amount == null && cost != null && qty != null) amount = cost * qty;
+  const sup = note.match(/거래처\s*([^·]+)/);
+  return { id: l.id, time: l.time, bookId: l.bookId, title: l.title,
+           category: l.category || null, qty, cost, amount,
+           supplier: sup ? sup[1].trim() : null, note: purchaseMemo(l.note),
+           exact: amount != null };   // 금액을 못 읽었으면 순수익·합계에서 뺀다
+}
+/* 화면·집계가 쓰는 매입 목록 (최신순) */
+function purchaseList() {
+  return stockLogs.map(purchaseOf).filter(Boolean);
 }
 /* 원장 기록은 '판매'와 분리된 별도 쓰기다.
    기록이 실패해도(권한/네트워크) 판매·입고 자체는 절대 막히면 안 되기 때문에
@@ -1461,9 +1519,13 @@ function checkout() {
     const b = bookById(c.id);
     return { book: b, qty: c.qty };
   }).filter(l => l.book);
+  /* 원가(cost)를 품목에 박아 둔다 — 나중에 그 책의 입고단가가 바뀌어도
+     이미 판 건의 순수익이 흔들리면 안 되기 때문. 원가를 모르는 책은 null 로 둔다
+     (0 으로 채우면 순수익이 부풀려져 거짓말이 된다). */
   const items = lines.map(l => ({
     title: l.book.title, category: catOf(l.book),
-    qty: l.qty, price: l.book.price, amount: l.book.price * l.qty
+    qty: l.qty, price: l.book.price, amount: l.book.price * l.qty,
+    cost: Number.isFinite(l.book.cost) ? l.book.cost : null,
   }));
 
   // 재고는 increment(원자적)으로, 매출·이력은 새 문서로 → 동시 판매에도 안전
@@ -1702,74 +1764,206 @@ function isFiltering() {
   return !!(f.q || f.from || f.to || f.method || f.type);
 }
 
+/* 지금 보고 있는 갈래. 출고(판매·반품) 와 입고(매입) 는 볼 열이 서로 달라서,
+   칩을 바꾸면 표 머리글도 통계 카드도 같이 바뀐다 — 한 표에 억지로 욱여넣으면
+   '고객'과 '거래처', '판매가'와 '입고단가'가 같은 칸에 섞여 읽을 수 없다. */
+let flowTab = 'out';                       // 'all' | 'out' | 'in'
+const FLOWS = [['all', '전체'], ['out', '출고'], ['in', '입고']];
+
+/* 매입 목록에도 매출과 같은 검색·기간 필터를 건다 */
+function filteredPurchases() {
+  const f = salesFilter();
+  return purchaseList().filter(p => {
+    const day = ymd(new Date(p.time));
+    if (f.from && day < f.from) return false;
+    if (f.to && day > f.to) return false;
+    if (f.q) {
+      const hay = [p.title, p.supplier || '', p.note || ''].join(' ').toLowerCase();
+      if (!hay.includes(f.q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderFlowChips() {
+  const el = $('flowChips');
+  if (!el) return;
+  const tx = filteredTransactions().length, pu = filteredPurchases().length;
+  el.innerHTML = '';
+  FLOWS.forEach(([k, label]) => {
+    const n = k === 'out' ? tx : (k === 'in' ? pu : tx + pu);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = flowTab === k ? 'on' : '';
+    btn.innerHTML = `${label}<span class="n">${n}</span>`;
+    btn.onclick = () => { flowTab = k; salesShown = SALES_PAGE; renderSales(); };
+    el.appendChild(btn);
+  });
+  // 결제수단·판매/반품 고르개는 출고에만 뜻이 있다
+  document.querySelectorAll('#salesFilters [data-only=out]').forEach(sel => {
+    sel.style.display = (flowTab === 'in') ? 'none' : '';
+  });
+}
+
+const statCard = (lbl, val, cls = '', hero = false) =>
+  `<div class="stat${hero ? ' hero' : ''}"><div class="lbl">${lbl}</div>` +
+  `<div class="val ${cls}">${val}</div></div>`;
+
+/* 출고 한 건 → 표 한 줄 (지금까지의 매출 내역 그대로) */
+function saleRow(t) {
+  const isReturn = t.type === 'return';
+  const desc = (isReturn ? '↩ [반품] ' : '') +
+    (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
+  let manage;
+  if (isReturn) manage = '<span class="pill diff">반품</span>';
+  else {
+    const remain = remainingReturnable(t);
+    if (remain <= 0) manage = '<span class="pill mute">반품됨</span>';
+    else {
+      const note = remain < t.qty
+        ? `<div style="font-size:11px;color:var(--amber);margin-bottom:3px">일부 반품됨 (잔여 ${remain}권)</div>` : '';
+      manage = note + '<button class="mini-btn del" data-a="return">반품</button>';
+    }
+  }
+  manage = '<button class="mini-btn" data-a="time" title="일시 수정">🕐</button>' + manage +
+           '<button class="mini-btn" data-a="drop" title="기록 삭제">🗑</button>';
+
+  const tr = document.createElement('tr');
+  if (isReturn) tr.classList.add('row-return');
+  tr.innerHTML = flowTab === 'all'
+    ? `<td data-label="일시">${fmtDateTime(t.time)}</td>
+       <td class="center" data-label="구분">${isReturn ? '<span class="pill diff">반품</span>' : '<span class="pill out">출고</span>'}</td>
+       <td class="cell-main" data-label="내역">${desc}</td>
+       <td data-label="고객·거래처">${t.customer ? esc(t.customer) : '<span class="dim">-</span>'}</td>
+       <td class="num" data-label="수량">${t.qty}권</td>
+       <td class="num" data-label="금액"><b>${won(t.received)}</b></td>
+       <td class="center" data-label="관리">${manage}</td>`
+    : `<td data-label="일시">${fmtDateTime(t.time)}</td>
+       <td class="cell-main" data-label="내역">${desc}</td>
+       <td data-label="고객">${t.customer ? esc(t.customer) : '<span class="dim">-</span>'}</td>
+       <td class="num" data-label="수량">${t.qty}권</td>
+       <td class="num" data-label="정가 합계">${won(t.total)}</td>
+       <td class="num" data-label="할인">${t.discount ? '−' + won(t.discount) + (t.discountPct ? ` (${t.discountPct}%)` : '') : '-'}</td>
+       <td class="num" data-label="결제 금액"><b>${won(t.received)}</b></td>
+       <td class="center" data-label="결제수단">${methodPills(t)}</td>
+       <td class="center" data-label="관리">${manage}</td>`;
+  const rbtn = tr.querySelector('[data-a=return]');
+  if (rbtn) rbtn.onclick = () => returnModal(t);
+  tr.querySelector('[data-a=time]').onclick = () => editTimeModal(t);
+  tr.querySelector('[data-a=drop]').onclick = () => deleteTxModal(t);
+  return tr;
+}
+
+/* 입고 한 건 → 표 한 줄 */
+function buyRow(p) {
+  const tr = document.createElement('tr');
+  const sup = p.supplier ? esc(p.supplier) : '<span class="dim">-</span>';
+  const amt = p.amount != null ? won(p.amount)
+            : '<span class="dim" title="입고금액이 적혀 있지 않습니다">모름</span>';
+  const unit = p.cost != null ? won(p.cost) : '<span class="dim">-</span>';
+  tr.innerHTML = flowTab === 'all'
+    ? `<td data-label="일시">${fmtDateTime(p.time)}</td>
+       <td class="center" data-label="구분"><span class="pill in">입고</span></td>
+       <td class="cell-main" data-label="내역">${esc(p.title)}${p.qty != null ? ` ×${p.qty}` : ''}</td>
+       <td data-label="고객·거래처">${sup}</td>
+       <td class="num" data-label="수량">${p.qty != null ? p.qty + '권' : '-'}</td>
+       <td class="num" data-label="금액"><b>${amt}</b></td>
+       <td class="center" data-label="관리"><span class="pill mute">매입</span></td>`
+    : `<td data-label="일시">${fmtDateTime(p.time)}</td>
+       <td class="cell-main" data-label="책">${esc(p.title)}</td>
+       <td data-label="거래처">${sup}</td>
+       <td class="num" data-label="수량">${p.qty != null ? p.qty + '권' : '-'}</td>
+       <td class="num" data-label="입고단가">${unit}</td>
+       <td class="num" data-label="입고금액"><b>${amt}</b></td>
+       <td class="cell-main" data-label="메모">${p.note ? esc(p.note) : '<span class="dim">-</span>'}</td>`;
+  return tr;
+}
+
+const HEADS = {
+  all: `<tr><th>일시</th><th class="center">구분</th><th>내역</th><th>고객 · 거래처</th>
+          <th class="num">수량</th><th class="num">금액</th><th class="center">관리</th></tr>`,
+  out: `<tr><th>일시</th><th>구매 내역</th><th>고객</th><th class="num">수량</th>
+          <th class="num">정가 합계</th><th class="num">할인</th><th class="num">결제 금액</th>
+          <th class="center">결제수단</th><th class="center">관리</th></tr>`,
+  in:  `<tr><th>일시</th><th>책 제목</th><th>거래처</th><th class="num">수량</th>
+          <th class="num">입고단가</th><th class="num">입고금액</th><th>메모</th></tr>`,
+};
+
 function renderSales() {
   const body = $('salesBody');
   body.innerHTML = '';
+  renderFlowChips();
+  $('salesHead').innerHTML = HEADS[flowTab];
 
-  const list = filteredTransactions();
+  const txList = (flowTab === 'in') ? [] : filteredTransactions();
+  const buyList = (flowTab === 'out') ? [] : filteredPurchases();
+
   let total = 0, received = 0, discount = 0, refund = 0;
-  list.forEach(t => {
+  txList.forEach(t => {
     total += t.total; received += t.received; discount += (t.discount || 0);
     if (t.type === 'return') refund += -t.received;
+  });
+  let buyAmount = 0, buyQty = 0, buyUnknown = 0;
+  buyList.forEach(p => {
+    if (p.amount != null) buyAmount += p.amount; else buyUnknown++;
+    if (p.qty != null) buyQty += p.qty;
   });
 
   const filtering = isFiltering();
   $('salesFilters').classList.toggle('on', filtering);
+  const allCount = flowTab === 'out' ? transactions.length
+                 : (flowTab === 'in' ? purchaseList().length
+                                     : transactions.length + purchaseList().length);
+  const shownCount = txList.length + buyList.length;
   $('salesCount').innerHTML = filtering
-    ? `검색 결과 <b>${list.length}건</b> / 전체 ${transactions.length}건`
-    : `전체 <b>${transactions.length}건</b>`;
+    ? `검색 결과 <b>${shownCount}건</b> / 전체 ${allCount}건`
+    : `전체 <b>${allCount}건</b>`;
 
-  const shown = list.slice(0, salesShown);
-  shown.forEach(t => {
-    const isReturn = t.type === 'return';
-    const desc = (isReturn ? '↩ [반품] ' : '') +
-      (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
-    let manage;
-    if (isReturn) manage = '<span class="pill diff">반품</span>';
-    else {
-      const remain = remainingReturnable(t);
-      if (remain <= 0) manage = '<span class="pill mute">반품됨</span>';
-      else {
-        const note = remain < t.qty
-          ? `<div style="font-size:11px;color:var(--amber);margin-bottom:3px">일부 반품됨 (잔여 ${remain}권)</div>` : '';
-        manage = note + '<button class="mini-btn del" data-a="return">반품</button>';
-      }
-    }
-    manage += '<button class="mini-btn" data-a="drop" title="기록 삭제">🗑</button>';
+  // 통계 카드 — 갈래마다 볼 숫자가 다르다
+  $('salesCards').innerHTML =
+    flowTab === 'out' ? [
+      statCard('매출 합계 (실수령)', won(received), 'green', true),
+      statCard('총 판매 건수', txList.length + '건'),
+      statCard('판매 금액 합계(정가)', won(total)),
+      statCard('할인 합계', discount ? '−' + won(discount) : '0원', 'red'),
+      statCard('환불 금액 합계', refund ? '−' + won(refund) : '0원', 'red'),
+    ].join('')
+    : flowTab === 'in' ? [
+      statCard('매입 합계', won(buyAmount), 'red', true),
+      statCard('입고 건수', buyList.length + '건'),
+      statCard('입고 권수', buyQty + '권'),
+      statCard('금액 모름', buyUnknown + '건', buyUnknown ? 'muted' : ''),
+    ].join('')
+    : [
+      statCard('매출 − 매입', won(received - buyAmount), received - buyAmount >= 0 ? 'green' : 'red', true),
+      statCard('매출 합계 (실수령)', won(received), 'green'),
+      statCard('매입 합계', won(buyAmount), 'red'),
+      statCard('출고 건수', txList.length + '건'),
+      statCard('입고 건수', buyList.length + '건'),
+    ].join('');
 
-    const tr = document.createElement('tr');
-    if (isReturn) tr.style.background = '#fdf5f5';
-    tr.innerHTML = `
-      <td data-label="일시">${fmtDateTime(t.time)}</td>
-      <td class="cell-main" data-label="내역">${desc}</td>
-      <td data-label="고객">${t.customer ? esc(t.customer) : '<span style="color:var(--muted)">-</span>'}</td>
-      <td class="num" data-label="수량">${t.qty}권</td>
-      <td class="num" data-label="정가 합계">${won(t.total)}</td>
-      <td class="num" data-label="할인">${t.discount ? '−' + won(t.discount) + (t.discountPct ? ` (${t.discountPct}%)` : '') : '-'}</td>
-      <td class="num" data-label="결제 금액"><b>${won(t.received)}</b></td>
-      <td class="center" data-label="결제수단">${methodPills(t)}</td>
-      <td class="center" data-label="관리">${manage}</td>`;
-    const rbtn = tr.querySelector('[data-a=return]');
-    if (rbtn) rbtn.onclick = () => returnModal(t);
-    tr.querySelector('[data-a=drop]').onclick = () => deleteTxModal(t);
-    body.appendChild(tr);
-  });
+  /* 전체 보기는 두 목록을 시간순으로 섞는다 */
+  const merged = [
+    ...txList.map(t => ({ time: t.time, kind: 'out', v: t })),
+    ...buyList.map(p => ({ time: p.time, kind: 'in', v: p })),
+  ].sort((a, b) => String(b.time).localeCompare(String(a.time)));
 
-  if (list.length === 0) {
-    body.innerHTML = `<tr class="empty-row"><td colspan="9">${
-      transactions.length === 0 ? '아직 판매 내역이 없습니다.'
-        : '검색 조건에 맞는 내역이 없습니다. 조건을 바꾸거나 “초기화”를 눌러보세요.'
-    }</td></tr>`;
+  merged.slice(0, salesShown)
+        .forEach(r => body.appendChild(r.kind === 'out' ? saleRow(r.v) : buyRow(r.v)));
+
+  if (merged.length === 0) {
+    const cols = HEADS[flowTab].match(/<th/g).length;
+    const empty = flowTab === 'in'
+      ? (purchaseList().length === 0
+          ? '아직 입고 기록이 없습니다. 재고 화면의 “+ 입고” 로 등록하거나, ⚙ 설정에서 시트의 옛 입고를 가져오세요.'
+          : '검색 조건에 맞는 입고가 없습니다.')
+      : (transactions.length === 0 ? '아직 판매 내역이 없습니다.'
+          : '검색 조건에 맞는 내역이 없습니다. 조건을 바꾸거나 “초기화”를 눌러보세요.');
+    body.innerHTML = `<tr class="empty-row"><td colspan="${cols}">${empty}</td></tr>`;
   }
   const more = $('salesMore');
-  more.style.display = list.length > salesShown ? '' : 'none';
-  more.textContent = `더 보기 (${list.length - salesShown}건 남음)`;
-
-  $('sTxCount').textContent = list.length + '건';
-  $('sTotal').textContent = won(total);
-  $('sDiscount').textContent = discount ? '−' + won(discount) : '0원';
-  $('sReceived').textContent = won(received);
-  $('sRefund').textContent = refund ? '−' + won(refund) : '0원';
+  more.style.display = merged.length > salesShown ? '' : 'none';
+  more.textContent = `더 보기 (${merged.length - salesShown}건 남음)`;
 }
 
 function fmtDateTime(iso) {
@@ -2009,6 +2203,25 @@ function periodTx() {
   });
 }
 
+/* ---------- 순수익 (매출총이익) ----------
+   순수익 = 그 기간 실수령 매출 − 그 기간에 '팔린 책의 원가'.
+   그 기간에 들여온 입고 금액이 아니다 — 책을 대량으로 들여온 달이 무조건 적자로
+   보이는 것을 피하려는 것이고, '이번 달 장사로 얼마 남았나'에 답하는 숫자다.
+   반품은 qty 가 음수라 원가도 자동으로 되돌아간다.
+   원가를 모르는 책은 0 으로 채우지 않고 따로 세어 알려 준다 — 0 으로 채우면
+   순수익이 부풀려져 거짓말이 되기 때문. */
+function cogsOf(list) {
+  let cost = 0;
+  const unknown = new Set();
+  list.forEach(t => (t.items || []).forEach(i => {
+    if (i.placeholder) return;
+    const c = itemCost(i);
+    if (c == null) { if (i.qty) unknown.add(bookKey(i.title, i.category)); return; }
+    cost += c * i.qty;
+  }));
+  return { cost, unknown: unknown.size };
+}
+
 function renderReport() {
   const { label } = periodRange();
   const list = periodTx();
@@ -2021,6 +2234,8 @@ function renderReport() {
       if (p.method === '현금') cash += p.received; else transfer += p.received;
     });
   });
+  const { cost: cogs, unknown } = cogsOf(list);
+  const profit = revenue - cogs;
 
   $('rLabel').textContent = `${label} 매출 (실수령)`;
   $('rRevenue').textContent = won(revenue);
@@ -2030,6 +2245,15 @@ function renderReport() {
   $('rTransfer').textContent = won(transfer);
   $('rDisc').textContent = disc ? `−${won(disc)}` : '0원';
   $('rRefund').textContent = refund ? `−${won(refund)}` : '0원';
+  $('rCogs').textContent = cogs ? `−${won(cogs)}` : '0원';
+  const pf = $('rProfit');
+  pf.textContent = won(profit);
+  pf.className = 'val ' + (profit >= 0 ? 'green' : 'red');
+  const margin = revenue > 0 ? Math.round(profit / revenue * 1000) / 10 : null;
+  $('rProfitSub').innerHTML = [
+    margin !== null ? `이익률 ${margin}%` : '',
+    unknown ? `<span class="warn-text">입고단가를 모르는 책 ${unknown}종은 원가 0으로 셌습니다</span>` : '',
+  ].filter(Boolean).join(' · ');
 
   renderChart(list);
   renderRank(list);
@@ -2153,6 +2377,66 @@ function renderRank(list) {
    반품과는 다르다 — 반품은 '있었던 일'로 남기고, 이건 '없던 일'로 만든다.
    누적 판매 수(sold)는 매출과 어긋나면 안 되니 항상 되돌리고,
    재고는 선택 — 시트에서 재고를 새로 맞춘 뒤라면 되돌리면 오히려 어긋나기 때문. */
+/* 로컬 시각 <-> datetime-local 입력값 (초·시간대 문제 없이 그대로 주고받는다) */
+const toLocalInput = iso => {
+  const d = new Date(iso), pad = v => String(v).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+         `T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+/* ================= 거래 일시 고치기 =================
+   계산대가 바빠 나중에 몰아서 등록하는 일이 있다. 그때 실제로 팔린 시각으로 되돌린다.
+   시트에도 그대로 반영한다: 옛 줄을 기록ID 로 지우고, 새 날짜로 다시 적는다.
+   (변동 이력 원장의 시각은 규칙상 고쳐 쓸 수 없어 그대로 남는다 — 안내한다) */
+function editTimeModal(t) {
+  const desc = (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
+  openModal(`
+    <h3>일시 수정</h3>
+    <p class="desc">${esc(desc)}<br>
+      <b>${won(Math.abs(t.received))}</b> · ${esc(methodText(t))}${t.customer ? ' · ' + esc(t.customer) : ''}</p>
+    <div class="field"><label>실제 ${t.type === 'return' ? '반품' : '판매'} 일시</label>
+      <input type="datetime-local" id="mWhen" value="${toLocalInput(t.time)}"></div>
+    <div class="info-box" style="margin-top:4px">
+      지금 기록: <b>${fmtDateTime(t.time)}</b><br>
+      스프레드시트 원장의 이 거래 줄도 <b>새 날짜로 다시 적습니다</b>
+      (옛 줄은 지웁니다). 변동 이력의 시각은 원장이라 그대로 남습니다.
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn primary" id="mSave">저장</button>
+    </div>`);
+  $('mCancel').onclick = closeModal;
+  $('mSave').onclick = async () => {
+    const v = $('mWhen').value;
+    if (!v) { toast('일시를 입력하세요.', 'bad'); return; }
+    const when = new Date(v);
+    if (isNaN(when.getTime())) { toast('일시를 읽을 수 없습니다.', 'bad'); return; }
+    if (when.getTime() > Date.now() + 60 * 1000) {
+      toast('앞날로는 옮길 수 없습니다.', 'bad'); return;
+    }
+    const iso = when.toISOString();
+    if (iso === t.time) { closeModal(); return; }
+
+    $('mSave').disabled = true; $('mSave').textContent = '저장 중…';
+    const oldKey = txSheetKey(t);
+    const newKey = `tx:${t.id}@${Date.now().toString(36)}`;
+    try {
+      await updateDoc(doc(txCol, t.id), { time: iso, sheetKey: newKey });
+      /* 순서가 중요하다: 먼저 옛 줄을 지우라고 큐에 넣고(같은 키로 아직 못 보낸 줄이
+         있으면 그것도 같이 걷힌다), 그 다음 새 기록ID 로 새 줄을 넣는다. */
+      queueSheetDelete(oldKey);
+      queueForSheet(newKey, 'sale', sheetRecords({ ...t, time: iso, sheetKey: newKey }));
+      closeModal();
+      toast(`일시를 ${fmtDateTime(iso)} 로 옮겼습니다.`, 'good');
+    } catch (e) {
+      console.error('일시 수정 실패', e);
+      $('mSave').disabled = false; $('mSave').textContent = '다시 시도';
+      toast('저장 실패 · 연결 확인', 'bad');
+    }
+  };
+  setTimeout(() => $('mWhen').focus(), 60);
+}
+
 function deleteTxModal(t) {
   const isReturn = t.type === 'return';
   const desc = (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
@@ -2193,7 +2477,7 @@ function deleteTxModal(t) {
       await batch.commit();
 
       // 시트에 적어 둔 줄도 없앤다 (저장이 끝난 뒤 별도로 — 실패해도 삭제 자체는 이미 끝났다)
-      queueSheetDelete('tx:' + t.id);
+      queueSheetDelete(txSheetKey(t));
 
       // 이 거래로 남은 원장 기록도 같이 정리.
       // 원장은 부가 데이터라 여기서 실패해도 삭제 자체는 이미 끝난 것으로 본다.
@@ -2228,6 +2512,14 @@ const catForTitle = title => {
   const b = books.find(x => x.title === title);
   return b ? catOf(b) : '기타';
 };
+/* 옛 거래에는 품목에 원가가 없다. 그럴 때만 지금 책 정보의 입고단가로 갈음한다
+   (정확하지 않을 수 있어, 리포트는 '원가를 모르는 책 n종' 을 따로 알려 준다). */
+function costForTitle(title, cat) {
+  const b = findBook(title, cat);
+  return b && Number.isFinite(b.cost) ? b.cost : null;
+}
+/* 거래 품목 하나의 원가 — 박혀 있으면 그것, 없으면 지금 책 정보에서 */
+const itemCost = i => Number.isFinite(i.cost) ? i.cost : costForTitle(i.title, i.category);
 function sheetMethod(t) {
   const label = t.discountLabel || ((t.discount > 0) ? '할인' : null);
   return label ? `${t.method}(${label})` : (t.method || '');
@@ -2384,6 +2676,12 @@ function queueForSheet(key, type, records) {
 /* 앱에서 거래를 지우면 시트 줄도 같이 지운다.
    아직 못 보낸 거래는 큐에서 빼되, 삭제 요청도 같이 넣는다 — 마침 전송 중이었을 수도 있기 때문.
    시트에 그 줄이 없으면 서버는 아무것도 안 지우고 조용히 넘어간다. */
+/* 이 거래가 시트 원장에서 쓰고 있는 기록ID.
+   일시를 고치면 옛 줄을 지우고 새 줄을 쓰는데, 같은 기록ID 로 다시 쓰면 안 된다 —
+   한 번의 요청에서 Apps Script 가 '쓰기 → 지우기' 순으로 도는 탓에 방금 쓴 줄까지
+   같이 지워지기 때문. 그래서 새 줄에는 새 기록ID 를 주고, 그 값을 거래에 적어 둔다. */
+const txSheetKey = t => t.sheetKey || ('tx:' + t.id);
+
 function queueSheetDelete(key) {
   const delKey = 'del:' + key;
   const q = sheetQueue().filter(x => x.key !== key);
@@ -2546,6 +2844,24 @@ function download(filename, content, type) {
 function exportCsv(list, suffix) {
   if (!list.length) { toast('내보낼 내역이 없습니다.', 'bad'); return; }
   download(`서적부_매출_${suffix}.csv`, '﻿' + buildCsv(list), 'text/csv;charset=utf-8;');
+  toast('CSV 파일을 저장했습니다.', 'good');
+}
+
+/* 입고 목록 CSV — 시트 원장의 입고 줄과 같은 열 이름을 쓴다 */
+const csvCell = v => {
+  const t = String(v ?? '');
+  return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+};
+function exportPurchaseCsv(list, suffix) {
+  if (!list.length) { toast('내보낼 입고 내역이 없습니다.', 'bad'); return; }
+  const head = ['날짜', '제품명', '거래처', '수량', '입고단가', '입고금액', '메모'];
+  const rows = list.map(p => [
+    sheetDate(p.time),
+    `[${sheetCat(p.category || catForTitle(p.title))}] ${p.title}`,
+    p.supplier || '', p.qty ?? '', p.cost ?? '', p.amount ?? '', p.note || '',
+  ]);
+  const csv = [head, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
+  download(`서적부_입고_${suffix}.csv`, '﻿' + csv, 'text/csv;charset=utf-8;');
   toast('CSV 파일을 저장했습니다.', 'good');
 }
 
@@ -2734,6 +3050,11 @@ function addBookModal() {
       queueForSheet(`stock:${ref.id}:${now}`, 'stock', [stockRecord({
         title, category: $('mCat').value, qty: stock, cost, supplier, time: now,
       })]);
+      // 금액이 있는 첫 입고는 매입 기록으로도 남긴다 (입고 내역·순수익이 이걸 센다)
+      writeLogs([{ bookId: ref.id, title, reason: '입고', time: now,
+                   before: 0, after: stock, note: '신규 등록 입고',
+                   category: $('mCat').value, qty: stock, cost,
+                   amount: cost * stock, supplier: supplier || null }]);
     } else {
       queueAdjust(ref.id, { title, category: $('mCat').value, delta: stock, note: '신규 등록' });
     }
@@ -2785,13 +3106,17 @@ function restockModal(b) {
       $('mNote').value.trim(),
     ].filter(Boolean).join(' · ') || null;
 
-    writeLogs([{ bookId: b.id, title: b.title, reason: '입고', before: b.stock, after: b.stock + add, note: memo }]);
-
     const now = new Date().toISOString();
+    const useCost = isNaN(cost) ? (b.cost ?? null) : cost;
+    const useSup = supplier || b.supplier || '';
+    writeLogs([{ bookId: b.id, title: b.title, reason: '입고', time: now,
+                 before: b.stock, after: b.stock + add, note: memo,
+                 category: catOf(b), qty: add, cost: useCost,
+                 amount: useCost != null ? useCost * add : null, supplier: useSup }]);
+
     queueForSheet(`stock:${b.id}:${now}`, 'stock', [stockRecord({
       title: b.title, category: catOf(b), qty: add, time: now,
-      cost: isNaN(cost) ? (b.cost ?? null) : cost,
-      supplier: supplier || b.supplier || '',
+      cost: useCost, supplier: useSup,
     })]);
 
     closeModal();
@@ -3090,6 +3415,8 @@ function processReturn(t) {
     items.push({
       title: orig.title, category: orig.category || catForTitle(orig.title),
       qty: -q, price: orig.price, amount: -(orig.price * q),
+      // 원가도 원래 줄에서 이어받는다 — 반품이면 순수익에서 원가만큼 되돌아간다
+      cost: Number.isFinite(orig.cost) ? orig.cost : costForTitle(orig.title, orig.category),
     });
     qtySum += q; totalSum += orig.price * q;
   });
@@ -3942,11 +4269,13 @@ $('sheetBackdrop').onclick = closeSheet;
 $('salesMore').onclick = () => { salesShown += SALES_PAGE; renderSales(); };
 $('exportCsv').onclick = () => {
   const f = salesFilter();
-  const tag = isFiltering()
+  const tag = (isFiltering()
     ? [f.q, f.from && f.to ? `${f.from}~${f.to}` : (f.from || f.to), f.method,
        { sale: '판매만', return: '반품만' }[f.type]].filter(Boolean).join('_')
-    : `전체_${ymd(new Date())}`;
-  exportCsv(filteredTransactions(), tag.replace(/[\\/:*?"<>|]/g, '_'));
+    : `전체_${ymd(new Date())}`).replace(/[\\/:*?"<>|]/g, '_');
+  // 지금 보고 있는 갈래를 그대로 내보낸다 ('전체'는 두 파일로 나눈다 — 열이 다르다)
+  if (flowTab !== 'in') exportCsv(filteredTransactions(), tag);
+  if (flowTab !== 'out') exportPurchaseCsv(filteredPurchases(), tag);
 };
 
 // 검색·필터가 바뀌면 페이지를 처음으로 되돌리고 다시 그린다

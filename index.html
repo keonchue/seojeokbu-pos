@@ -417,6 +417,9 @@
     background: var(--gray); color: var(--muted); margin-right: 6px; vertical-align: middle;
   }
   .cat-badge.c-bible   { background: var(--blue-wash);  color: var(--blue-dark); }
+  /* 개역한글도 성경이라 같은 파랑을 쓰되, 채움 대신 테두리로 갈래를 가른다 */
+  .cat-badge.c-bible2  { background: var(--surface); color: var(--blue-light);
+                         box-shadow: inset 0 0 0 1px var(--blue-wash); }
   .cat-badge.c-kids    { background: var(--amber-wash); color: var(--amber); }
   .cat-badge.c-general { background: var(--green-wash); color: var(--green-dark); }
 
@@ -1019,12 +1022,31 @@ const digits = v => String(v ?? '').replace(/[^\d]/g, '');
 /* ---------- 카테고리 · 안전재고 ----------
    기존 스프레드시트가 제품명을 `[성경] 호크마 성경` 처럼 적어 왔다.
    앱은 제목에 접두사를 넣지 않고 category 필드로 따로 들고,
-   시트로 내보낼 때만 `[카테고리] 제목` 으로 합친다. */
-const CATS = ['성경', '어린이', '일반', '기타'];
-const CAT_SLUG = { '성경': 'c-bible', '어린이': 'c-kids', '일반': 'c-general', '기타': 'c-etc' };
-const catOf = b => CATS.includes(b?.category) ? b.category : '기타';
-const catBadge = b => `<span class="cat-badge ${CAT_SLUG[catOf(b)]}">${catOf(b)}</span>`;
-const sheetTitle = b => `[${catOf(b)}] ${b.title}`;
+   시트로 내보낼 때만 `[카테고리] 제목` 으로 합친다.
+
+   성경만 앱에서 개역개정 / 개역한글로 갈라 본다. 시트는 예나 지금이나 [성경] 하나뿐이고
+   앞으로도 그래야 하므로, 시트로 나가는 이름은 sheetCat 으로 다시 [성경] 으로 합친다.
+   어느 갈래인지는 제목 앞머리가 '개역개정' 인지로 정한다 — 책에 갈래를 따로 적어 두지 않은
+   예전 책도 바로 갈라져 보이고, 손으로 고쳤던 책은 저장된 값이 그대로 이긴다. */
+const CATS = ['성경 - 개역개정', '성경 - 개역한글', '어린이', '일반', '기타'];
+const BIBLE_SUBS = ['성경 - 개역개정', '성경 - 개역한글'];
+const SHEET_CATS = ['성경', '어린이', '일반', '기타'];      // 스프레드시트가 아는 이름
+const CAT_SLUG = { '성경 - 개역개정': 'c-bible', '성경 - 개역한글': 'c-bible2',
+                   '성경': 'c-bible', '어린이': 'c-kids', '일반': 'c-general', '기타': 'c-etc' };
+/* 배지는 제목 옆에 붙으므로 짧게 적는다 — 제목을 밀어내면 안 된다 */
+const CAT_SHORT = { '성경 - 개역개정': '개역개정', '성경 - 개역한글': '개역한글' };
+const knownCat = c => CATS.includes(c) || SHEET_CATS.includes(c);
+/* 제목 앞머리로 성경 갈래를 정한다 */
+const bibleSub = title => /^\s*개역개정/.test(String(title ?? '')) ? '성경 - 개역개정' : '성경 - 개역한글';
+/* 책에도 거래 품목({title, category})에도 그대로 쓴다 */
+const catOf = o => CATS.includes(o?.category) ? o.category
+               : (o?.category === '성경' ? bibleSub(o?.title) : '기타');
+/* 시트에 적을 이름 — 성경 갈래는 다시 하나로 합친다 */
+const sheetCat = c => BIBLE_SUBS.includes(c) ? '성경' : (SHEET_CATS.includes(c) ? c : '기타');
+const catSlug  = c => CAT_SLUG[c] || 'c-etc';
+const catShort = c => CAT_SHORT[c] || c;
+const catBadge = b => `<span class="cat-badge ${catSlug(catOf(b))}">${catShort(catOf(b))}</span>`;
+const sheetTitle = b => `[${sheetCat(catOf(b))}] ${b.title}`;
 /* 시트의 '상태' 열과 같은 규칙: 현재재고 < 안전재고 이면 매입필요 */
 const safetyOf = b => Number.isFinite(b?.safety) ? b.safety : 0;
 const isLow = b => b.stock < safetyOf(b);
@@ -1051,12 +1073,18 @@ function matchCat(b, cat) { return cat === '전체' || catOf(b) === cat; }
    앱은 원래 책을 제목만으로 찾았는데, 그러면 엉뚱한 판의 재고가 깎인다.
    그래서 분류까지 같이 본다. 옛 기록에는 분류가 없을 수 있어, 없으면 제목만으로 찾는다. */
 const titleKey = s => String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, '');
-const bookKey = (title, cat) => `${CATS.includes(cat) ? cat : '기타'}::${titleKey(title)}`;
+/* 키는 시트가 아는 큰 분류로 잡는다 — 시트에는 성경 갈래가 없어서, 갈래까지 넣으면
+   시트 줄과 앱 책이 서로 못 만난다. 성경끼리 제목이 같은 책은 시트도 못 가른다. */
+const bookKey = (title, cat) => `${sheetCat(cat)}::${titleKey(title)}`;
 
 function findBook(title, cat) {
-  if (CATS.includes(cat)) {
-    const exact = books.find(b => b.title === title && catOf(b) === cat);
+  if (knownCat(cat)) {
+    const want = catOf({ category: cat, title });
+    const exact = books.find(b => b.title === title && catOf(b) === want);
     if (exact) return exact;
+    // 성경 갈래까지는 못 맞춰도 큰 분류가 같으면 그 책이다 (시트에서 온 줄이 이렇다)
+    const same = books.find(b => b.title === title && sheetCat(catOf(b)) === sheetCat(want));
+    if (same) return same;
   }
   return books.find(b => b.title === title);
 }
@@ -1558,7 +1586,7 @@ function payBreakdown(book, txList = transactions) {
   txList.forEach(tx => payParts(tx).forEach(t => {
     (t.items || []).forEach(i => {
       if (i.title !== book.title) return;
-      if (CATS.includes(i.category) && i.category !== cat) return;
+      if (knownCat(i.category) && catOf(i) !== cat) return;
       if (t.method === '현금') cash += i.qty; else transfer += i.qty;
     });
   }));
@@ -2102,7 +2130,7 @@ function renderRank(list) {
     });
   }));
   const rows = [...map.values()]
-    .map(r => [r.title + (isSharedTitle(shared, r.title) && r.category ? ` [${r.category}]` : ''), r])
+    .map(r => [r.title + (isSharedTitle(shared, r.title) && r.category ? ` [${catShort(catOf(r))}]` : ''), r])
     .sort((a, b) => b[1].qty - a[1].qty);
   body.innerHTML = '';
   if (rows.length === 0) {
@@ -2238,7 +2266,7 @@ function sheetRecords(t) {
     const amount = nets[idx];                      // 반품이면 음수
     const qty = Math.abs(i.qty);                   // 수량은 언제나 양수
     const unit = qty ? Math.round((amount / qty) * 100) / 100 : 0;
-    const cat = CATS.includes(i.category) ? i.category : catForTitle(i.title);
+    const cat = sheetCat(knownCat(i.category) ? catOf(i) : catForTitle(i.title));
     return {
       날짜: date,
       제품명: `[${cat}] ${i.title}`,
@@ -2257,7 +2285,7 @@ function sheetRecords(t) {
 function stockRecord({ title, category, qty, cost, supplier, time }) {
   return {
     날짜: ymd(new Date(time)),
-    제품명: `[${category}] ${title}`,
+    제품명: `[${sheetCat(category)}] ${title}`,
     구분: '입고',
     수량: qty,
     입고단가: cost ?? '',
@@ -2272,7 +2300,7 @@ function stockRecord({ title, category, qty, cost, supplier, time }) {
 function adjustRecord({ title, category, delta, note, time }) {
   return {
     날짜: ymd(new Date(time)),
-    제품명: `[${CATS.includes(category) ? category : '기타'}] ${title}`,
+    제품명: `[${sheetCat(category)}] ${title}`,
     구분: delta > 0 ? '입고' : '출고',
     수량: Math.abs(delta),
     결제: '재고조정',
@@ -2711,7 +2739,7 @@ function addBookModal() {
     }
     // 시트의 기준정보 목록에도 이 책 줄을 만든다 (가나다 순 자리는 스크립트가 찾는다)
     queueSheetBook(ref.id, {
-      제품명: `[${$('mCat').value}] ${title}`,
+      제품명: `[${sheetCat($('mCat').value)}] ${title}`,
       단가: price,
       안전재고: isNaN(safety) ? 0 : safety,
     });
@@ -2937,7 +2965,7 @@ function returnModal(t) {
     if (max <= 0) return '';
     // 제목이 겹치는 책이면 어느 판인지 같이 보여 줘야 고를 수 있다
     const tag = (i.category && isSharedTitle(shared, i.title))
-      ? `<span class="cat-badge ${CAT_SLUG[i.category] || 'c-etc'}">${esc(i.category)}</span>` : '';
+      ? `<span class="cat-badge ${catSlug(catOf(i))}">${esc(catShort(catOf(i)))}</span>` : '';
     return `<div class="ret-row" data-idx="${idx}">
       <div>
         <div class="ret-title">${tag}${esc(i.title)}</div>
@@ -3219,8 +3247,9 @@ function settingsModal() {
    제품명 앞의 [성경] 같은 대괄호는 카테고리로 떼어내고, 앱에는 순수 제목만 남긴다. */
 const stripCat = s => {
   const m = String(s).trim().match(/^\[\s*([^\]]+?)\s*\]\s*(.+)$/);
-  return m ? { cat: CATS.includes(m[1]) ? m[1] : '기타', title: m[2].trim() }
-           : { cat: '기타', title: String(s).trim() };
+  const title = m ? m[2].trim() : String(s).trim();
+  // 시트가 아는 것은 [성경] 뿐이라, 갈래는 제목을 보고 앱 쪽에서 정한다
+  return { cat: catOf({ category: m ? m[1] : '', title }), title };
 };
 /* '₩50,000', '-27', '' 를 모두 안전하게 숫자로. 빈칸은 null(= 건드리지 않음) */
 const sheetNum = v => {
@@ -3413,7 +3442,8 @@ function importSheetModal() {
       await runBatched(parsed, (batch, r) => {
         const old = r._id ? bookById(r._id) : null;
         const patch = {};
-        if (want.cat) patch.category = r.category;
+        // 시트는 성경 갈래를 모른다 — 큰 분류가 그대로면 앱에 정해 둔 갈래를 건드리지 않는다
+        if (want.cat && !(old && sheetCat(catOf(old)) === sheetCat(r.category))) patch.category = r.category;
         if (want.price && r.price !== null) patch.price = r.price;
         if (want.safety && r.safety !== null) patch.safety = r.safety;
         if (want.stock && r.stock !== null) patch.stock = r.stock;
@@ -3725,7 +3755,7 @@ function planSheetImport(rows) {
       // 정가는 앱의 판매가를 쓴다 — 할인액을 역산하려면 정가가 필요하기 때문.
       // 앱에 없는 책은 받은 금액을 그대로 정가로 본다(할인 0).
       const price = b ? b.price : (r._qty ? Math.round(r._amount / r._qty) : 0);
-      return { title, category: cat, qty: r._qty, price, amount: price * r._qty, _net: r._amount };
+      return { title, category: b ? catOf(b) : cat, qty: r._qty, price, amount: price * r._qty, _net: r._amount };
     });
     const total = items.reduce((s, i) => s + i.amount, 0);
     const received = items.reduce((s, i) => s + i._net, 0);

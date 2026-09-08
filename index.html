@@ -233,9 +233,13 @@
     padding-top: env(safe-area-inset-top, 0px);
     height: calc(54px + env(safe-area-inset-top, 0px));
   }
-  header .brand { font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--tr-lg); white-space: nowrap; }
+  /* 좁아지면 이름이 먼저 줄어든다 — 오른쪽 도구(개업·연결·설정)는 무슨 일이 있어도 화면 안에 남는다 */
+  header .brand {
+    font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--tr-lg); white-space: nowrap;
+    min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  }
   header .brand span { color: var(--on-ink-dim); font-weight: 500; font-size: var(--fs-2xs); margin-left: 8px; }
-  header .info { font-size: var(--fs-xs); color: var(--on-ink-dim); display: flex; gap: 14px; align-items: center; }
+  header .info { font-size: var(--fs-xs); color: var(--on-ink-dim); display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
   header .info > div { white-space: nowrap; }
   header .info b { color: #fff; font-weight: 700; }
   header .clock { font-variant-numeric: tabular-nums; }
@@ -281,7 +285,9 @@
     display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: 700;
     background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.18);
     padding: 5px 11px; border-radius: var(--r-pill); white-space: nowrap; color: #cbd6e6;
+    cursor: pointer; user-select: none;
   }
+  .sync:focus-visible { outline: 2px solid #ffcb45; outline-offset: 2px; }
   .sync .dot { width: 8px; height: 8px; border-radius: 50%; background: #54d696; flex-shrink: 0; }
   .sync.warn { background: rgba(255,206,90,.15); border-color: rgba(255,206,90,.4); color: #ffe3a3; }
   .sync.warn .dot { background: #ffce5a; animation: pulse 1.4s ease-in-out infinite; }
@@ -807,14 +813,29 @@
     .mini-btn { min-height: var(--tap); padding: 0 14px; }
 
     body { height: 100dvh; }
-    header { padding: 0 14px; height: calc(52px + env(safe-area-inset-top, 0px)); }
+    /* padding 을 통째로 덮어쓰면 상태바 자리(safe-area)까지 지워져,
+       머리글이 상태바 쪽으로 올라붙고 탭 위에 빈 남색 띠가 남는다. 위쪽은 그대로 둔다. */
+    header {
+      padding-left: 12px; padding-right: 10px; padding-bottom: 0;
+      gap: 8px; height: calc(50px + env(safe-area-inset-top, 0px));
+    }
     header .brand { font-size: var(--fs-md); }
     header .brand span { display: none; }
     header .info { gap: 8px; font-size: var(--fs-2xs); }
     header .info .hide-sm { display: none; }
+    /* '실시간 연결됨' 다섯 글자가 톱니를 화면 밖으로 밀어낸다 — 폰에서는 초록 불빛만 남기고,
+       불빛을 누르면 무슨 상태인지 말해준다 */
+    .sync { background: none; border: none; padding: 8px 6px; gap: 0; }
+    .sync .sync-text { display: none; }
+    .sync .dot { width: 10px; height: 10px; box-shadow: 0 0 0 3px rgba(84,214,150,.18); }
+    .sync.warn .dot { box-shadow: 0 0 0 3px rgba(255,206,90,.20); }
+    .sync.off  .dot { box-shadow: 0 0 0 3px rgba(255,130,130,.20); }
+    .icon-btn { min-width: 36px; height: 32px; padding: 0 9px; }
+    #installBtn .lbl { display: none; }
+    .biz-chip { padding: 5px 10px; }
     .tabs { overflow-x: auto; scrollbar-width: none; }
     .tabs::-webkit-scrollbar { display: none; }
-    .tabs button { flex: 1 0 auto; padding: 12px 15px; font-size: var(--fs-xs); }
+    .tabs button { flex: 1 0 auto; padding: 12px 14px; font-size: var(--fs-xs); }
 
     #pos.view.active { flex-direction: column; }
     .product-pane { padding: 14px; padding-bottom: calc(var(--bar-h) + var(--safe-b) + 14px); }
@@ -902,6 +923,14 @@
     tr.row-return { border-color: #eec4c0; background: #fdf4f3; }
   }
 
+  /* 손바닥만 한 폰 — '매출' 이라는 말은 떼도 숫자가 스스로 말한다. 톱니 자리를 먼저 지킨다. */
+  @media (max-width: 420px) {
+    header { padding-left: 10px; padding-right: 8px; gap: 7px; }
+    header .brand { font-size: var(--fs-sm); }
+    .hdr-rev .k { display: none; }
+    header .info { gap: 7px; }
+  }
+
   /* 아주 좁은 화면 — 카드가 150px 남짓이라 배지 자리(62px)를 떼면 첫 줄에 글자가 안 남는다.
      이때는 겹치지 말고 배지를 제목 위에 따로 올린다. 제목은 여전히 안 자른다. */
   @media (max-width: 400px) {
@@ -928,10 +957,10 @@
   <div class="brand">📚 서적부 POS <span>Book Store</span></div>
   <div class="info">
     <div class="hide-sm">영업일자 <b id="today"></b> <b id="clock" class="clock"></b></div>
-    <div>매출 <b id="hdrRevenue">0원</b></div>
+    <div class="hdr-rev"><span class="k">매출</span> <b id="hdrRevenue">0원</b></div>
     <button id="bizChip" class="biz-chip off" title="개업 · 마감">–</button>
-    <div id="syncBadge" class="sync"><span class="dot"></span><span id="syncText">연결 중…</span></div>
-    <button id="installBtn" class="icon-btn" style="display:none" title="홈 화면에 설치">⬇ 설치</button>
+    <div id="syncBadge" class="sync" role="status" tabindex="0"><span class="dot"></span><span id="syncText" class="sync-text">연결 중…</span></div>
+    <button id="installBtn" class="icon-btn" style="display:none" title="홈 화면에 설치">⬇<span class="lbl">설치</span></button>
     <button id="settingsBtn" class="icon-btn" title="설정 · 백업">⚙</button>
   </div>
 </header>
@@ -1344,6 +1373,8 @@ function renderSync() {
   } else {
     text.textContent = '실시간 연결됨';
   }
+  badge.title = text.textContent;
+  badge.setAttribute('aria-label', '연결 상태 — ' + text.textContent);
 
   if (offline && !wasOffline) {
     wasOffline = true;
@@ -1355,6 +1386,13 @@ function renderSync() {
 }
 window.addEventListener('online', renderSync);
 window.addEventListener('offline', renderSync);
+
+/* 폰에서는 불빛만 보인다 — 눌러야 무슨 상태인지 알 수 있게 */
+$('syncBadge')?.addEventListener('click', () => {
+  const badge = $('syncBadge');
+  toast($('syncText').textContent, badge.classList.contains('off') ? 'bad'
+       : badge.classList.contains('warn') ? '' : 'good');
+});
 
 function readMeta(snap) {
   return {

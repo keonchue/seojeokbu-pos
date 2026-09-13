@@ -58,8 +58,11 @@
     --green-wash: #e2f2e9;
     --red: #c2352c;
     --red-wash: #fbeae8;
+    /* 찬송가 분류 눈금 하나에만 쓴다 — 뜻 색(초록·파랑·빨강·앰버)과 겹치지 않는 자리 */
+    --violet: #6b4a9e;
     --amber: #8f6008;
     --amber-wash: #fbf0d8;
+    --amber-line: #e6cf9a;      /* 앰버 바탕 위에 얹히는 테두리 — 결제대기 줄·칩이 쓴다 */
 
     --r-sm: 9px;
     --r-md: 13px;
@@ -175,7 +178,7 @@
   button, .btn, .book-btn, .mini-btn, .icon-btn, .biz-chip,
   .cats button, .period button, .tabs button, .pay-methods button,
   .disc-toggle button, .cart-row .qty button, .cart-row .del button,
-  .ret-qty button, .mb-open, .pay-actions .clear, .pay-actions .checkout {
+  .ret-qty button, .mb-open, .pay-actions .clear, .pay-actions .hold, .pay-actions .checkout {
     font-family: inherit;
     transition: transform var(--press-out), box-shadow var(--press-out),
                 background var(--press-out), border-color var(--press-out), color var(--press-out);
@@ -186,18 +189,19 @@
   .cats button:active, .period button:active, .pay-methods button:active,
   .disc-toggle button:active, .cart-row .qty button:active, .cart-row .del button:active,
   .ret-qty button:active, .mb-open:active:not(:disabled),
-  .pay-actions .clear:active, .pay-actions .checkout:active:not(:disabled) {
+  .pay-actions .clear:active, .pay-actions .hold:active:not(:disabled),
+  .pay-actions .checkout:active:not(:disabled) {
     transition-duration: var(--press-in);
     transform: translateY(2px);
   }
   /* 두께가 있는 버튼들 — 눌리면 옆면이 사라진다 */
   .btn.primary, .btn.green, .btn.solid-danger, .pay-actions .checkout,
-  .pay-actions .clear, .mb-open, .login-card button, #updateBar button {
+  .pay-actions .clear, .pay-actions .hold, .mb-open, .login-card button, #updateBar button {
     box-shadow: 0 2px 0 var(--btn-edge, rgba(0,0,0,.22)), var(--sh-1);
   }
   .btn.primary:active:not(:disabled), .btn.green:active:not(:disabled),
   .btn.solid-danger:active:not(:disabled), .pay-actions .checkout:active:not(:disabled),
-  .pay-actions .clear:active, .mb-open:active:not(:disabled),
+  .pay-actions .clear:active, .pay-actions .hold:active:not(:disabled), .mb-open:active:not(:disabled),
   .login-card button:active:not(:disabled), #updateBar button:active {
     box-shadow: 0 0 0 var(--btn-edge, rgba(0,0,0,.22));
   }
@@ -453,18 +457,35 @@
   }
   .contact-extra.hide { display: none; }
 
-  .pay-actions { display: flex; gap: 8px; padding: 0 16px 16px; }
+  /* 버튼 셋이 한 줄에 선다 — 너비는 글자가 정한다. 30% 씩 나눠 주면 폰 세로에서
+     '결제 완료' 가 먼저 좁아진다. 주 동작이 남는 자리를 다 갖고, 나머지는 제 글자만큼만. */
+  .pay-actions { display: flex; gap: 7px; padding: 0 16px 16px; }
   .pay-actions .clear {
-    flex: 0 0 30%; min-height: 52px; border: none; border-radius: var(--r-sm); background: var(--gray);
+    flex: 0 0 auto; padding: 0 14px; min-height: 52px; border: none; border-radius: var(--r-sm);
+    background: var(--gray);
     color: var(--ink-3); font-size: var(--fs-md); font-weight: 700; cursor: pointer;
     --btn-edge: #d5d0c5;
   }
+  /* 대기는 앰버다 — 이 앱에서 앰버는 이미 '아직 안 끝난 것'(분할결제·재고 부족)을 뜻한다.
+     초록(결제 완료)도 빨강(비우기·반품)도 건드리지 않는다. */
+  .pay-actions .hold {
+    flex: 0 0 auto; padding: 0 14px; min-height: 52px; border: 1px solid var(--amber-line);
+    border-radius: var(--r-sm); background: var(--amber-wash);
+    color: var(--amber); font-size: var(--fs-md); font-weight: 700; cursor: pointer;
+    --btn-edge: #e0c68d;
+  }
+  .pay-actions .hold:disabled { opacity: .42; cursor: not-allowed; box-shadow: none; --btn-edge: transparent; }
   .pay-actions .checkout {
     flex: 1; min-height: 52px; border: none; border-radius: var(--r-sm); background: var(--green);
     color: #fff; font-size: var(--fs-lg); font-weight: 700; cursor: pointer; letter-spacing: var(--tr-lg);
     --btn-edge: #08472c;
   }
   .pay-actions .checkout:disabled { background: #b9bfc4; cursor: not-allowed; box-shadow: none; --btn-edge: transparent; }
+  /* 0원 출고 — 돈이 안 들어오는 건이라 초록(매출)을 쓰면 안 된다.
+     앰버는 이 앱에서 '보통 결제가 아닌 것'을 맡는 색이다. */
+  .pay-actions .checkout.free { background: var(--amber); --btn-edge: #6d4a06; }
+  .customer.free label { color: var(--amber); }
+  .customer.free input { border-color: var(--amber-line); background: var(--amber-wash); }
 
   /* ═══════════ 상품 그리드 ═══════════ */
   .product-pane { flex: 1; padding: 18px; overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -503,10 +524,86 @@
   .book-btn .bs {
     position: absolute; top: 14px; right: 15px; font-size: var(--fs-2xs); font-weight: 700;
     color: var(--muted); white-space: nowrap; background: none; padding: 0; border-radius: 0;
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: tabular-nums; text-align: right; line-height: 1.35;
   }
   .book-btn .bs.low  { color: var(--amber); }
   .book-btn .bs.zero { color: var(--red); }
+  /* 대기에 잡힌 권수는 재고 바로 밑에 붙는다 — '재고가 왜 줄었지' 를 숫자 옆에서 바로 답한다 */
+  .book-btn .bs em { display: block; font-style: normal; color: var(--amber); font-size: 11px; }
+
+  /* ═══════════ 결제대기 ═══════════
+     손님이 몰릴 때 담다 만 장바구니를 통째로 옆에 세워 둔다.
+     자리는 상품 창 맨 위 한 줄 — 대기가 없으면 줄 자체가 사라져서 평소 화면은 그대로다.
+     칩 하나가 손님 하나고, 누르면 그 손님이 장바구니로 돌아온다. */
+  .holds-bar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: var(--amber-wash); border: 1px solid var(--amber-line);
+    border-radius: var(--r-md); padding: 9px 11px; margin-bottom: 14px;
+  }
+  .holds-bar.hide { display: none; }
+  .holds-lbl {
+    flex: none; font-size: var(--fs-2xs); font-weight: 700; color: var(--amber); letter-spacing: .04em;
+  }
+  .hold-chip {
+    display: inline-flex; align-items: center; background: #fff;
+    border: 1px solid var(--amber-line); border-radius: var(--r-pill);
+    box-shadow: var(--sh-1); overflow: hidden;
+  }
+  .hold-chip .hc-open {
+    display: inline-flex; align-items: center; gap: 9px; border: none; background: none;
+    cursor: pointer; color: inherit; padding: 0 5px 0 14px;
+    min-height: var(--pill-h); font-size: var(--fs-2xs);
+  }
+  .hold-chip .hc-open b { font-weight: 700; }
+  .hold-chip .hc-qty { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .hold-chip .hc-amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hold-chip.compact .hc-open { padding: 0 3px 0 13px; }
+  .hold-chip .hc-drop {
+    border: none; background: none; cursor: pointer; color: var(--muted);
+    width: 32px; min-height: var(--pill-h); font-size: 12px; font-weight: 700;
+  }
+  /* 칩은 알약 하나로 읽혀야 한다 — 안쪽 버튼만 2px 내려앉으면 껍질이 남아 어긋나 보인다.
+     그래서 누름은 자리 이동이 아니라 바탕색으로 말한다. */
+  .hold-chip .hc-open:active { transform: none; background: var(--amber-wash); }
+  .hold-chip .hc-drop:active { transform: none; background: var(--red-wash); color: var(--red); }
+  @media (hover: hover) {
+    .hold-chip:hover { border-color: var(--amber); box-shadow: var(--sh-2); }
+    .hold-chip .hc-drop:hover { color: var(--red); background: var(--red-wash); }
+  }
+  /* 마감 창에서 남은 대기를 알리는 상자 — 빨강(되돌릴 수 없음)이 아니라 앰버(안 끝남)다 */
+  .hold-warn {
+    background: var(--amber-wash); border: 1px solid var(--amber-line); border-radius: var(--r-sm);
+    padding: 13px 15px; font-size: var(--fs-xs); color: #6d4a06; line-height: 1.65; margin-bottom: 15px;
+  }
+  .hold-warn ul { margin: 8px 0 0 17px; }
+  .hold-warn li { font-variant-numeric: tabular-nums; }
+
+  /* ═══════════ 교환 — 차액 ═══════════
+     교환에서 사람이 보는 숫자는 딱 하나, '얼마를 더 받나 / 돌려주나' 다.
+     그래서 목록보다 크게, 부호가 아니라 말로 적는다. */
+  .ex-diff {
+    border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2);
+    padding: 14px 16px; margin: 14px 0;
+  }
+  .ex-diff .ex-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: var(--fs-xs); color: var(--muted); padding: 3px 0;
+  }
+  .ex-diff .ex-row b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .ex-diff .ex-total {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    border-top: 1px solid var(--line); margin-top: 8px; padding-top: 11px;
+  }
+  .ex-diff .ex-total .k { font-size: var(--fs-sm); font-weight: 700; }
+  .ex-diff .ex-total .v {
+    font-size: var(--fs-2xl); font-weight: 700; letter-spacing: var(--tr-2xl);
+    font-variant-numeric: tabular-nums;
+  }
+  .ex-diff.get   .ex-total .k, .ex-diff.get   .ex-total .v { color: var(--green-dark); }
+  .ex-diff.give  .ex-total .k, .ex-diff.give  .ex-total .v { color: var(--red); }
+  .ex-diff.even  .ex-total .v { color: var(--muted); }
+  .ex-cart { font-size: var(--fs-xs); line-height: 1.6; }
+  .ex-cart b { font-weight: 700; }
 
   /* ═══════════ 항상 보이는 액션 바 ═══════════
      어느 화면에서든 바닥에 '지금 할 일'이 고정돼 있다. 폰 세로에서는 이게 엄지 자리다. */
@@ -602,10 +699,20 @@
     content: ''; width: 3px; height: 11px; border-radius: 1px;
     background: currentColor; opacity: .85; flex: none;
   }
+  /* 성경 네 갈래는 전부 파랑이다 — 시트에서 [성경] 하나인 것들이라 한 식구로 보여야 한다.
+     가르는 건 색이 아니라 눈금의 결: 꽉 참 · 위 반 · 아래 반 · 점선. */
   .cat-badge.c-bible   { color: var(--blue); }
-  /* 개역한글도 성경이라 같은 파랑을 쓰되, 눈금을 반만 채워 갈래를 가른다 */
   .cat-badge.c-bible2  { color: var(--blue-light); }
   .cat-badge.c-bible2::before { background: linear-gradient(var(--blue-light) 50%, transparent 50%); }
+  .cat-badge.c-bible3  { color: var(--blue-dark); }
+  .cat-badge.c-bible3::before { background: linear-gradient(transparent 50%, var(--blue-dark) 50%); }
+  .cat-badge.c-bible4  { color: var(--blue-light); }
+  .cat-badge.c-bible4::before {
+    background: repeating-linear-gradient(var(--blue-light) 0 3px, transparent 3px 5px);
+  }
+  /* 찬송가는 성경이 아니라 어린이·일반과 같은 줄의 독립 분류다. 파랑 식구에서 빼야
+     한눈에 갈린다 — 남은 뜻 색(초록=매출, 빨강=환불, 앰버=경고)과 겹치지 않는 자리. */
+  .cat-badge.c-hymn    { color: var(--violet); }
   .cat-badge.c-kids    { color: var(--amber); }
   .cat-badge.c-general { color: var(--green-dark); }
   .cat-badge.c-etc     { color: var(--muted); }
@@ -635,6 +742,41 @@
   .stat.hero { grid-column: span 2; }
   .stat.hero .val { font-size: var(--fs-3xl); font-weight: 700; }
   .stat.hero .lbl { color: var(--ink-3); font-weight: 700; }
+
+  /* ═══════════ 리포트 요약 — 내려가도 따라온다 ═══════════
+     책별 순수익을 훑으러 아래로 내려가면 '무슨 기간, 얼마'가 화면에서 사라진다.
+     그래서 요약이 판 위에 붙어 따라오되, 붙는 순간 한 줄로 줄어든다 —
+     큰 숫자 그대로 따라오면 표를 절반이나 덮기 때문.
+     줄어드는 건 '접힌다'가 아니라 '멀어진다' — 글자만 작아지고 자리는 그대로다. */
+  .sticky-sum {
+    position: sticky; top: 0; z-index: 40;
+    background: var(--bg); margin-bottom: 22px;
+    transition: padding var(--press-out), box-shadow var(--press-out);
+  }
+  .sticky-sum .stat { transition: padding var(--press-out); }
+  .sticky-sum .stat .lbl,
+  .sticky-sum .stat .val,
+  .sticky-sum .stat .sub {
+    transition: font-size var(--press-out), margin var(--press-out), opacity var(--press-out);
+  }
+  /* 붙어 있는 동안 */
+  .sticky-sum.stuck {
+    box-shadow: 0 10px 20px -14px rgba(16,26,48,.35);
+    border-bottom-color: var(--ink-3);
+  }
+  .sticky-sum.stuck .stat { padding-top: 8px; padding-bottom: 9px; }
+  .sticky-sum.stuck .stat .lbl { font-size: 11px; margin-bottom: 2px; }
+  .sticky-sum.stuck .stat .val { font-size: var(--fs-lg); }
+  .sticky-sum.stuck .stat.hero .val { font-size: var(--fs-xl); }
+  /* 이익률·경고 같은 곁줄은 붙는 순간 물러난다 — 한 줄 높이를 지키는 값이다 */
+  .sticky-sum.stuck .stat .sub { opacity: 0; height: 0; margin: 0; overflow: hidden; }
+
+  .rank-head { margin-bottom: 12px; }
+  .rank-head h3 { font-size: var(--fs-lg); letter-spacing: var(--tr-lg); }
+  .rank-sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 4px; line-height: 1.55; }
+  .rank-sub .warn-text { color: var(--amber); font-weight: 700; }
+  td .pos { color: var(--green-dark); }
+  td .neg { color: var(--red); }
 
   /* ═══════════ 표 ═══════════ */
   .table-wrap { overflow-x: auto; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); box-shadow: var(--sh-1); }
@@ -673,10 +815,18 @@
   .pill.diff { color: var(--red); }
   .pill.mute { color: var(--muted); border-bottom-color: var(--line); }
   .pill.warn { color: var(--amber); }
+  .pill.split { color: var(--amber); }
   .pill.out { color: var(--green-dark); }
   .pill.in  { color: var(--amber); }
   .pay-lines { display: flex; flex-direction: column; gap: 3px; }
   .pay-lines .pill { text-align: center; }
+
+  /* 절판 — 시트의 회색 칠한 줄과 같은 뜻이다. 지우는 게 아니라 물러나 있는 것이라
+     글자를 흐리게만 하고 줄은 그대로 둔다. 제목과 남은 재고는 읽혀야 하므로 너무 죽이지 않는다. */
+  tbody tr.dead-row { background: var(--surface-2); color: var(--muted); }
+  tbody tr.dead-row .cell-main b { font-weight: 600; color: var(--muted); }
+  tbody tr.dead-row .cat-badge { opacity: .5; }
+  .dead-tag { margin-left: 8px; vertical-align: middle; }
 
   /* ═══════════ 리포트 ═══════════ */
   .period { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
@@ -943,6 +1093,9 @@
     .cart-head, .cart-row { grid-template-columns: 1fr 72px 88px 38px; }
     .cart-row { padding: 10px 12px; }
     .summary, .pay-methods, .customer, .split-pay, .pay-actions { padding-left: 12px; padding-right: 12px; }
+    /* 버튼 셋이 한 줄에 서야 하므로 곁가지 둘은 한 단계 작게 — '결제 완료' 는 그대로 둔다 */
+    .pay-actions { gap: 6px; }
+    .pay-actions .clear, .pay-actions .hold { padding: 0 10px; font-size: var(--fs-sm); }
     .mobile-bar { gap: 10px; padding: 0 12px; }
     .mobile-bar .mb-amt { font-size: 19px; }
     .mobile-bar .mb-open { padding: 0 15px; font-size: var(--fs-sm); }
@@ -1045,7 +1198,7 @@
       </div>
 
       <div class="customer hide" id="discLabelWrap">
-        <label>할인 종류 (선택 · 비워두면 “할인”)</label>
+        <label id="discLabelText">할인 종류 (선택 · 비워두면 “할인”)</label>
         <input id="discLabel" type="text" placeholder="예) 지역할인, 직원할인" autocomplete="off" enterkeyhint="done">
       </div>
 
@@ -1063,14 +1216,16 @@
 
       <div class="pay-actions">
         <button class="clear" id="clearCart">비우기</button>
+        <button class="hold" id="holdBtn" disabled>⏸ 대기</button>
         <button class="checkout" id="checkout" disabled>결제 완료</button>
       </div>
     </div>
 
     <div class="product-pane">
+      <div class="holds-bar hide" id="holdsBar"></div>
       <div class="product-head">
         <input id="qBooks" class="search" type="search" placeholder="🔍 책 제목으로 찾기" style="flex:1;max-width:340px">
-        <button class="btn danger" id="posReturnBtn">↩ 반품하기</button>
+        <button class="btn ghost" id="posExchangeBtn">⇄ 교환</button><button class="btn danger" id="posReturnBtn">↩ 반품하기</button>
       </div>
       <div class="cats" id="posCats"></div>
       <div class="grid" id="bookGrid"></div>
@@ -1095,7 +1250,17 @@
       </div>
       <div class="filters" id="invFilters">
         <input id="qInv" class="search" type="search" placeholder="🔍 책 제목으로 찾기">
+        <select id="invSort" aria-label="정렬">
+          <option value="stock-desc">재고 많은 순</option>
+          <option value="stock-asc">재고 적은 순</option>
+          <option value="price-desc">판매가 높은 순</option>
+          <option value="price-asc">판매가 낮은 순</option>
+          <option value="sold-desc">많이 팔린 순</option>
+          <option value="title">제목 가나다순</option>
+          <option value="default" selected>기본 (재고 있는 책 먼저)</option>
+        </select>
         <label class="chk"><input type="checkbox" id="onlyLow"> 매입 필요만</label>
+        <label class="chk"><input type="checkbox" id="showDead"> 절판 포함</label>
         <span class="count" id="invCount"></span>
       </div>
       <div class="cats" id="invCats"></div>
@@ -1103,7 +1268,7 @@
         <table>
           <thead><tr>
             <th>책 제목</th><th class="num">판매가</th><th class="num">입고단가</th>
-            <th class="num">현재 재고</th>
+            <th class="num">현재 재고</th><th class="num">안전재고</th>
             <th class="center">결제 방법</th>
             <th class="num">누적 판매</th><th class="center">관리</th>
           </tr></thead>
@@ -1135,9 +1300,10 @@
           <option value="분할">분할결제</option>
         </select>
         <select id="fType" data-only="out">
-          <option value="">판매+반품</option>
+          <option value="">판매+반품+교환</option>
           <option value="sale">판매만</option>
           <option value="return">반품만</option>
+          <option value="exchange">교환만</option>
         </select>
         <button class="btn ghost" id="fClear">초기화</button>
         <span class="count" id="salesCount"></span>
@@ -1166,8 +1332,8 @@
 
       <div class="period" id="periodBar">
         <button data-p="today">오늘</button>
-        <button data-p="week">최근 7일</button>
         <button data-p="month" class="on">이번 달</button>
+        <button data-p="lastmonth">저번 달</button>
         <button data-p="all">전체</button>
         <span class="custom">
           <input type="date" id="pFrom"><span>~</span><input type="date" id="pTo">
@@ -1175,7 +1341,8 @@
         </span>
       </div>
 
-      <div class="cards">
+      <div id="reportSumTop"></div>
+      <div class="cards sticky-sum" id="reportSum">
         <div class="stat hero"><div class="lbl" id="rLabel">이번 달 매출 (실수령)</div><div class="val green" id="rRevenue">0원</div></div>
         <div class="stat"><div class="lbl">판매 권수 (반품 차감)</div><div class="val" id="rQty">0권</div></div>
         <div class="stat"><div class="lbl">거래 건수</div><div class="val" id="rCount">0건</div></div>
@@ -1199,11 +1366,15 @@
         </div>
       </div>
 
+      <div class="rank-head">
+        <h3>책별 순수익</h3>
+        <p class="rank-sub" id="rankSub"></p>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr>
             <th>책 제목</th><th class="num">판매 권수</th><th class="num">판매액(정가)</th>
-            <th class="center">현금</th><th class="center">계좌이체</th>
+            <th class="num">실매출</th><th class="num">원가</th><th class="num">순수익</th>
           </tr></thead>
           <tbody id="rankBody"></tbody>
         </table>
@@ -1257,6 +1428,7 @@ let books = [];
 let transactions = [];
 let stockLogs = [];
 let cart = [];          // { id, qty }
+let holds = [];         // 결제대기 — 세워 둔 장바구니들. 아래 '결제대기' 단락 참고
 let payMethod = '계좌이체';
 
 const won = n => (n || 0).toLocaleString('ko-KR') + '원';
@@ -1274,13 +1446,21 @@ const digits = v => String(v ?? '').replace(/[^\d]/g, '');
    앞으로도 그래야 하므로, 시트로 나가는 이름은 sheetCat 으로 다시 [성경] 으로 합친다.
    어느 갈래인지는 제목 앞머리가 '개역개정' 인지로 정한다 — 책에 갈래를 따로 적어 두지 않은
    예전 책도 바로 갈라져 보이고, 손으로 고쳤던 책은 저장된 값이 그대로 이긴다. */
-const CATS = ['성경 - 개역개정', '성경 - 개역한글', '어린이', '일반', '기타'];
-const BIBLE_SUBS = ['성경 - 개역개정', '성경 - 개역한글'];
+/* 성경은 앱에서 네 갈래로 본다. 시트는 예나 지금이나 [성경] 하나뿐이고 앞으로도 그래야 하므로
+   sheetCat 에서 다시 [성경] 으로 합친다.
+   찬송가는 성경이 아니다 — 어린이·일반과 같은 줄의 독립 분류로 두되,
+   시트에는 예전부터 [기타] 로 적어 왔으므로 그대로 [기타] 로 내보낸다. */
+const CATS = ['성경 - 개역개정', '성경 - 개역한글', '성경 - 한영/영어', '성경 - 어린이',
+              '찬송가', '어린이', '일반', '기타'];
+const BIBLE_SUBS = ['성경 - 개역개정', '성경 - 개역한글', '성경 - 한영/영어', '성경 - 어린이'];
 const SHEET_CATS = ['성경', '어린이', '일반', '기타'];      // 스프레드시트가 아는 이름
 const CAT_SLUG = { '성경 - 개역개정': 'c-bible', '성경 - 개역한글': 'c-bible2',
+                   '성경 - 한영/영어': 'c-bible3', '성경 - 어린이': 'c-bible4',
+                   '찬송가': 'c-hymn',
                    '성경': 'c-bible', '어린이': 'c-kids', '일반': 'c-general', '기타': 'c-etc' };
 /* 배지는 제목 옆에 붙으므로 짧게 적는다 — 제목을 밀어내면 안 된다 */
-const CAT_SHORT = { '성경 - 개역개정': '개역개정', '성경 - 개역한글': '개역한글' };
+const CAT_SHORT = { '성경 - 개역개정': '개역개정', '성경 - 개역한글': '개역한글',
+                    '성경 - 한영/영어': '한영·영어', '성경 - 어린이': '어린이성경' };
 const knownCat = c => CATS.includes(c) || SHEET_CATS.includes(c);
 /* 제목 앞머리로 성경 갈래를 정한다 */
 const bibleSub = title => /^\s*개역개정/.test(String(title ?? '')) ? '성경 - 개역개정' : '성경 - 개역한글';
@@ -1557,15 +1737,22 @@ function renderBookGrid() {
   grid.innerHTML = '';
   const q = $('qBooks').value.trim().toLowerCase();
   renderCatChips('posCats', posCat, c => { posCat = c; renderBookGrid(); });
-  const list = books.filter(b => matchTitle(b.title, q) && matchCat(b, posCat)).sort(byStockThenName);
+  /* 절판은 판매 화면에서 아예 뺀다 — 계산대에서 다시는 누를 일이 없는 책이
+     212종 사이에 섞여 있으면 찾는 책이 그만큼 늦게 나온다.
+     남은 재고는 재고 탭에서 그대로 보인다. */
+  const list = books.filter(b => !b.discontinued && matchTitle(b.title, q) && matchCat(b, posCat))
+                    .sort(byStockThenName);
   const shared = sharedTitles();
   list.forEach(b => {
     const inCart = cart.find(c => c.id === b.id);
-    const remaining = b.stock - (inCart ? inCart.qty : 0);
+    // 대기에 잡혀 있는 권수는 재고에서 미리 뺀다 — 그래야 화면의 숫자가 실제로 팔 수 있는 수다
+    const held = heldQty(b.id);
+    const remaining = b.stock - (inCart ? inCart.qty : 0) - held;
     const out = remaining <= 0;
     let cls = 'bs', label = `재고 ${remaining}`;
     if (remaining <= 0) { cls += ' zero'; label = '품절'; }
     else if (remaining < safetyOf(b) || remaining <= 10) cls += ' low';
+    if (held) label += `<em>대기 ${held}</em>`;   // 재고가 왜 줄었는지 바로 밑에서 답한다
     const el = document.createElement('button');
     el.className = 'book-btn' + (out ? ' out' : '');
     // 제목이 같은 책이 또 있으면 분류를 붙여 준다 — 안 그러면 어느 쪽인지 구별이 안 된다
@@ -1615,7 +1802,9 @@ function renderCart() {
   });
   $('sumQty').textContent = totalQty + '권';
   $('checkout').disabled = cart.length === 0;
+  $('holdBtn').disabled = cart.length === 0;
   renderBookGrid();
+  renderHolds();
   updateTotals();
   renderMobileBar(totalQty);
 }
@@ -1688,10 +1877,23 @@ function updateTotals() {
     (discountMode === 'percent' && disc > 0) ? `${discountPct()}% → −${won(disc)}` : '';
   if (currentView() === 'pos') $('mbAmt').textContent = won(cartTotal() - disc);
 
-  // 할인이 걸렸을 때만 '할인 종류'를 묻는다 → 시트 결제방식 열에 계좌이체(지역할인) 형태로 들어감
+  /* 할인이 걸렸을 때만 '할인 종류'를 묻는다 → 시트 결제방식 열에 계좌이체(지역할인) 형태로 들어감.
+
+     받을 금액이 0원이 되는 순간은 다른 일이다 — 열람용·증정처럼 돈이 안 오간 출고다.
+     그래서 칸 이름이 '특이사항'으로 바뀌고 결제 버튼도 '0원 출고'가 된다.
+     같은 자리에서 같은 손짓으로 하되, 무엇을 하고 있는지는 틀리게 읽힐 수 없게. */
+  const free = cartTotal() > 0 && (cartTotal() - disc) === 0;
   const dw = $('discLabelWrap');
   dw.classList.toggle('hide', disc <= 0);
+  dw.classList.toggle('free', free);
   if (disc <= 0) $('discLabel').value = '';
+  $('discLabelText').textContent = free
+    ? '특이사항 (시트 고객명 칸에 적힙니다)'
+    : '할인 종류 (선택 · 비워두면 “할인”)';
+  $('discLabel').placeholder = free ? '예) 열람용' : '예) 지역할인, 직원할인';
+  const co = $('checkout');
+  co.textContent = free ? '0원 출고' : '결제 완료';
+  co.classList.toggle('free', free);
 
   syncSplitField();   // 할인이 바뀌면 받을 금액이 바뀌므로 계좌이체분도 다시 계산한다
 }
@@ -1713,10 +1915,13 @@ function selectPayMethod(m) {
 }
 
 /* ================= 장바구니 동작 ================= */
+/* 모자랄 때 뭐라고 할지 — 대기가 물고 있으면 그렇다고 말해 줘야 찾아갈 데가 있다 */
+const shortMsg = id => heldQty(id) ? '남은 재고가 결제대기에 잡혀 있습니다.' : '재고가 부족합니다.';
+
 function addToCart(id) {
   const b = bookById(id); if (!b) return;
   const inCart = cart.find(c => c.id === id);
-  if ((inCart ? inCart.qty : 0) >= b.stock) { toast('재고가 부족합니다.', 'bad'); return; }
+  if ((inCart ? inCart.qty : 0) >= availableOf(b)) { toast(shortMsg(id), 'bad'); return; }
   if (inCart) inCart.qty++; else cart.push({ id, qty: 1 });
   playAddSound();
   renderCart();
@@ -1724,7 +1929,7 @@ function addToCart(id) {
 function changeQty(id, d) {
   const c = cart.find(x => x.id === id); if (!c) return;
   const b = bookById(id);
-  if (d > 0 && b && c.qty >= b.stock) { toast('재고가 부족합니다.', 'bad'); return; }
+  if (d > 0 && b && c.qty >= availableOf(b)) { toast(shortMsg(id), 'bad'); return; }
   if (d > 0) playAddSound();
   c.qty += d;
   if (c.qty <= 0) cart = cart.filter(x => x.id !== id);
@@ -1744,6 +1949,201 @@ function clearCart() {
   if (payMethod === '분할') selectPayMethod('계좌이체');
   renderCart();
   closeSheet();
+}
+
+/* ================= 결제대기 =================
+   손님이 한꺼번에 몰릴 때, 담다 만 장바구니를 통째로 세워 두고 다음 손님을 먼저 계산한다.
+   세워 둔 것은 칩 하나를 눌러 되돌린다.
+
+   대기는 '장바구니의 사진'이다 — 책과 수량만이 아니라 할인·결제수단·분할 현금액·
+   고객 이름·연락처·주소까지 넘길 때 모습 그대로 담고, 그대로 되돌린다.
+   목록이었다면 불러온 뒤 할인을 다시 쳐야 한다.
+
+   저장은 이 기기 localStorage 다. 대기는 계산대에 손님이 서 있는 몇 분만 사는 물건이고,
+   넘긴 그 기기에서 그대로 불러간다. Firestore 에 올리면 두 기기가 같은 대기를 동시에
+   불러 이중 결제가 나고, 보안 규칙도 다시 게시해야 한다.
+   새로고침·앱 재시작·인터넷 끊김에는 이대로도 살아남는다. */
+const HOLDS_KEY = 'holds';
+/* 이만큼 쌓이면 칩에서 이름·금액을 떼고 번호만 남긴다 — 셋까지는 한 줄에 서지만
+   넷부터는 칩이 두 줄로 흘러 책을 아래로 밀어낸다. 자세한 건 눌러 보면 장바구니에 다 있다. */
+const HOLDS_COMPACT_AT = 4;
+
+function loadHolds() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(HOLDS_KEY));
+    holds = Array.isArray(saved) ? saved.filter(h => h && Array.isArray(h.items)) : [];
+  } catch (e) { console.error('대기 읽기 실패', e); holds = []; }
+}
+function saveHolds() {
+  try { localStorage.setItem(HOLDS_KEY, JSON.stringify(holds)); }
+  catch (e) { console.error('대기 저장 실패', e); }
+}
+
+/* 대기에 잡혀 있는 권수. 재고에서 이만큼 미리 빼고 보여 준다 —
+   손님이 이미 손에 들고 있는 책이라 실제와 맞고, 그 사이 남에게 팔려서
+   대기를 되돌릴 때 '재고가 부족합니다' 가 뜨는 일이 없다.
+   Firestore 의 재고 숫자는 건드리지 않는다 (다른 기기 표시가 흔들리면 안 된다). */
+function heldQty(id) {
+  return holds.reduce((s, h) =>
+    s + h.items.reduce((t, i) => t + (i.id === id ? i.qty : 0), 0), 0);
+}
+/* 지금 장바구니에 담을 수 있는 최대 권수 */
+const availableOf = b => b.stock - heldQty(b.id);
+
+const holdQtyOf = h => h.items.reduce((s, i) => s + i.qty, 0);
+const holdTotal = h => h.items.reduce((s, i) => {
+  const b = bookById(i.id);
+  return s + (b ? b.price * i.qty : 0);
+}, 0);
+/* 칩에 적는 금액은 받을 금액이다 — 담을 때 걸어 둔 할인을 그대로 먹인다 */
+function holdPayable(h) {
+  const total = holdTotal(h);
+  let d;
+  if (h.discountMode === 'percent') {
+    const pct = Math.min(Math.max(parseFloat(String(h.discount ?? '').replace(/[^\d.]/g, '')) || 0, 0), 100);
+    d = Math.round(total * pct / 100);
+  } else {
+    const raw = digits(h.discount);
+    d = raw === '' ? 0 : parseInt(raw, 10);
+  }
+  return total - Math.min(d, total);
+}
+/* 이름을 적어 뒀으면 이름이 먼저다 — 줄이 서면 번호보다 이름이 빨리 찾힌다 */
+const holdName = h => String(h.customer || '').trim() || `대기 ${h.no}`;
+
+/* 비어 있는 가장 작은 번호를 준다 — 대기 1·2 중 2를 결제하면 다음 대기가 다시 2다.
+   번호가 7, 12 로 커지면 '몇 번이었더라' 가 시작된다. */
+function nextHoldNo() {
+  const used = new Set(holds.map(h => h.no));
+  let n = 1;
+  while (used.has(n)) n++;
+  return n;
+}
+
+function snapshotCart() {
+  return {
+    no: nextHoldNo(),
+    at: new Date().toISOString(),
+    items: cart.map(c => ({ id: c.id, qty: c.qty })),
+    discountMode,
+    discount: $('discount').value,
+    discLabel: $('discLabel').value,
+    method: payMethod,
+    splitCash: $('splitCash').value,
+    customer: $('customer').value,
+    phone: $('phone').value,
+    address: $('address').value,
+  };
+}
+
+/* 사진을 다시 펼친다. 순서가 중요하다 —
+   selectPayMethod 는 현금이면 고객칸을 지우고, setDiscountMode 는 할인칸을 비운다.
+   둘을 먼저 세워 놓고 값을 적어야 방금 적은 것이 지워지지 않는다. */
+function applyHold(h) {
+  cart = h.items.map(i => ({ id: i.id, qty: i.qty }));
+  selectPayMethod(h.method || '계좌이체');
+  setDiscountMode(h.discountMode === 'percent' ? 'percent' : 'amount');
+  $('discount').value = h.discount || '';
+  $('discLabel').value = h.discLabel || '';
+  $('splitCash').value = h.splitCash || '';
+  $('customer').value = h.customer || '';
+  $('phone').value = h.phone || '';
+  $('address').value = h.address || '';
+  const hasContact = !!(h.phone || h.address);
+  $('contactExtra').classList.toggle('hide', !hasContact);
+  $('contactToggle').textContent = hasContact ? '− 연락처 · 주소 접기' : '＋ 연락처 · 주소 (택배 발송)';
+  renderCart();          // 합계·할인·분할까지 여기서 다시 계산된다
+}
+
+/* 지금 장바구니를 대기로 세운다. 맞바꾸기(resumeHold)가 부를 때는 조용히 — 토스트는 한 번만 뜬다 */
+function holdCart(silent) {
+  if (cart.length === 0) return null;
+  const h = snapshotCart();
+  holds.push(h);
+  saveHolds();
+  clearCart();           // 장바구니와 입력칸을 비우고 다시 그린다
+  renderHolds();
+  renderActionBar();
+  if (!silent) toast(`장바구니 ${holdQtyOf(h)}권을 ${holdName(h)}(으)로 옮겼습니다.`, 'good');
+  return h;
+}
+
+function resumeHold(no) {
+  const i = holds.findIndex(h => h.no === no);
+  if (i < 0) return;
+  /* 불러올 것을 먼저 빼낸다 — 지금 담긴 것을 대기로 밀어 넣을 때
+     방금 비운 그 번호를 물려받게 하려면 순서가 이래야 한다. */
+  const h = holds.splice(i, 1)[0];
+  const moved = cart.length ? holdCart(true) : null;
+
+  // 대기 중에 재고에서 지워진 책은 그 줄만 뺀다 — 대기 전체를 잃지 않는다
+  const lost = h.items.filter(it => !bookById(it.id)).length;
+  h.items = h.items.filter(it => bookById(it.id));
+
+  applyHold(h);
+  saveHolds();
+  renderHolds();
+  renderActionBar();
+  openSheet();
+
+  const tail = lost ? ` (없어진 책 ${lost}종은 뺐습니다)` : '';
+  toast(moved
+    ? `담겨 있던 ${holdQtyOf(moved)}권을 ${holdName(moved)}(으)로 옮기고 ${holdName(h)}을(를) 불러왔습니다.${tail}`
+    : `${holdName(h)}을(를) 불러왔습니다.${tail}`, lost ? 'bad' : 'good');
+}
+
+function dropHold(no) {
+  const h = holds.find(x => x.no === no);
+  if (!h) return;
+  openModal(`
+    <h3>대기 버리기</h3>
+    <div class="hold-warn">
+      <b>${esc(holdName(h))}</b> · ${holdQtyOf(h)}권 · ${won(holdPayable(h))}<br><br>
+      버리면 담겨 있던 것은 되돌릴 수 없습니다. 잡아 둔 재고는 다시 풀립니다.
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">돌아가기</button>
+      <button class="btn solid-danger" id="mSave">버리기</button>
+    </div>`);
+  $('mCancel').onclick = closeModal;
+  $('mSave').onclick = () => {
+    holds = holds.filter(x => x.no !== no);
+    saveHolds();
+    renderCart();        // 잡혀 있던 재고가 풀리므로 책 목록까지 다시 그린다
+    closeModal();
+    toast(`${holdName(h)}을(를) 버렸습니다.`);
+  };
+}
+
+/* 마감과 함께 비운다 — 다음 개업 때 어제 손님 장바구니가 튀어나오면 안 된다 */
+function clearHolds() {
+  if (holds.length === 0) return;
+  holds = [];
+  saveHolds();
+  renderCart();
+}
+
+function renderHolds() {
+  const bar = $('holdsBar');
+  if (!bar) return;
+  bar.classList.toggle('hide', holds.length === 0);
+  if (holds.length === 0) { bar.innerHTML = ''; return; }
+
+  const compact = holds.length >= HOLDS_COMPACT_AT;
+  bar.innerHTML = '<span class="holds-lbl">결제대기</span>' + holds.map(h => {
+    const full = `${holdName(h)} · ${holdQtyOf(h)}권 · ${won(holdPayable(h))}`;
+    const body = compact
+      ? `<b>대기 ${h.no}</b>`
+      : `<b>${esc(holdName(h))}</b><span class="hc-qty">${holdQtyOf(h)}권</span>` +
+        `<span class="hc-amt">${won(holdPayable(h))}</span>`;
+    return `<span class="hold-chip${compact ? ' compact' : ''}">
+      <button type="button" class="hc-open" data-no="${h.no}" title="${esc(full)} — 눌러서 불러오기">${body}</button>
+      <button type="button" class="hc-drop" data-drop="${h.no}" aria-label="${esc(full)} 버리기" title="버리기">✕</button>
+    </span>`;
+  }).join('');
+
+  bar.querySelectorAll('[data-no]').forEach(b => b.onclick = () => resumeHold(Number(b.dataset.no)));
+  bar.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => dropHold(Number(b.dataset.drop)));
 }
 
 /* ================= 결제 ================= */
@@ -1771,8 +2171,13 @@ function checkout() {
   const customer = hasTransfer ? $('customer').value.trim() : '';
   const phone    = hasTransfer ? $('phone').value.trim() : '';
   const address  = hasTransfer ? $('address').value.trim() : '';
-  // 할인 종류: 비워두면 그냥 '할인' → 시트에는 계좌이체(할인) / 계좌이체(지역할인) 로 기록
-  const discLabel = discount > 0 ? ($('discLabel').value.trim() || '할인') : null;
+  /* 할인 종류: 비워두면 그냥 '할인' → 시트에는 계좌이체(할인) / 계좌이체(지역할인) 로 기록.
+     받을 돈이 0원이면 할인이 아니라 무상 출고다 — 비워 두면 '무상'으로 적고,
+     이 값은 시트의 결제 열이 아니라 고객명 열로 간다 (sheetRecords 참고). */
+  const free = total > 0 && payable === 0;
+  const discLabel = discount > 0
+    ? ($('discLabel').value.trim() || (free ? '무상' : '할인'))
+    : null;
 
   const lines = cart.map(c => {
     const b = bookById(c.id);
@@ -1821,7 +2226,9 @@ function checkout() {
   const methodText = split
     ? `현금 ${won(split.cash)} · 계좌이체 ${won(split.transfer)}`
     : payMethod;
-  toast(`결제 완료 · ${won(received)} (${methodText}${customer ? ' · ' + customer : ''})`, 'good');
+  toast(free
+    ? `0원 출고 · ${lines.reduce((s2, l) => s2 + l.qty, 0)}권 (${discLabel})`
+    : `결제 완료 · ${won(received)} (${methodText}${customer ? ' · ' + customer : ''})`, 'good');
   clearCart();
 }
 
@@ -1902,56 +2309,95 @@ function methodText(t) {
 /* ================= 재고 화면 ================= */
 /* 제목이 같고 분류만 다른 책이 있으므로 분류까지 맞춰 센다.
    옛 기록에는 분류가 없을 수 있어, 그럴 땐 제목만 맞으면 센다. */
+/* 분할결제는 여기서 가르지 않는다 — 가게에서는 '분할로 판 책'이 한 갈래다.
+   payParts 로 쪼개면 같은 한 권이 현금 줄과 계좌이체 줄에 흩어져,
+   '이 책은 어떻게 팔리나' 를 보러 온 눈에는 도리어 답이 흐려진다. */
 function payBreakdown(book, txList = transactions) {
   const cat = catOf(book);
-  let cash = 0, transfer = 0;
-  txList.forEach(tx => payParts(tx).forEach(t => {
-    (t.items || []).forEach(i => {
+  let cash = 0, transfer = 0, split = 0;
+  txList.forEach(tx => {
+    (tx.items || []).forEach(i => {
       if (i.title !== book.title) return;
       if (knownCat(i.category) && catOf(i) !== cat) return;
-      if (t.method === '현금') cash += i.qty; else transfer += i.qty;
+      if (isSplitTx(tx)) split += i.qty;
+      else if (tx.method === '현금') cash += i.qty;
+      else transfer += i.qty;
     });
-  }));
-  return { cash, transfer };
+  });
+  return { cash, transfer, split };
 }
+/* 0권짜리 줄은 적지 않는다 — 예전에는 안 팔린 책마다 '현금 0권 / 계좌이체 0권' 두 줄이
+   찍혀, 표 전체가 0으로 도배되고 정작 팔린 책이 묻혔다. 아무것도 안 팔렸으면 — 하나. */
+function payLines(pay) {
+  const rows = [
+    pay.cash     ? `<span class="pill cash">현금 ${pay.cash}권</span>` : '',
+    pay.transfer ? `<span class="pill transfer">계좌이체 ${pay.transfer}권</span>` : '',
+    pay.split    ? `<span class="pill split">분할결제 ${pay.split}권</span>` : '',
+  ].filter(Boolean);
+  return rows.length ? `<div class="pay-lines">${rows.join('')}</div>` : '<span class="dim">—</span>';
+}
+/* 재고 표 정렬. 같은 값이 여럿이면 제목 가나다로 묶어 줘야 순서가 매번 바뀌지 않는다 —
+   숫자만으로 세우면 재고 0권짜리들이 새로 그릴 때마다 자리를 바꿔 눈이 미끄러진다. */
+function invSorter() {
+  const byTitle = (a, b) => String(a.title).localeCompare(String(b.title), 'ko');
+  const num = (f, dir) => (a, b) => (dir * ((f(b) || 0) - (f(a) || 0))) || byTitle(a, b);
+  switch ($('invSort') ? $('invSort').value : 'default') {
+    case 'stock-desc': return num(b => b.stock, 1);
+    case 'stock-asc':  return num(b => b.stock, -1);
+    case 'price-desc': return num(b => b.price, 1);
+    case 'price-asc':  return num(b => b.price, -1);
+    case 'sold-desc':  return num(b => b.sold, 1);
+    case 'title':      return byTitle;
+    default:           return byStockThenName;
+  }
+}
+
 function renderInventory() {
   const body = $('invBody');
   body.innerHTML = '';
 
-  // 상단 카드는 항상 '전체 재고' 기준 (검색해도 총 자산이 흔들리면 안 됨)
+  /* 상단 카드는 항상 '전체 재고' 기준 (검색해도 총 자산이 흔들리면 안 됨).
+     절판은 빼고 센다 — '매입 필요'는 다시 들일 책에만 뜻이 있고,
+     재고 자산도 팔 수 있는 책으로 잡아야 숫자가 거짓말을 안 한다. */
   let totalStock = 0, asset = 0, lowCount = 0;
-  books.forEach(b => { totalStock += b.stock; asset += b.stock * b.price; if (isLow(b)) lowCount++; });
+  books.filter(b => !b.discontinued).forEach(b => {
+    totalStock += b.stock; asset += b.stock * b.price; if (isLow(b)) lowCount++;
+  });
 
   const q = $('qInv').value.trim().toLowerCase();
   const onlyLow = $('onlyLow').checked;
+  const showDead = $('showDead').checked;
   renderCatChips('invCats', invCat, c => { invCat = c; renderInventory(); });
+  // 절판이라도 재고가 남아 있으면 늘 보인다 — 남은 걸 모르고 지나치면 안 되니까
+  const deadOk = b => !b.discontinued || showDead || b.stock > 0;
+  const live = books.filter(b => !b.discontinued).length;
   const list = books
-    .filter(b => matchTitle(b.title, q) && matchCat(b, invCat) && (!onlyLow || isLow(b)))
-    .sort(byStockThenName);
-  const filtering = !!q || invCat !== '전체' || onlyLow;
+    .filter(b => deadOk(b) && matchTitle(b.title, q) && matchCat(b, invCat) && (!onlyLow || isLow(b)))
+    .sort(invSorter());
+  const filtering = !!q || invCat !== '전체' || onlyLow || showDead;
   $('invFilters').classList.toggle('on', filtering);
   $('invCount').innerHTML = filtering
     ? `검색 결과 <b>${list.length}종</b> / 전체 ${books.length}종`
-    : `전체 <b>${books.length}종</b>`;
+    : `판매 중 <b>${live}종</b>${books.length > live ? ` <span class="dim">· 절판 ${books.length - live}종</span>` : ''}`;
 
   list.forEach(b => {
     const pay = payBreakdown(b);
     const low = isLow(b);
     const safety = safetyOf(b);
     const tr = document.createElement('tr');
+    if (b.discontinued) tr.className = 'dead-row';
     tr.innerHTML = `
       <td class="cell-main" data-label="책">${catBadge(b)}<b>${esc(b.title)}</b>${
+        b.discontinued ? '<span class="pill mute dead-tag">절판</span>' : ''}${
         b.supplier ? `<div class="sub">거래처 ${esc(b.supplier)}</div>` : ''}</td>
       <td class="num" data-label="판매가">${won(b.price)}</td>
       <td class="num" data-label="입고단가">${b.cost ? won(b.cost) : '<span class="dim">—</span>'}</td>
       <td class="num" data-label="현재 재고"><b>${b.stock}</b>권
-        ${low ? '<div><span class="pill warn">매입 필요</span></div>'
-              : (safety ? `<div class="sub">안전 ${safety}권</div>` : '')}</td>
+        ${low ? '<div><span class="pill warn">매입 필요</span></div>' : ''}</td>
+      <td class="num" data-label="안전재고">${
+        safety ? `${safety}권` : '<span class="dim">—</span>'}</td>
       <td class="center" data-label="결제 방법">
-        <div class="pay-lines">
-          <span class="pill cash">현금 ${pay.cash}권</span>
-          <span class="pill transfer">계좌이체 ${pay.transfer}권</span>
-        </div>
+        ${payLines(pay)}
       </td>
       <td class="num" data-label="누적 판매">${b.sold || 0}권</td>
       <td class="center" data-label="관리">
@@ -1967,7 +2413,7 @@ function renderInventory() {
     body.appendChild(tr);
   });
   if (list.length === 0) {
-    body.innerHTML = `<tr class="empty-row"><td colspan="7">${
+    body.innerHTML = `<tr class="empty-row"><td colspan="8">${
       books.length === 0
         ? '등록된 책이 없습니다. “＋ 새 책 등록”을 눌러 추가하세요.'
         : '검색 조건에 맞는 책이 없습니다.'
@@ -2000,8 +2446,9 @@ function filteredTransactions() {
     // 분할결제는 현금으로 걸러도, 계좌이체로 걸러도 나와야 한다 (둘 다 들어 있으므로)
     if (f.method === '분할') { if (!isSplitTx(t)) return false; }
     else if (f.method && !payParts(t).some(p => p.method === f.method)) return false;
-    if (f.type === 'sale' && t.type === 'return') return false;
+    if (f.type === 'sale' && t.type !== 'sale' && t.type !== undefined) return false;
     if (f.type === 'return' && t.type !== 'return') return false;
+    if (f.type === 'exchange' && t.type !== 'exchange') return false;
 
     const day = ymd(new Date(t.time));
     if (f.from && day < f.from) return false;
@@ -2072,10 +2519,15 @@ const statCard = (lbl, val, cls = '', hero = false) =>
 /* 출고 한 건 → 표 한 줄 (지금까지의 매출 내역 그대로) */
 function saleRow(t) {
   const isReturn = t.type === 'return';
-  const desc = (isReturn ? '↩ [반품] ' : '') +
-    (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
+  const isExchange = t.type === 'exchange';
+  /* 교환은 한 줄에 두 방향이 같이 있다 — 돌려받은 책은 ↩, 새로 나간 책은 그냥.
+     부호를 지우고 나열하면 '무엇과 무엇을 바꿨는지' 가 사라진다. */
+  const desc = (isReturn ? '↩ [반품] ' : (isExchange ? '⇄ [교환] ' : '')) +
+    (t.items || []).map(i =>
+      `${isExchange && i.qty < 0 ? '↩' : ''}${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
   let manage;
   if (isReturn) manage = '<span class="pill diff">반품</span>';
+  else if (isExchange) manage = '<span class="pill warn">교환</span>';
   else {
     const remain = remainingReturnable(t);
     if (remain <= 0) manage = '<span class="pill mute">반품됨</span>';
@@ -2359,6 +2811,12 @@ function closeBizModal() {
       <div class="row"><span class="dim">판매</span><span>${s.saleCount}건 · ${s.qty}권</span></div>
       <div class="row total"><span>합계</span><span>${won(s.revenue)}</span></div>
     </div>
+    ${holds.length ? `<div class="hold-warn">
+      <b>결제대기 ${holds.length}건이 아직 남아 있습니다.</b>
+      <ul>${holds.map(h =>
+        `<li>${esc(holdName(h))} · ${holdQtyOf(h)}권 · ${won(holdPayable(h))}</li>`).join('')}</ul>
+      <br>마감하면 이 대기는 사라집니다. 결제할 것이 있으면 먼저 불러오세요.
+    </div>` : ''}
     <div class="info-box">
       마감하면 헤더 매출이 <b>0으로 돌아갑니다.</b> 거래 기록은 그대로 남으니
       매출 내역·리포트에서 언제든 볼 수 있습니다.<br>
@@ -2398,6 +2856,8 @@ function closeBizModal() {
     } catch (e) {
       console.error('마감 요약 저장 실패 (마감 자체는 완료)', e);
     }
+    // 창에서 이미 알렸다 — 다음 개업 때 어제 손님 장바구니가 남아 있으면 안 된다
+    clearHolds();
     closeModal();
     toast(`마감했습니다 · ${won(rec.revenue)}`, 'good');
   };
@@ -2442,13 +2902,15 @@ function periodRange() {
   if (period === 'today') {
     const f = startOfDay(now); return { from: f, to: new Date(f.getTime() + 864e5), label: '오늘' };
   }
-  if (period === 'week') {
-    const to = new Date(startOfDay(now).getTime() + 864e5);
-    return { from: new Date(to.getTime() - 7 * 864e5), to, label: '최근 7일' };
-  }
   if (period === 'month') {
     const f = new Date(now.getFullYear(), now.getMonth(), 1);
     return { from: f, to: new Date(now.getFullYear(), now.getMonth() + 1, 1), label: `${now.getMonth() + 1}월` };
+  }
+  /* 저번 달은 달이 바뀐 직후에 제일 많이 본다 — 지난달 장사가 어땠는지 마감하는 자리다.
+     1월이면 작년 12월로 넘어가야 하므로 Date 에 월 −1 을 맡긴다. */
+  if (period === 'lastmonth') {
+    const f = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return { from: f, to: new Date(now.getFullYear(), now.getMonth(), 1), label: `${f.getMonth() + 1}월` };
   }
   if (period === 'custom' && customFrom && customTo) {
     const f = new Date(customFrom + 'T00:00:00');
@@ -2520,6 +2982,20 @@ function renderReport() {
   renderChart(list);
   renderRank(list);
   if (currentView() === 'report') renderActionBar();
+}
+
+/* 요약이 판 꼭대기에 붙었는지 알아낸다.
+   스크롤 이벤트로 좌표를 재면 매 프레임 레이아웃을 강제로 계산하게 되는데,
+   이 표는 책이 수백 줄이라 그때마다 화면이 끊긴다. 대신 요약 바로 위에 둔
+   1px 짜리 표식이 화면 밖으로 나갔는지만 관찰자에게 맡긴다 — 브라우저가 알아서 센다. */
+function watchReportSum() {
+  const mark = $('reportSumTop'), sum = $('reportSum');
+  const panel = sum.closest('.panel');
+  if (!mark || !sum || !panel || !window.IntersectionObserver) return;
+  new IntersectionObserver(
+    ([e]) => sum.classList.toggle('stuck', !e.isIntersecting),
+    { root: panel, threshold: 0 },
+  ).observe(mark);
 }
 
 /* 일별 매출 막대 — 단일 계열이라 범례 없음, 최고값만 직접 라벨 */
@@ -2605,33 +3081,47 @@ function renderRank(list) {
   const body = $('rankBody');
   const shared = sharedTitles();
   // 제목이 같고 분류만 다른 책은 서로 다른 책이므로 순위도 따로 잡는다
+  /* 실매출은 netAmounts 로 잡는다 — 정가가 아니라 할인·반품이 반영된, 실제로 받은 돈이다.
+     위의 순수익 카드가 쓰는 것과 같은 값이라 책별 합이 전체와 어긋나지 않는다.
+     원가를 모르는 책은 0으로 채우지 않는다 — 채우면 그 책이 통째로 이익인 척한다. */
   const map = new Map();
-  list.forEach(tx => payParts(tx).forEach(t => {
-    (t.items || []).forEach(i => {
+  list.forEach(tx => {
+    const nets = netAmounts(tx);
+    (tx.items || []).forEach((i, idx) => {
       if (i.placeholder) return;   // 분할결제에서 금액만 옮겨 담은 0권 줄
       const k = bookKey(i.title, i.category);
-      const r = map.get(k) || { title: i.title, category: i.category, qty: 0, amount: 0, cash: 0, transfer: 0 };
-      r.qty += i.qty; r.amount += i.amount;
-      if (t.method === '현금') r.cash += i.qty; else r.transfer += i.qty;
+      const r = map.get(k) || { title: i.title, category: i.category,
+                                qty: 0, amount: 0, net: 0, cost: 0, noCost: false };
+      r.qty += i.qty; r.amount += i.amount; r.net += nets[idx];
+      const c = itemCost(i);
+      if (c == null) { if (i.qty) r.noCost = true; } else r.cost += c * i.qty;
       map.set(k, r);
     });
-  }));
+  });
   const rows = [...map.values()]
     .map(r => [r.title + (isSharedTitle(shared, r.title) && r.category ? ` [${catShort(catOf(r))}]` : ''), r])
-    .sort((a, b) => b[1].qty - a[1].qty);
+    .sort((a, b) => (b[1].net - b[1].cost) - (a[1].net - a[1].cost));
+  const noCostCount = rows.filter(([, r]) => r.noCost).length;
+  $('rankSub').innerHTML = rows.length === 0 ? ''
+    : `순수익이 큰 책부터. 실매출은 할인·반품을 반영한 실제 받은 돈입니다.${
+        noCostCount ? ` <span class="warn-text">입고단가를 모르는 책 ${noCostCount}종은 원가를 뺄 수 없어 순수익이 부풀려져 보입니다.</span>` : ''}`;
   body.innerHTML = '';
   if (rows.length === 0) {
-    body.innerHTML = '<tr class="empty-row"><td colspan="5">이 기간에는 판매된 책이 없습니다.</td></tr>';
+    body.innerHTML = '<tr class="empty-row"><td colspan="6">이 기간에는 판매된 책이 없습니다.</td></tr>';
     return;
   }
   rows.forEach(([title, r]) => {
+    const profit = r.net - r.cost;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="cell-main" data-label="책"><b>${esc(title)}</b></td>
+      <td class="cell-main" data-label="책"><b>${esc(title)}</b>${
+        r.noCost ? '<span class="pill warn dead-tag">원가 모름</span>' : ''}</td>
       <td class="num" data-label="판매 권수"><b>${r.qty}</b>권</td>
       <td class="num" data-label="판매액(정가)">${won(r.amount)}</td>
-      <td class="center" data-label="현금"><span class="pill cash">현금 ${r.cash}권</span></td>
-      <td class="center" data-label="계좌이체"><span class="pill transfer">계좌이체 ${r.transfer}권</span></td>`;
+      <td class="num" data-label="실매출">${won(r.net)}</td>
+      <td class="num" data-label="원가">${r.cost ? `<span class="neg">−${won(r.cost)}</span>`
+                                                 : '<span class="dim">—</span>'}</td>
+      <td class="num" data-label="순수익"><b class="${profit >= 0 ? 'pos' : 'neg'}">${won(profit)}</b></td>`;
     body.appendChild(tr);
   });
 }
@@ -2657,7 +3147,8 @@ function editTimeModal(t) {
     <h3>일시 수정</h3>
     <p class="desc">${esc(desc)}<br>
       <b>${won(Math.abs(t.received))}</b> · ${esc(methodText(t))}${t.customer ? ' · ' + esc(t.customer) : ''}</p>
-    <div class="field"><label>실제 ${t.type === 'return' ? '반품' : '판매'} 일시</label>
+    <div class="field"><label>실제 ${
+      { return: '반품', exchange: '교환' }[t.type] || '판매'} 일시</label>
       <input type="datetime-local" id="mWhen" value="${toLocalInput(t.time)}"></div>
     <div class="info-box" style="margin-top:4px">
       지금 기록: <b>${fmtDateTime(t.time)}</b><br>
@@ -2783,7 +3274,15 @@ function costForTitle(title, cat) {
 }
 /* 거래 품목 하나의 원가 — 박혀 있으면 그것, 없으면 지금 책 정보에서 */
 const itemCost = i => Number.isFinite(i.cost) ? i.cost : costForTitle(i.title, i.category);
+/* 받을 돈이 0원인 출고 — 열람용·증정처럼 돈이 오가지 않은 건.
+   할인 100%%(또는 정가만큼 깎은 것)로 만든다. 반품은 금액이 음수라 여기 안 걸린다. */
+function isFreeTx(t) {
+  return t && t.type !== 'return' && (t.total || 0) > 0 && (t.received || 0) === 0;
+}
+/* 무상 출고는 결제 열에 (열람용)을 붙이지 않는다 — 시트에서 '현금' 으로 깔끔히 모여야
+   현금 합계 필터가 안 깨진다. 적어 둔 특이사항은 고객명 열로 간다(아래 sheetRecords). */
 function sheetMethod(t) {
+  if (isFreeTx(t)) return t.method || '';
   const label = t.discountLabel || ((t.discount > 0) ? '할인' : null);
   return label ? `${t.method}(${label})` : (t.method || '');
 }
@@ -2825,12 +3324,17 @@ function sheetRecords(t) {
     return {
       날짜: date,
       제품명: `[${cat}] ${i.title}`,
-      구분: isReturn ? '입고' : (String(i.title).includes('택배비') ? '택배비' : '출고'),
+      /* 교환 한 건에는 돌려받은 책(음수)과 새로 준 책(양수)이 같이 들어 있어
+         거래 종류로 한꺼번에 정할 수 없다. 줄의 부호가 정한다 —
+         시트 현재재고가 SUMIFS(입고) − SUMIFS(출고*) 라서 이게 어긋나면 재고가 틀어진다. */
+      구분: isReturn ? '입고'
+          : (String(i.title).includes('택배비') ? '택배비' : (i.qty < 0 ? '입고' : '출고')),
       수량: qty,
       출고단가: unit,
       출고금액: amount,
       결제: method,
-      고객: t.customer || '',
+      // 무상 출고는 입금자명이 있을 수 없다 — 그 자리에 '왜 나갔는지' 를 적는다
+      고객: (isFreeTx(t) ? (t.discountLabel || '무상') : t.customer) || '',
       연락처: t.phone || '',
       주소: t.address || '',
     };
@@ -3402,6 +3906,10 @@ function editBookModal(b) {
       <div class="field"><label>안전재고 (권)</label><input id="mSafety" inputmode="numeric" value="${safetyOf(b)}"></div>
     </div>
     <div class="field"><label>거래처 (선택)</label><input id="mSupplier" value="${esc(b.supplier || '')}" placeholder="예) 성서원"></div>
+    <label class="chkline"><input type="checkbox" id="mDead"${b.discontinued ? ' checked' : ''}>
+      절판 — 더 이상 들이지 않는 책</label>
+    <p class="desc" style="margin:-4px 0 14px">판매 화면에서 빠지고, 재고 탭에는 회색으로 남습니다.
+      남은 재고와 지난 기록은 그대로입니다.</p>
     <div class="field"><label>조정 사유 (선택)</label><input id="mNote" placeholder="예) 실사 후 분실 2권 반영"></div>
     <div class="modal-actions">
       <button class="btn ghost" id="mCancel">취소</button>
@@ -3418,11 +3926,13 @@ function editBookModal(b) {
     const safety = parseInt(digits($('mSafety').value), 10);
     const category = $('mCat').value;
     const supplier = $('mSupplier').value.trim() || null;
+    const dead = $('mDead').checked;
 
     updateDoc(doc(booksCol, b.id), {
       title, price, stock, category, supplier,
       cost: isNaN(cost) ? null : cost,
       safety: isNaN(safety) ? 0 : safety,
+      discontinued: dead,
     }).catch(e => { console.error(e); toast('저장 실패 · 연결 확인', 'bad'); });
 
     const logs = [];
@@ -3434,6 +3944,10 @@ function editBookModal(b) {
     if (price !== b.price) logs.push({ bookId: b.id, title, reason: '가격변경', field: 'price', before: b.price, after: price, note });
     if (title !== b.title) logs.push({ bookId: b.id, title, reason: '이름변경', field: 'title', note: `${b.title} → ${title}` });
     if (category !== catOf(b)) logs.push({ bookId: b.id, title, reason: '분류변경', field: 'category', note: `${catOf(b)} → ${category}` });
+    // 절판은 되돌릴 수 있는 표시지만, 언제 누가 내렸는지는 이력에 남아야 한다
+    if (dead !== !!b.discontinued) {
+      logs.push({ bookId: b.id, title, reason: dead ? '절판' : '절판 해제', field: 'discontinued', note });
+    }
     writeLogs(logs);
 
     closeModal(); toast('저장했습니다.', 'good');
@@ -3504,8 +4018,10 @@ function showLogs(list, b) {
 function returnedQtyMap(t) {
   const m = {};
   transactions.forEach(r => {
-    if (r.type === 'return' && r.refId === t.id) {
+    if ((r.type === 'return' || r.type === 'exchange') && r.refId === t.id) {
       (r.items || []).forEach(i => {
+        // 교환 건에는 새로 나간 책(양수)도 같이 들어 있다 — 되돌린 건 음수 줄뿐이다
+        if (i.qty >= 0) return;
         const k = bookKey(i.title, i.category);
         m[k] = (m[k] || 0) + (-i.qty);
       });
@@ -3513,9 +4029,12 @@ function returnedQtyMap(t) {
   });
   return m;
 }
+/* 되돌릴 수 있는 권수. 교환 건에는 돌려받은 책(음수 줄)도 같이 들어 있으므로
+   나간 줄(양수)만 센다 — 그래야 교환으로 받아 간 책도 나중에 반품·재교환할 수 있다. */
 function remainingReturnable(t) {
   const done = returnedQtyMap(t);
-  return (t.items || []).reduce((s, i) => s + (i.qty - (done[bookKey(i.title, i.category)] || 0)), 0);
+  return (t.items || []).reduce((acc, i) =>
+    acc + (i.qty > 0 ? i.qty - (done[bookKey(i.title, i.category)] || 0) : 0), 0);
 }
 
 function returnPickerModal() {
@@ -3721,6 +4240,238 @@ function processReturn(t) {
   const how = (isSplitTx(t) && cashRefund > 0 && trRefund > 0)
     ? ` (현금 ${won(cashRefund)} · 계좌이체 ${won(trRefund)})` : '';
   toast(`반품 완료 · ${won(refund)} 차감${how}`, 'good');
+}
+
+/* ================= 교환 =================
+   지금까지는 '반품하고 다시 결제' 로 처리해 왔다. 그러면 기록에는 판 적 없는 매출과
+   받은 적 없는 환불이 각각 남아, 실제로 오간 돈(차액)과 장부가 어긋난다.
+   교환은 한 건이다 — 돌려받은 책(음수 줄)과 새로 준 책(양수 줄)이 한 거래 안에 같이 들어가고,
+   received 에는 실제로 오간 차액만 적힌다.
+
+   새로 줄 책은 장바구니로 고른다. 책 고르는 화면을 모달 안에 또 만들지 않으려는 것이고,
+   덕분에 검색·분류·재고 막음·결제대기까지 판매와 똑같이 동작한다. */
+function cartSummaryHtml() {
+  const lines = cart.map(c => {
+    const b = bookById(c.id);
+    return b ? `<b>${esc(b.title)}</b> ×${c.qty} · ${won(b.price * c.qty)}` : '';
+  }).filter(Boolean);
+  return `${lines.join('<br>')}<br>합계 <b>${won(cartTotal())}</b>`;
+}
+
+function exchangeStart() {
+  if (cart.length === 0) {
+    toast('새로 드릴 책을 먼저 장바구니에 담으세요.', 'bad');
+    return;
+  }
+  if (!requireOpen('교환')) return;
+  const pickable = transactions.filter(t =>
+    t.type !== 'return' && remainingReturnable(t) > 0);
+  if (pickable.length === 0) { toast('교환할 결제 내역이 없습니다.', 'bad'); return; }
+
+  const rows = pickable.slice(0, 60).map(t => {
+    const desc = (t.items || []).map(i => `${esc(i.title)} ×${i.qty}`).join(', ');
+    const remain = remainingReturnable(t);
+    const partial = remain < t.qty ? ` <span style="color:var(--amber)">(잔여 ${remain}권)</span>` : '';
+    return `<div class="pick-row" data-id="${t.id}">
+      <div>
+        <div class="ret-title">${desc}${partial}</div>
+        <div class="ret-sub">${fmtDateTime(t.time)} · ${won(t.received)} · ${esc(methodText(t))}${
+          t.customer ? ' · ' + esc(t.customer) : ''}</div>
+      </div>
+      <button class="mini-btn" data-a="pick">이 건과 교환</button>
+    </div>`;
+  }).join('');
+
+  openModal(`
+    <h3>⇄ 교환할 결제 건 선택</h3>
+    <div class="info-box ex-cart">새로 드릴 책 (장바구니)<br>${cartSummaryHtml()}</div>
+    <p class="desc">손님이 원래 사 가신 결제 내역을 고르세요. (최근 순)</p>
+    <div class="ret-list">${rows}</div>
+    <div class="modal-actions"><button class="btn ghost" id="mCancel">취소</button></div>`);
+  modal.querySelectorAll('.pick-row').forEach(row => {
+    const t = pickable.find(x => x.id === row.dataset.id);
+    row.querySelector('[data-a=pick]').onclick = () => exchangeModal(t);
+  });
+  $('mCancel').onclick = closeModal;
+}
+
+function exchangeModal(t) {
+  const done = returnedQtyMap(t);
+  const shared = sharedTitles();
+  const rows = (t.items || []).map((i, idx) => {
+    const max = i.qty - (done[bookKey(i.title, i.category)] || 0);
+    if (max <= 0) return '';
+    const tag = (i.category && isSharedTitle(shared, i.title))
+      ? `<span class="cat-badge ${catSlug(catOf(i))}">${esc(catShort(catOf(i)))}</span>` : '';
+    return `<div class="ret-row" data-idx="${idx}">
+      <div>
+        <div class="ret-title">${tag}${esc(i.title)}</div>
+        <div class="ret-sub">${won(i.price)} · 돌려받을 수 있는 수량 ${max}권</div>
+      </div>
+      <div class="ret-qty">
+        <button type="button" data-a="dec">−</button>
+        <input class="rq" data-price="${i.price}" data-max="${max}" value="0" inputmode="numeric">
+        <button type="button" data-a="inc">＋</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  openModal(`
+    <h3>⇄ 교환</h3>
+    <div class="info-box ex-cart">새로 드릴 책<br>${cartSummaryHtml()}</div>
+    <p class="desc">손님에게서 <b>돌려받을 책</b>과 수량을 고르세요.</p>
+    <div class="ret-list">${rows}</div>
+
+    <div class="ex-diff" id="exDiff">
+      <div class="ex-row"><span>새로 드릴 책</span><b id="exOut">0원</b></div>
+      <div class="ex-row"><span>돌려받을 책</span><b id="exIn">0원</b></div>
+      <div class="ex-total"><span class="k" id="exLabel">차액 없음</span><span class="v" id="exAmt">0원</span></div>
+    </div>
+
+    <div class="field hide" id="exMethodWrap">
+      <label id="exMethodLabel">받을 방법</label>
+      <select id="exMethod">
+        <option value="현금">💵 현금</option>
+        <option value="계좌이체" selected>💳 계좌이체</option>
+      </select>
+    </div>
+    <div class="field hide" id="exAdjustWrap">
+      <label id="exAdjustLabel">실제로 받을 금액 (고칠 수 있습니다)</label>
+      <input id="exAdjust" inputmode="numeric">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn primary" id="mSave" disabled>교환 처리</button>
+    </div>`);
+
+  let exTouched = false;      // 금액을 손으로 고쳤으면 수량이 바뀌어도 덮어쓰지 않는다
+  const recalc = () => {
+    let back = 0, backQty = 0;
+    modal.querySelectorAll('.rq').forEach(inp => {
+      let q = parseInt(digits(inp.value), 10) || 0;
+      q = Math.min(Math.max(q, 0), +inp.dataset.max);
+      inp.value = q;
+      back += q * (+inp.dataset.price);
+      backQty += q;
+    });
+    const out = cartTotal();
+    const diff = out - back;
+    $('exOut').textContent = won(out);
+    $('exIn').textContent = back ? '−' + won(back) : '0원';
+    $('exAmt').textContent = won(Math.abs(diff));
+    /* 부호를 읽게 하지 않는다 — 계산대에서 '−12,000원' 은 받으라는 건지 주라는 건지 헷갈린다.
+       말로 적고, 색으로 갈라 준다(초록=받는다, 빨강=내준다). */
+    $('exLabel').textContent = diff > 0 ? '더 받을 금액' : (diff < 0 ? '돌려드릴 금액' : '차액 없음');
+    $('exDiff').className = 'ex-diff ' + (diff > 0 ? 'get' : diff < 0 ? 'give' : 'even');
+    $('exMethodLabel').textContent = diff > 0 ? '받을 방법' : '돌려드릴 방법';
+    $('exAdjustLabel').textContent = diff > 0
+      ? '실제로 받을 금액 (고칠 수 있습니다)' : '실제로 돌려드릴 금액 (고칠 수 있습니다)';
+    $('exMethodWrap').classList.toggle('hide', diff === 0);
+    $('exAdjustWrap').classList.toggle('hide', diff === 0);
+    if (!exTouched) $('exAdjust').value = Math.abs(diff).toLocaleString('ko-KR');
+    $('mSave').disabled = backQty === 0;
+  };
+  modal.querySelectorAll('.ret-row').forEach(row => {
+    const inp = row.querySelector('.rq');
+    row.querySelector('[data-a=dec]').onclick = () => { inp.value = (+inp.value || 0) - 1; recalc(); };
+    row.querySelector('[data-a=inc]').onclick = () => { inp.value = (+inp.value || 0) + 1; recalc(); };
+    inp.oninput = recalc;
+  });
+  $('exAdjust').addEventListener('input', e => {
+    exTouched = true;
+    const v = digits(e.target.value);
+    e.target.value = v === '' ? '' : parseInt(v, 10).toLocaleString('ko-KR');
+  });
+  // 원 거래가 받은 방법을 기본으로 — 대개 같은 수단으로 주고받는다
+  if (t.method === '현금' || t.method === '계좌이체') $('exMethod').value = t.method;
+  recalc();
+  $('mCancel').onclick = closeModal;
+  $('mSave').onclick = () => processExchange(t);
+}
+
+/* 화면에서 고른 것들을 거래 한 건으로 만든다.
+   돌려받은 책은 음수 줄, 새로 준 책은 양수 줄 — 한 배열에 같이 담긴다. */
+function buildExchange(t, picks, cartLines, paid, method) {
+  const backItems = picks.map(({ idx, qty }) => {
+    const orig = t.items[idx];
+    return {
+      title: orig.title, category: orig.category || catForTitle(orig.title),
+      qty: -qty, price: orig.price, amount: -(orig.price * qty),
+      // 원가도 원래 줄에서 이어받는다 — 순수익에서 그만큼 되돌아가야 한다
+      cost: Number.isFinite(orig.cost) ? orig.cost : costForTitle(orig.title, orig.category),
+    };
+  });
+  const outItems = cartLines.map(l => ({
+    title: l.book.title, category: catOf(l.book),
+    qty: l.qty, price: l.book.price, amount: l.book.price * l.qty,
+    cost: Number.isFinite(l.book.cost) ? l.book.cost : null,
+  }));
+  const backTotal = backItems.reduce((s, i) => s + -i.amount, 0);
+  const outTotal = outItems.reduce((s, i) => s + i.amount, 0);
+  const diff = outTotal - backTotal;
+  // 화면에서는 부호 없이 받았다 — 저장할 때 다시 부호를 붙인다
+  const received = diff === 0 ? 0 : (diff > 0 ? paid : -paid);
+  const items = [...backItems, ...outItems];
+  return {
+    time: new Date().toISOString(), type: 'exchange', refId: t.id,
+    items,
+    qty: items.reduce((s, i) => s + i.qty, 0),
+    total: diff, payable: diff, received,
+    diff: received - diff,
+    discount: 0, discountPct: null, discountLabel: null,
+    method: diff === 0 ? (t.method || '계좌이체') : method,
+    split: null,
+    customer: t.customer || null,
+    phone: t.phone || null,
+    address: t.address || null,
+  };
+}
+
+function processExchange(t) {
+  if (!requireOpen('교환')) { closeModal(); return; }
+  if (cart.length === 0) { toast('새로 드릴 책이 없습니다.', 'bad'); closeModal(); return; }
+
+  const picks = [];
+  modal.querySelectorAll('.ret-row').forEach(row => {
+    const inp = row.querySelector('.rq');
+    const qty = Math.min(Math.max(parseInt(digits(inp.value), 10) || 0, 0), +inp.dataset.max);
+    if (qty > 0) picks.push({ idx: +row.dataset.idx, qty });
+  });
+  if (picks.length === 0) { toast('돌려받을 책을 고르세요.', 'bad'); return; }
+
+  const cartLines = cart.map(c => ({ book: bookById(c.id), qty: c.qty })).filter(l => l.book);
+  const paid = parseInt(digits($('exAdjust').value), 10) || 0;
+  const exData = buildExchange(t, picks, cartLines, paid, $('exMethod').value);
+
+  const exRef = doc(txCol);
+  const batch = writeBatch(db);
+  const logs = [];
+  playDrawerSound();          // 누른 그 자리에서 — 저장을 기다리면 소리가 늦다
+  exData.items.forEach(i => {
+    const b = findBook(i.title, i.category);
+    if (!b) return;
+    // 돌려받은 책은 재고가 늘고(qty 음수), 새로 준 책은 줄어든다 — 한 규칙으로 둘 다 맞는다
+    batch.update(doc(booksCol, b.id), { stock: increment(-i.qty), sold: increment(i.qty) });
+    logs.push({
+      bookId: b.id, title: b.title, reason: '교환',
+      before: b.stock, after: b.stock - i.qty, txId: exRef.id,
+    });
+  });
+  batch.set(exRef, exData);
+  const backQty = picks.reduce((s, p) => s + p.qty, 0);
+  batch.update(doc(txCol, t.id), { returned: (remainingReturnable(t) - backQty) <= 0 });
+  batch.commit().catch(e => { console.error(e); toast('교환 저장 실패 · 연결 확인', 'bad'); });
+  writeLogs(logs);
+  queueForSheet('tx:' + exRef.id, 'sale', sheetRecords(exData));
+
+  closeModal();
+  clearCart();
+  const r = exData.received;
+  const how = r > 0 ? `${won(r)} 더 받음 (${exData.method})`
+            : r < 0 ? `${won(-r)} 돌려드림 (${exData.method})`
+            : '차액 없음';
+  toast(`교환 완료 · ${how}`, 'good');
 }
 
 /* ================= 설정 ================= */
@@ -4749,7 +5500,9 @@ function renderActionBar() {
     const qty = cart.reduce((s, c) => s + c.qty, 0);
     // 판이 이미 서 있으면 버튼은 닫는 일을 한다 — 같은 자리에서 열고 닫는다
     const open = $('cartPane').classList.contains('open');
-    setBar(qty ? `담긴 책 ${qty}권` : '담긴 책 없음', won(payableAmount()),
+    // 장바구니를 닫아 둔 채 책을 찾고 있어도 세워 둔 손님을 잊지 않게, 건수를 옆에 붙인다
+    const held = holds.length ? ` · 대기 ${holds.length}건` : '';
+    setBar((qty ? `담긴 책 ${qty}권` : '담긴 책 없음') + held, won(payableAmount()),
            open ? '장바구니 닫기' : '장바구니',
            () => (open ? closeSheet() : openSheet()), cart.length === 0);
     return;
@@ -4816,7 +5569,9 @@ $('discModeAmt').onclick = () => setDiscountMode('amount');
 $('discModePct').onclick = () => setDiscountMode('percent');
 $('checkout').onclick = checkout;
 $('clearCart').onclick = clearCart;
+$('holdBtn').onclick = () => holdCart();
 $('posReturnBtn').onclick = returnPickerModal;
+$('posExchangeBtn').onclick = exchangeStart;
 $('addBookBtn').onclick = addBookModal;
 $('allLogsBtn').onclick = () => logModal(null);
 $('settingsBtn').onclick = settingsModal;
@@ -4846,7 +5601,9 @@ $('fClear').onclick = () => {
 };
 $('qBooks').addEventListener('input', renderBookGrid);
 $('qInv').addEventListener('input', renderInventory);
+$('invSort').addEventListener('change', renderInventory);
 $('onlyLow').addEventListener('change', renderInventory);
+$('showDead').addEventListener('change', renderInventory);
 $('contactToggle').onclick = () => {
   const box = $('contactExtra'), open = box.classList.toggle('hide');
   $('contactToggle').textContent = open ? '＋ 연락처 · 주소 (택배 발송)' : '− 연락처 · 주소 접기';
@@ -4995,6 +5752,8 @@ window.addEventListener('appinstalled', () => {
   const want = new URLSearchParams(location.search).get('view');
   if (want && document.getElementById(want)) switchView(want);
 
+  loadHolds();          // 세워 둔 장바구니는 새로고침·앱 재시작을 건너 살아남는다
+  watchReportSum();     // 리포트 요약이 표를 훑는 동안에도 따라오게
   syncCustomerField();
   renderSync();
   renderAll();

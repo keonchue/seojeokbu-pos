@@ -100,6 +100,9 @@
     --press-out: 220ms cubic-bezier(.2,.9,.3,1);
     /* 서랍이 미끄러지는 곡선 — 감쇠 0.8 · 응답 0.3 (애플의 drawer 값) 에 가깝게 */
     --slide: 320ms cubic-bezier(.22,1.02,.36,1);
+    /* 스스로 자리를 잡는 것 — 누름(--press-out)보다 길고, 끝에서 천천히 멎는다.
+       리포트 요약이 줄어들 때처럼 '사람이 시킨 게 아니라 화면이 알아서 물러나는' 움직임. */
+    --settle: 420ms cubic-bezier(.25,.75,.32,1);
   }
 
   html, body { height: 100%; }
@@ -751,25 +754,31 @@
   .sticky-sum {
     position: sticky; top: 0; z-index: 40;
     background: var(--bg); margin-bottom: 22px;
-    transition: padding var(--press-out), box-shadow var(--press-out);
+    transition: box-shadow var(--settle), border-bottom-color var(--settle);
   }
-  .sticky-sum .stat { transition: padding var(--press-out); }
+  .sticky-sum .stat { transition: padding var(--settle); }
   .sticky-sum .stat .lbl,
-  .sticky-sum .stat .val,
+  .sticky-sum .stat .val {
+    transition: font-size var(--settle), margin var(--settle);
+  }
+  /* 곁줄은 높이째로 접힌다. height: auto → 0 은 애니메이션이 안 되므로 max-height 로 민다 —
+     안 그러면 글자만 서서히 사라지고 자리는 한 번에 툭 꺼져 그 순간만 덜컥거린다. */
   .sticky-sum .stat .sub {
-    transition: font-size var(--press-out), margin var(--press-out), opacity var(--press-out);
+    max-height: 40px; overflow: hidden;
+    transition: max-height var(--settle), margin var(--settle), opacity var(--settle);
   }
   /* 붙어 있는 동안 */
   .sticky-sum.stuck {
     box-shadow: 0 10px 20px -14px rgba(16,26,48,.35);
     border-bottom-color: var(--ink-3);
   }
-  .sticky-sum.stuck .stat { padding-top: 8px; padding-bottom: 9px; }
-  .sticky-sum.stuck .stat .lbl { font-size: 11px; margin-bottom: 2px; }
-  .sticky-sum.stuck .stat .val { font-size: var(--fs-lg); }
-  .sticky-sum.stuck .stat.hero .val { font-size: var(--fs-xl); }
-  /* 이익률·경고 같은 곁줄은 붙는 순간 물러난다 — 한 줄 높이를 지키는 값이다 */
-  .sticky-sum.stuck .stat .sub { opacity: 0; height: 0; margin: 0; overflow: hidden; }
+  /* 줄어드는 폭은 일부러 작게 잡았다. 26 → 17 처럼 크게 줄이면 눈이 '글자가 바뀌었다'로 읽는다.
+     한 걸음만 물러나야 '멀어졌다'로 읽힌다 — 아낀 높이는 그래도 28px 남짓이다. */
+  .sticky-sum.stuck .stat { padding-top: 9px; padding-bottom: 10px; }
+  .sticky-sum.stuck .stat .lbl { font-size: 11px; margin-bottom: 3px; }
+  .sticky-sum.stuck .stat .val { font-size: 19px; }
+  .sticky-sum.stuck .stat.hero .val { font-size: 24px; }
+  .sticky-sum.stuck .stat .sub { max-height: 0; margin-top: 0; opacity: 0; }
 
   .rank-head { margin-bottom: 12px; }
   .rank-head h3 { font-size: var(--fs-lg); letter-spacing: var(--tr-lg); }
@@ -2525,6 +2534,9 @@ function saleRow(t) {
   const desc = (isReturn ? '↩ [반품] ' : (isExchange ? '⇄ [교환] ' : '')) +
     (t.items || []).map(i =>
       `${isExchange && i.qty < 0 ? '↩' : ''}${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
+  /* 교환은 한 권 받고 한 권 주면 권수 변동이 0 이다. '0권' 이라고 적으면
+     아무것도 안 판 줄처럼 읽히므로, 변동이 없으면 숫자 대신 줄표를 둔다. */
+  const qtyCell = t.qty === 0 ? '<span class="dim">-</span>' : `${t.qty}권`;
   let manage;
   if (isReturn) manage = '<span class="pill diff">반품</span>';
   else if (isExchange) manage = '<span class="pill warn">교환</span>';
@@ -2544,16 +2556,19 @@ function saleRow(t) {
   if (isReturn) tr.classList.add('row-return');
   tr.innerHTML = flowTab === 'all'
     ? `<td data-label="일시">${fmtDateTime(t.time)}</td>
-       <td class="center" data-label="구분">${isReturn ? '<span class="pill diff">반품</span>' : '<span class="pill out">출고</span>'}</td>
+       <td class="center" data-label="구분">${
+         isReturn ? '<span class="pill diff">반품</span>'
+       : isExchange ? '<span class="pill warn">교환</span>'
+       : '<span class="pill out">출고</span>'}</td>
        <td class="cell-main" data-label="내역">${desc}</td>
        <td data-label="고객·거래처">${t.customer ? esc(t.customer) : '<span class="dim">-</span>'}</td>
-       <td class="num" data-label="수량">${t.qty}권</td>
+       <td class="num" data-label="수량">${qtyCell}</td>
        <td class="num" data-label="금액"><b>${won(t.received)}</b></td>
        <td class="center" data-label="관리">${manage}</td>`
     : `<td data-label="일시">${fmtDateTime(t.time)}</td>
        <td class="cell-main" data-label="내역">${desc}</td>
        <td data-label="고객">${t.customer ? esc(t.customer) : '<span class="dim">-</span>'}</td>
-       <td class="num" data-label="수량">${t.qty}권</td>
+       <td class="num" data-label="수량">${qtyCell}</td>
        <td class="num" data-label="정가 합계">${won(t.total)}</td>
        <td class="num" data-label="할인">${t.discount ? '−' + won(t.discount) + (t.discountPct ? ` (${t.discountPct}%)` : '') : '-'}</td>
        <td class="num" data-label="결제 금액"><b>${won(t.received)}</b></td>

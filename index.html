@@ -214,6 +214,8 @@
     .btn.ghost:hover:not(:disabled) { background: var(--surface-2); border-color: #cfc9bd; }
     .btn.danger:hover:not(:disabled) { background: var(--red-wash); }
     .mini-btn:hover:not(:disabled) { background: var(--surface-2); border-color: #cfc9bd; }
+    .act-row:hover { background: var(--surface-2); }
+    .act-row.danger:hover { background: var(--red-wash); }
   }
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -924,6 +926,31 @@
   .modal-actions .btn { flex: 1; min-height: 48px; font-size: var(--fs-md); }
   .warn-box { background: var(--red-wash); border: 1px solid #eec4c0; border-radius: var(--r-sm); padding: 13px 15px; font-size: var(--fs-xs); color: #8c2921; line-height: 1.65; margin-bottom: 15px; }
   .info-box { background: var(--blue-wash); border: 1px solid #c9dcf5; border-radius: var(--r-sm); padding: 13px 15px; font-size: var(--fs-xs); color: var(--blue-dark); line-height: 1.65; margin-bottom: 15px; }
+  /* 기록 수정 레이어 — 좁은 관리 칸에 단추를 늘어놓는 대신 한 겹 안으로 들인다.
+     줄 하나가 곧 할 일 하나고, 되돌릴 수 없는 일(삭제)만 맨 아래에서 붉게 선다. */
+  .act-head { padding: 0 2px 13px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .act-head .ah-when { font-size: var(--fs-2xs); color: var(--muted); }
+  .act-head .ah-what { font-size: var(--fs-sm); font-weight: 700; line-height: 1.5; margin-top: 4px; }
+  .act-head .ah-meta { font-size: var(--fs-xs); color: var(--muted); margin-top: 4px; }
+  .act-list { border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+  .act-row {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 14px 15px; min-height: var(--tap); border: none; background: #fff;
+    border-bottom: 1px solid var(--line-soft); text-align: left; cursor: pointer;
+    color: var(--text); font-family: inherit; transition: background var(--press-out);
+  }
+  .act-row:last-child { border-bottom: none; }
+  .act-row:active { background: var(--surface-2); }
+  .act-ico { font-size: 17px; width: 22px; text-align: center; flex-shrink: 0; }
+  .act-body { flex: 1; min-width: 0; }
+  .act-name { display: block; font-size: var(--fs-sm); font-weight: 700; }
+  .act-sub { display: block; font-size: var(--fs-2xs); color: var(--muted); margin-top: 2px;
+             overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .act-arrow { color: var(--muted); opacity: .5; font-size: 15px; flex-shrink: 0; }
+  .act-row.danger .act-name { color: var(--red); }
+  .act-row.danger:active { background: var(--red-wash); }
+  /* 관리 칸: 상태 표식은 단추 위에 한 줄로 얹는다 (표식은 '할 일' 이 아니라 '지금 상태') */
+  td.cell-manage .pill { display: block; margin-bottom: 5px; }
   .ret-list { max-height: 290px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
   .ret-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; border-bottom: 1px solid var(--line-soft); }
   .ret-row:last-child { border-bottom: none; }
@@ -2537,20 +2564,18 @@ function saleRow(t) {
   /* 교환은 한 권 받고 한 권 주면 권수 변동이 0 이다. '0권' 이라고 적으면
      아무것도 안 판 줄처럼 읽히므로, 변동이 없으면 숫자 대신 줄표를 둔다. */
   const qtyCell = t.qty === 0 ? '<span class="dim">-</span>' : `${t.qty}권`;
-  let manage;
-  if (isReturn) manage = '<span class="pill diff">반품</span>';
-  else if (isExchange) manage = '<span class="pill warn">교환</span>';
+  /* 관리 칸에는 단추 하나와 상태 표식만 둔다. 할 수 있는 일(일시·고객·반품·삭제)은
+     수정 레이어 안으로 넣는다 — 좁은 칸에 넷을 늘어놓으면 폰에서 옆 단추가 눌린다.
+     표식은 '할 일' 이 아니라 '지금 상태' 라서 열어 보지 않고도 읽히게 밖에 남긴다. */
+  let mark = '';
+  if (isReturn) mark = '<span class="pill diff">반품</span>';
+  else if (isExchange) mark = '<span class="pill warn">교환</span>';
   else {
     const remain = remainingReturnable(t);
-    if (remain <= 0) manage = '<span class="pill mute">반품됨</span>';
-    else {
-      const note = remain < t.qty
-        ? `<div style="font-size:11px;color:var(--amber);margin-bottom:3px">일부 반품됨 (잔여 ${remain}권)</div>` : '';
-      manage = note + '<button class="mini-btn del" data-a="return">반품</button>';
-    }
+    if (remain <= 0) mark = '<span class="pill mute">반품됨</span>';
+    else if (remain < t.qty) mark = `<span class="pill warn">일부 반품 · 잔여 ${remain}권</span>`;
   }
-  manage = '<button class="mini-btn" data-a="time" title="일시 수정">🕐</button>' + manage +
-           '<button class="mini-btn" data-a="drop" title="기록 삭제">🗑</button>';
+  const manage = mark + '<button class="mini-btn" data-a="manage">수정</button>';
 
   const tr = document.createElement('tr');
   if (isReturn) tr.classList.add('row-return');
@@ -2564,7 +2589,7 @@ function saleRow(t) {
        <td data-label="고객·거래처">${t.customer ? esc(t.customer) : '<span class="dim">-</span>'}</td>
        <td class="num" data-label="수량">${qtyCell}</td>
        <td class="num" data-label="금액"><b>${won(t.received)}</b></td>
-       <td class="center" data-label="관리">${manage}</td>`
+       <td class="center cell-manage" data-label="관리">${manage}</td>`
     : `<td data-label="일시">${fmtDateTime(t.time)}</td>
        <td class="cell-main" data-label="내역">${desc}</td>
        <td data-label="고객">${t.customer ? esc(t.customer) : '<span class="dim">-</span>'}</td>
@@ -2573,11 +2598,8 @@ function saleRow(t) {
        <td class="num" data-label="할인">${t.discount ? '−' + won(t.discount) + (t.discountPct ? ` (${t.discountPct}%)` : '') : '-'}</td>
        <td class="num" data-label="결제 금액"><b>${won(t.received)}</b></td>
        <td class="center" data-label="결제수단">${methodPills(t)}</td>
-       <td class="center" data-label="관리">${manage}</td>`;
-  const rbtn = tr.querySelector('[data-a=return]');
-  if (rbtn) rbtn.onclick = () => returnModal(t);
-  tr.querySelector('[data-a=time]').onclick = () => editTimeModal(t);
-  tr.querySelector('[data-a=drop]').onclick = () => deleteTxModal(t);
+       <td class="center cell-manage" data-label="관리">${manage}</td>`;
+  tr.querySelector('[data-a=manage]').onclick = () => manageTxModal(t);
   return tr;
 }
 
@@ -2588,6 +2610,7 @@ function buyRow(p) {
   const amt = p.amount != null ? won(p.amount)
             : '<span class="dim" title="입고금액이 적혀 있지 않습니다">모름</span>';
   const unit = p.cost != null ? won(p.cost) : '<span class="dim">-</span>';
+  const manage = '<button class="mini-btn" data-a="manage">수정</button>';
   tr.innerHTML = flowTab === 'all'
     ? `<td data-label="일시">${fmtDateTime(p.time)}</td>
        <td class="center" data-label="구분"><span class="pill in">입고</span></td>
@@ -2595,14 +2618,16 @@ function buyRow(p) {
        <td data-label="고객·거래처">${sup}</td>
        <td class="num" data-label="수량">${p.qty != null ? p.qty + '권' : '-'}</td>
        <td class="num" data-label="금액"><b>${amt}</b></td>
-       <td class="center" data-label="관리"><span class="pill mute">매입</span></td>`
+       <td class="center cell-manage" data-label="관리">${manage}</td>`
     : `<td data-label="일시">${fmtDateTime(p.time)}</td>
        <td class="cell-main" data-label="책">${esc(p.title)}</td>
        <td data-label="거래처">${sup}</td>
        <td class="num" data-label="수량">${p.qty != null ? p.qty + '권' : '-'}</td>
        <td class="num" data-label="입고단가">${unit}</td>
        <td class="num" data-label="입고금액"><b>${amt}</b></td>
-       <td class="cell-main" data-label="메모">${p.note ? esc(p.note) : '<span class="dim">-</span>'}</td>`;
+       <td class="cell-main" data-label="메모">${p.note ? esc(p.note) : '<span class="dim">-</span>'}</td>
+       <td class="center cell-manage" data-label="관리">${manage}</td>`;
+  tr.querySelector('[data-a=manage]').onclick = () => managePurchaseModal(p);
   return tr;
 }
 
@@ -2613,7 +2638,8 @@ const HEADS = {
           <th class="num">정가 합계</th><th class="num">할인</th><th class="num">결제 금액</th>
           <th class="center">결제수단</th><th class="center">관리</th></tr>`,
   in:  `<tr><th>일시</th><th>책 제목</th><th>거래처</th><th class="num">수량</th>
-          <th class="num">입고단가</th><th class="num">입고금액</th><th>메모</th></tr>`,
+          <th class="num">입고단가</th><th class="num">입고금액</th><th>메모</th>
+          <th class="center">관리</th></tr>`,
 };
 
 function renderSales() {
@@ -3156,7 +3182,7 @@ const toLocalInput = iso => {
    계산대가 바빠 나중에 몰아서 등록하는 일이 있다. 그때 실제로 팔린 시각으로 되돌린다.
    시트에도 그대로 반영한다: 옛 줄을 기록ID 로 지우고, 새 날짜로 다시 적는다.
    (변동 이력 원장의 시각은 규칙상 고쳐 쓸 수 없어 그대로 남는다 — 안내한다) */
-function editTimeModal(t) {
+function editTimeModal(t, onBack) {
   const desc = (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
   openModal(`
     <h3>일시 수정</h3>
@@ -3174,7 +3200,7 @@ function editTimeModal(t) {
       <button class="btn ghost" id="mCancel">취소</button>
       <button class="btn primary" id="mSave">저장</button>
     </div>`);
-  $('mCancel').onclick = closeModal;
+  $('mCancel').onclick = onBack || closeModal;
   $('mSave').onclick = async () => {
     const v = $('mWhen').value;
     if (!v) { toast('일시를 입력하세요.', 'bad'); return; }
@@ -3206,7 +3232,7 @@ function editTimeModal(t) {
   setTimeout(() => $('mWhen').focus(), 60);
 }
 
-function deleteTxModal(t) {
+function deleteTxModal(t, onBack) {
   const isReturn = t.type === 'return';
   const desc = (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
   openModal(`
@@ -3225,7 +3251,7 @@ function deleteTxModal(t) {
       <button class="btn ghost" id="mCancel">취소</button>
       <button class="btn solid-danger" id="mSave">삭제</button>
     </div>`);
-  $('mCancel').onclick = closeModal;
+  $('mCancel').onclick = onBack || closeModal;
   $('mSave').onclick = async () => {
     const undoStock = $('dStock').checked;
     $('mSave').disabled = true; $('mSave').textContent = '삭제 중…';
@@ -3263,6 +3289,188 @@ function deleteTxModal(t) {
       toast('삭제 실패 · 연결 확인', 'bad');
     }
   };
+}
+
+
+/* ================= 기록 수정 레이어 =================
+   관리 칸은 한 줄에 한 칸뿐이다. 거기에 🕐·반품·🗑 를 늘어놓고 고객명 수정까지 더하면
+   폰에서는 노리지 않은 단추가 눌린다. 그래서 줄마다 '수정' 하나만 두고, 할 수 있는 일은
+   이 레이어 안에 편다. 여는 김에 무엇을 건드리는지 머리에 적어 둔다 — 지금까지는
+   좁은 칸의 🗑 을 맥락 없이 눌러야 했다.
+   레이어에서 연 모달은 '취소' 하면 이 목록으로 돌아온다. 그래야 한 겹 안이지 딴 화면이 아니다. */
+const actRow = (icon, name, sub, action, cls = '') =>
+  `<button type="button" class="act-row ${cls}" data-a="${action}">
+     <span class="act-ico">${icon}</span>
+     <span class="act-body"><span class="act-name">${name}</span><span class="act-sub">${sub}</span></span>
+     <span class="act-arrow">›</span>
+   </button>`;
+
+function manageTxModal(t) {
+  const isReturn = t.type === 'return', isExchange = t.type === 'exchange';
+  const kind = isReturn ? '반품' : isExchange ? '교환' : '판매';
+  const desc = (t.items || []).map(i =>
+    `${isExchange && i.qty < 0 ? '↩' : ''}${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
+  const remain = (!isReturn && !isExchange) ? remainingReturnable(t) : 0;
+  const rows = [
+    actRow('🕐', '일시 수정', fmtDateTime(t.time), 'time'),
+    /* 무상 출고는 고객 칸에 '왜 나갔는지' 가 들어가는 자리라(시트 관습) 고칠 이름이 없다 */
+    isFreeTx(t) ? '' : actRow('👤', '고객 정보 수정',
+      t.customer ? esc(t.customer) : '적혀 있지 않음', 'cust'),
+    remain > 0 ? actRow('↩', '반품', `반품 가능 ${remain}권`, 'return') : '',
+    actRow('🗑', '기록 삭제', '없던 일로 만듭니다', 'drop', 'danger'),
+  ].filter(Boolean).join('');
+
+  openModal(`
+    <h3>${kind} 기록 수정</h3>
+    <div class="act-head">
+      <div class="ah-when">${fmtDateTime(t.time)}</div>
+      <div class="ah-what">${desc}</div>
+      <div class="ah-meta">${esc(methodText(t))} · <b>${won(t.received)}</b>${
+        t.customer ? ' · ' + esc(t.customer) : ''}</div>
+    </div>
+    <div class="act-list">${rows}</div>
+    <div class="modal-actions"><button class="btn ghost" id="mCancel">닫기</button></div>`);
+  const back = () => manageTxModal(t);
+  $('mCancel').onclick = closeModal;
+  const on = (a, fn) => { const el = modal.querySelector(`[data-a="${a}"]`); if (el) el.onclick = fn; };
+  on('time',   () => editTimeModal(t, back));
+  on('cust',   () => editCustomerModal(t, back));
+  on('return', () => returnModal(t, back));
+  on('drop',   () => deleteTxModal(t, back));
+}
+
+/* 입고 줄의 수정 레이어. 지금은 삭제 하나뿐인데도 레이어로 여는 이유가 있다 —
+   어느 책에 몇 권을 넣은 줄인지 보여 준 뒤에 지워야 '다른 품목에 잘못 넣었다' 가 고쳐진다. */
+function managePurchaseModal(p) {
+  openModal(`
+    <h3>입고 기록 수정</h3>
+    <div class="act-head">
+      <div class="ah-when">${fmtDateTime(p.time)}</div>
+      <div class="ah-what">${esc(p.title)}${p.qty != null ? ` ×${p.qty}권` : ''}</div>
+      <div class="ah-meta">${p.supplier ? esc(p.supplier) + ' · ' : ''}${
+        p.amount != null ? won(p.amount) : '금액 모름'}</div>
+    </div>
+    <div class="act-list">${
+      actRow('🗑', '기록 삭제', '없던 일로 만듭니다', 'drop', 'danger')}</div>
+    <div class="modal-actions"><button class="btn ghost" id="mCancel">닫기</button></div>`);
+  $('mCancel').onclick = closeModal;
+  modal.querySelector('[data-a=drop]').onclick =
+    () => deletePurchaseModal(p, () => managePurchaseModal(p));
+}
+
+/* 이 입고가 시트 원장에서 쓰고 있는 기록ID. 앱에서 넣은 줄은 넣던 시각으로 키를 지었고
+   (stock:책:시각 — restockModal·newBookModal 이 그렇게 넣는다), 시트에서 가져온 줄은
+   가져오면서 시트에 찍어 둔 기록ID(buy:…)가 따로 있다. */
+const purchaseSheetKey = l => l.sheetKey || `stock:${l.bookId}:${l.time}`;
+
+/* 엉뚱한 책에 입고해 버린 걸 되돌린다. 재고를 손으로 다시 써 넣지 않아도 되게
+   되돌리기를 기본으로 켜 둔다 — 판매 기록 삭제와 반대다. 판매는 시트에서 재고를
+   새로 맞춘 뒤일 수 있지만, 입고 삭제는 '방금 잘못 넣었다' 가 거의 전부이기 때문. */
+function deletePurchaseModal(p, onBack) {
+  const log = stockLogs.find(l => l.id === p.id);
+  if (!log) { toast('기록을 찾을 수 없습니다.', 'bad'); return; }
+  /* 시트에서 가져온 입고는 원장에 줄만 만들었을 뿐 앱 재고를 건드린 적이 없다.
+     그런 줄에서 재고를 되돌리면 있지도 않던 권수가 깎인다. */
+  const canUndo = Number.isFinite(log.delta) && log.delta !== 0;
+  const b = log.bookId ? books.find(x => x.id === log.bookId) : null;
+  openModal(`
+    <h3>입고 기록 삭제</h3>
+    <div class="warn-box">
+      <b>${fmtDateTime(p.time)}</b><br>${esc(p.title)}${p.qty != null ? ` ×${p.qty}권` : ''}<br>
+      ${p.supplier ? esc(p.supplier) + ' · ' : ''}${p.amount != null ? won(p.amount) : '금액 모름'}
+      <br><br>이 입고를 <b>없던 일로</b> 만듭니다. 되돌릴 수 없습니다.
+    </div>
+    ${canUndo ? `<label class="chkline"><input type="checkbox" id="dStock" checked> 재고도 함께 되돌리기
+      <span class="dim">(${Math.abs(log.delta)}권 차감${
+        b ? ` · ${b.stock}권 → ${b.stock - log.delta}권` : ''})</span></label>` : ''}
+    <div class="info-box" style="margin-top:10px">
+      ${canUndo
+        ? '잘못 넣은 입고라면 <b>켜 둔 채로</b> 삭제하세요. 재고가 입고 전으로 돌아갑니다.<br>'
+        : '이 줄은 시트에서 가져온 기록이라 앱 재고를 건드린 적이 없습니다. 재고는 그대로 둡니다.<br>'}
+      입고할 때 같이 갱신된 <b>입고단가 · 거래처</b>는 이전 값을 남겨 두지 않아 되돌리지 못합니다.
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn solid-danger" id="mSave">삭제</button>
+    </div>`);
+  $('mCancel').onclick = onBack || closeModal;
+  $('mSave').onclick = async () => {
+    const undoStock = canUndo && $('dStock').checked;
+    $('mSave').disabled = true; $('mSave').textContent = '삭제 중…';
+    try {
+      const batch = writeBatch(db);
+      if (undoStock && b) batch.update(doc(booksCol, b.id), { stock: increment(-log.delta) });
+      batch.delete(doc(logsCol, log.id));
+      await batch.commit();
+      // 시트 줄도 없앤다 (저장이 끝난 뒤 별도로 — 실패해도 삭제 자체는 이미 끝났다)
+      queueSheetDelete(purchaseSheetKey(log));
+      closeModal();
+      toast('입고 기록을 삭제했습니다.', 'good');
+    } catch (e) {
+      console.error('입고 삭제 실패', e);
+      $('mSave').disabled = false; $('mSave').textContent = '다시 시도';
+      toast('삭제 실패 · 연결 확인', 'bad');
+    }
+  };
+}
+
+/* ================= 고객 정보 고치기 =================
+   계좌이체를 받아 적을 때 입금자명을 잘못 치는 일이 있다. 앱만 고치면 시트의 고객명 칸은
+   틀린 채로 남아 입금 대조가 안 맞는다. 그래서 일시 수정과 같은 길을 쓴다 —
+   옛 줄을 기록ID 로 지우고, 새 기록ID 로 고친 줄을 다시 적는다. */
+function editCustomerModal(t, onBack) {
+  const desc = (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
+  openModal(`
+    <h3>고객 정보 수정</h3>
+    <p class="desc">${desc}<br>
+      <b>${won(Math.abs(t.received))}</b> · ${esc(methodText(t))}</p>
+    <div class="field"><label>고객명 (계좌이체는 입금자명)</label>
+      <input id="mCust" value="${esc(t.customer || '')}" placeholder="예) 김철수"></div>
+    <div class="field-row">
+      <div class="field"><label>연락처 (선택)</label>
+        <input id="mPhone" value="${esc(t.phone || '')}" placeholder="예) 010-0000-0000"></div>
+      <div class="field"><label>주소 (선택)</label>
+        <input id="mAddr" value="${esc(t.address || '')}"></div>
+    </div>
+    <div class="info-box" style="margin-top:4px">
+      지금 기록: <b>${t.customer ? esc(t.customer) : '적혀 있지 않음'}</b><br>
+      스프레드시트 원장의 이 거래 줄도 <b>고쳐 다시 적습니다</b> (옛 줄은 지웁니다).
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn primary" id="mSave">저장</button>
+    </div>`);
+  $('mCancel').onclick = onBack || closeModal;
+  $('mSave').onclick = async () => {
+    const customer = $('mCust').value.trim();
+    const phone = $('mPhone').value.trim();
+    const address = $('mAddr').value.trim();
+    const same = customer === (t.customer || '') && phone === (t.phone || '')
+              && address === (t.address || '');
+    if (same) { (onBack || closeModal)(); return; }
+
+    $('mSave').disabled = true; $('mSave').textContent = '저장 중…';
+    const oldKey = txSheetKey(t);
+    const newKey = `tx:${t.id}@${Date.now().toString(36)}`;
+    try {
+      await updateDoc(doc(txCol, t.id), {
+        customer: customer || null, phone: phone || null,
+        address: address || null, sheetKey: newKey,
+      });
+      /* 일시 수정과 같은 순서다: 먼저 옛 줄을 지우라고 큐에 넣고, 그 다음 새 기록ID 로
+         새 줄을 넣는다. 같은 기록ID 로 다시 쓰면 Apps Script 가 방금 쓴 줄까지 지운다. */
+      queueSheetDelete(oldKey);
+      queueForSheet(newKey, 'sale',
+        sheetRecords({ ...t, customer, phone, address, sheetKey: newKey }));
+      closeModal();
+      toast(customer ? `고객명을 '${customer}' 로 고쳤습니다.` : '고객 정보를 지웠습니다.', 'good');
+    } catch (e) {
+      console.error('고객 정보 수정 실패', e);
+      $('mSave').disabled = false; $('mSave').textContent = '다시 시도';
+      toast('저장 실패 · 연결 확인', 'bad');
+    }
+  };
+  setTimeout(() => $('mCust').focus(), 60);
 }
 
 /* ================= 기존 스프레드시트 형식 =================
@@ -4079,7 +4287,7 @@ function returnPickerModal() {
   $('mCancel').onclick = closeModal;
 }
 
-function returnModal(t) {
+function returnModal(t, onBack) {
   const done = returnedQtyMap(t);
   const shared = sharedTitles();
   const rows = (t.items || []).map((i, idx) => {
@@ -4171,7 +4379,7 @@ function returnModal(t) {
     moneyInput('mRefund');
   }
   recalc();
-  $('mCancel').onclick = closeModal;
+  $('mCancel').onclick = onBack || closeModal;
   $('mSave').onclick = () => processReturn(t);
 }
 

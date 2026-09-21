@@ -2528,13 +2528,32 @@ function filteredPurchases() {
   });
 }
 
+/* 결제수단·판매/반품/교환 고르개는 출고에만 뜻이 있는 조건이다. 그런데 전체 갈래에서도
+   그대로 보여서, '판매만' 을 골라도 출고만 걸러지고 입고 줄은 통째로 남았다 —
+   판매만 보려고 건 조건인데 입고가 섞여 나오니 목록도 합계도 읽을 수 없다.
+   그래서 전체 갈래에서는 출고 전용 조건이 걸린 순간 입고를 뺀다.
+
+   입고 갈래에서는 빼지 않는다. 거기선 이 고르개가 숨겨져 있어서, 출고에서 켜 둔 값이
+   남은 채 넘어오면 목록이 까닭 없이 비어 버리고 사람이 되돌릴 손잡이가 없다. */
+const outOnlyFilter = () => {
+  const f = salesFilter();
+  return !!(f.method || f.type);
+};
+/* 갈래가 실제로 보여 줄 입고 목록. 표·칩·합계·CSV 가 전부 이 하나를 본다 */
+function purchasesFor(tab) {
+  if (tab === 'out') return [];
+  if (tab === 'all' && outOnlyFilter()) return [];
+  return filteredPurchases();
+}
+
 function renderFlowChips() {
   const el = $('flowChips');
   if (!el) return;
   const tx = filteredTransactions().length, pu = filteredPurchases().length;
   el.innerHTML = '';
   FLOWS.forEach(([k, label]) => {
-    const n = k === 'out' ? tx : (k === 'in' ? pu : tx + pu);
+    // 입고 칩은 pu 그대로 — 그 갈래로 가면 출고 전용 조건은 무시되므로 이 숫자가 맞다
+    const n = k === 'out' ? tx : (k === 'in' ? pu : tx + purchasesFor('all').length);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = flowTab === k ? 'on' : '';
@@ -2649,7 +2668,7 @@ function renderSales() {
   $('salesHead').innerHTML = HEADS[flowTab];
 
   const txList = (flowTab === 'in') ? [] : filteredTransactions();
-  const buyList = (flowTab === 'out') ? [] : filteredPurchases();
+  const buyList = purchasesFor(flowTab);
 
   let total = 0, received = 0, discount = 0, refund = 0;
   txList.forEach(t => {
@@ -5739,7 +5758,7 @@ function renderActionBar() {
   }
   if (view === 'sales') {
     const tx = (flowTab === 'in') ? [] : filteredTransactions();
-    const buy = (flowTab === 'out') ? [] : filteredPurchases();
+    const buy = purchasesFor(flowTab);
     const got = tx.reduce((s, t) => s + t.received, 0);
     const paid = buy.reduce((s, b) => s + (b.amount || 0), 0);
     const label = flowTab === 'in' ? '매입 합계' : (flowTab === 'out' ? '매출 합계' : '매출 − 매입');
@@ -5806,11 +5825,13 @@ $('exportCsv').onclick = () => {
   const f = salesFilter();
   const tag = (isFiltering()
     ? [f.q, f.from && f.to ? `${f.from}~${f.to}` : (f.from || f.to), f.method,
-       { sale: '판매만', return: '반품만' }[f.type]].filter(Boolean).join('_')
+       { sale: '판매만', return: '반품만', exchange: '교환만' }[f.type]].filter(Boolean).join('_')
     : `전체_${ymd(new Date())}`).replace(/[\\/:*?"<>|]/g, '_');
   // 지금 보고 있는 갈래를 그대로 내보낸다 ('전체'는 두 파일로 나눈다 — 열이 다르다)
+  const buys = purchasesFor(flowTab);
   if (flowTab !== 'in') exportCsv(filteredTransactions(), tag);
-  if (flowTab !== 'out') exportPurchaseCsv(filteredPurchases(), tag);
+  // 전체에서 판매만 골랐으면 입고 파일은 내보내지 않는다 (빈 파일이 같이 떨어지던 자리)
+  if (flowTab === 'in' || buys.length) exportPurchaseCsv(buys, tag);
 };
 
 // 검색·필터가 바뀌면 페이지를 처음으로 되돌리고 다시 그린다

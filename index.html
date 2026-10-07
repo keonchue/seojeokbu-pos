@@ -1509,17 +1509,20 @@ const catSlug  = c => CAT_SLUG[c] || 'c-etc';
 const catShort = c => CAT_SHORT[c] || c;
 const catBadge = b => `<span class="cat-badge ${catSlug(catOf(b))}">${catShort(catOf(b))}</span>`;
 const sheetTitle = b => `[${sheetCat(catOf(b))}] ${b.title}`;
-/* 시트의 '상태' 열과 같은 규칙: 현재재고 < 안전재고 이면 매입필요 */
+/* 시트의 '상태' 열과 같은 규칙: 현재재고 < 안전재고 이면 매입필요.
+   절판은 다시 들이지 않는 책이라 재고가 모자라도 매입필요가 아니다 — 이걸 빼먹으면
+   남은 재고가 있는 절판 책이 '매입 필요' 걸러보기·알약·하단 건수에 섞여 나온다. */
 const safetyOf = b => Number.isFinite(b?.safety) ? b.safety : 0;
-const isLow = b => b.stock < safetyOf(b);
+const isLow = b => !b.discontinued && b.stock < safetyOf(b);
 
 let posCat = '전체', invCat = '전체';
-function renderCatChips(elId, cur, onPick) {
+/* pool — 그 화면이 실제로 보여 줄 수 있는 책. 칩의 숫자가 눌렀을 때 나오는 수와 같아야 한다 */
+function renderCatChips(elId, cur, onPick, pool = books) {
   const el = $(elId);
   if (!el) return;
   el.innerHTML = '';
   ['전체', ...CATS].forEach(c => {
-    const n = c === '전체' ? books.length : books.filter(b => catOf(b) === c).length;
+    const n = c === '전체' ? pool.length : pool.filter(b => catOf(b) === c).length;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = c === cur ? 'on' : '';
@@ -1772,7 +1775,8 @@ function renderBookGrid() {
   const grid = $('bookGrid');
   grid.innerHTML = '';
   const q = $('qBooks').value.trim().toLowerCase();
-  renderCatChips('posCats', posCat, c => { posCat = c; renderBookGrid(); });
+  renderCatChips('posCats', posCat, c => { posCat = c; renderBookGrid(); },
+                 books.filter(b => !b.discontinued));
   /* 절판은 판매 화면에서 아예 뺀다 — 계산대에서 다시는 누를 일이 없는 책이
      212종 사이에 섞여 있으면 찾는 책이 그만큼 늦게 나온다.
      남은 재고는 재고 탭에서 그대로 보인다. */
@@ -2403,9 +2407,9 @@ function renderInventory() {
   const q = $('qInv').value.trim().toLowerCase();
   const onlyLow = $('onlyLow').checked;
   const showDead = $('showDead').checked;
-  renderCatChips('invCats', invCat, c => { invCat = c; renderInventory(); });
   // 절판이라도 재고가 남아 있으면 늘 보인다 — 남은 걸 모르고 지나치면 안 되니까
   const deadOk = b => !b.discontinued || showDead || b.stock > 0;
+  renderCatChips('invCats', invCat, c => { invCat = c; renderInventory(); }, books.filter(deadOk));
   const live = books.filter(b => !b.discontinued).length;
   const list = books
     .filter(b => deadOk(b) && matchTitle(b.title, q) && matchCat(b, invCat) && (!onlyLow || isLow(b)))

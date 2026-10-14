@@ -394,6 +394,12 @@
   }
   .cart-row .qty span { min-width: 20px; text-align: center; font-weight: 700; }
   .cart-row .amt { text-align: right; font-weight: 700; }
+  /* 택배비 줄만 금액을 누를 수 있다 — 크기·무게마다 달라서. 밑줄 점선이 '눌러서 고침' 표시 */
+  .cart-row .amt-edit {
+    border: none; background: none; padding: 4px 0; font: inherit; font-weight: 700;
+    color: var(--blue); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px;
+  }
+  .cart-row .title .ship-note { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
   .cart-row .del { text-align: center; }
   .cart-row .del button {
     width: 30px; height: 30px; border: none; background: var(--red-wash); color: var(--red);
@@ -1463,7 +1469,7 @@ const DEFAULT_BOOK = { title: '톨스토이 단편선', price: 28000, stock: 100
 let books = [];
 let transactions = [];
 let stockLogs = [];
-let cart = [];          // { id, qty }
+let cart = [];          // { id, qty, price? } — price 는 택배비처럼 그때그때 금액이 다른 줄만
 let holds = [];         // 결제대기 — 세워 둔 장바구니들. 아래 '결제대기' 단락 참고
 let payMethod = '계좌이체';
 
@@ -1814,6 +1820,61 @@ function renderBookGrid() {
   }
 }
 
+/* ================= 택배비 금액 =================
+   택배비는 '[기타] 택배비' 라는 상품 하나로 판다. 그런데 금액이 크기·무게마다 달라서
+   상품 가격(3,100원) 하나로는 못 받는다. 그래서 장바구니 줄에 그 건의 금액(price)을
+   따로 적어 둘 수 있게 한다. 상품 가격은 그대로라 다음 손님은 다시 3,100원부터다.
+
+   시트에는 아무것도 새로 생기지 않는다 — 원장 줄은 지금과 똑같이 구분 '택배비' ·
+   제품명 '[기타] 택배비' 이고, 출고단가·출고금액 숫자만 그 건의 금액이 된다.
+   택배비모음(제품명으로 거름) · 월별정리(금액 합) 모두 그대로 맞는다. */
+const isShipping = b => !!b && String(b.title || '').includes('택배비');
+/* 장바구니(또는 결제대기) 한 줄의 한 개당 금액 — 따로 적은 금액이 있으면 그것 */
+function linePrice(c) {
+  if (Number.isFinite(c.price)) return c.price;
+  const b = bookById(c.id);
+  return b ? b.price : 0;
+}
+
+function shippingPriceModal(id) {
+  const c = cart.find(x => x.id === id), b = bookById(id);
+  if (!c || !b) return;
+  const now = linePrice(c);
+  openModal(`
+    <h3>택배비 금액</h3>
+    <p class="desc">이번 건에만 적용됩니다. 기본 금액은 <b>${won(b.price)}</b> 그대로입니다.</p>
+    <div class="field"><label>한 건당 금액 (원)</label>
+      <input id="mShip" inputmode="numeric" value="${now.toLocaleString('ko-KR')}"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mReset">${won(b.price)}로</button>
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn primary" id="mSave">적용</button>
+    </div>`);
+  const inp = $('mShip');
+  inp.addEventListener('input', () => {
+    const v = digits(inp.value);
+    inp.value = v === '' ? '' : parseInt(v, 10).toLocaleString('ko-KR');
+  });
+  const apply = price => {
+    const line = cart.find(x => x.id === id);
+    if (!line) { closeModal(); return; }
+    if (price === b.price) delete line.price; else line.price = price;
+    closeModal();
+    renderCart();
+  };
+  $('mCancel').onclick = closeModal;
+  $('mReset').onclick = () => apply(b.price);
+  $('mSave').onclick = () => {
+    const v = digits(inp.value);
+    const price = v === '' ? NaN : parseInt(v, 10);
+    if (!Number.isFinite(price) || price <= 0) { toast('금액을 입력하세요.', 'bad'); return; }
+    if (price > 1000000) { toast('금액이 너무 큽니다. 다시 확인하세요.', 'bad'); return; }
+    apply(price);
+  };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') $('mSave').click(); });
+  setTimeout(() => { inp.focus(); inp.select(); }, 60);
+}
+
 function renderCart() {
   const box = $('cartItems');
   box.innerHTML = '';
@@ -1824,20 +1885,25 @@ function renderCart() {
   cart.forEach(c => {
     const b = bookById(c.id);
     if (!b) return;
-    const amt = b.price * c.qty;
+    const unit = linePrice(c), amt = unit * c.qty;
+    const ship = isShipping(b);
     totalQty += c.qty;
     const row = document.createElement('div');
     row.className = 'cart-row';
     row.innerHTML = `
-      <div class="title">${esc(b.title)}</div>
+      <div class="title">${esc(b.title)}${ship && unit !== b.price
+        ? `<span class="ship-note">이번 건 ${won(unit)} (기본 ${won(b.price)})</span>` : ''}</div>
       <div class="qty">
         <button data-a="dec" aria-label="수량 줄이기">−</button><span>${c.qty}</span><button data-a="inc" aria-label="수량 늘리기">＋</button>
       </div>
-      <div class="amt">${won(amt)}</div>
+      <div class="amt">${ship
+        ? `<button type="button" class="amt-edit" data-a="price" title="눌러서 택배비 금액 바꾸기">${won(amt)} ✎</button>`
+        : won(amt)}</div>
       <div class="del"><button data-a="del" aria-label="삭제">✕</button></div>`;
     row.querySelector('[data-a=dec]').onclick = () => changeQty(c.id, -1);
     row.querySelector('[data-a=inc]').onclick = () => changeQty(c.id, 1);
     row.querySelector('[data-a=del]').onclick = () => removeFromCart(c.id);
+    if (ship) row.querySelector('[data-a=price]').onclick = () => shippingPriceModal(c.id);
     box.appendChild(row);
   });
   $('sumQty').textContent = totalQty + '권';
@@ -1860,10 +1926,7 @@ function renderMobileBar(totalQty) {
 }
 
 function cartTotal() {
-  return cart.reduce((s, c) => {
-    const b = bookById(c.id);
-    return s + (b ? b.price * c.qty : 0);
-  }, 0);
+  return cart.reduce((s, c) => s + (bookById(c.id) ? linePrice(c) * c.qty : 0), 0);
 }
 let discountMode = 'amount';   // 'amount'(원) | 'percent'(%)
 function discountPct() {
@@ -2031,10 +2094,8 @@ function heldQty(id) {
 const availableOf = b => b.stock - heldQty(b.id);
 
 const holdQtyOf = h => h.items.reduce((s, i) => s + i.qty, 0);
-const holdTotal = h => h.items.reduce((s, i) => {
-  const b = bookById(i.id);
-  return s + (b ? b.price * i.qty : 0);
-}, 0);
+const holdTotal = h => h.items.reduce((s, i) =>
+  s + (bookById(i.id) ? linePrice(i) * i.qty : 0), 0);
 /* 칩에 적는 금액은 받을 금액이다 — 담을 때 걸어 둔 할인을 그대로 먹인다 */
 function holdPayable(h) {
   const total = holdTotal(h);
@@ -2064,7 +2125,7 @@ function snapshotCart() {
   return {
     no: nextHoldNo(),
     at: new Date().toISOString(),
-    items: cart.map(c => ({ id: c.id, qty: c.qty })),
+    items: cart.map(c => ({ id: c.id, qty: c.qty, ...(Number.isFinite(c.price) ? { price: c.price } : {}) })),
     discountMode,
     discount: $('discount').value,
     discLabel: $('discLabel').value,
@@ -2080,7 +2141,7 @@ function snapshotCart() {
    selectPayMethod 는 현금이면 고객칸을 지우고, setDiscountMode 는 할인칸을 비운다.
    둘을 먼저 세워 놓고 값을 적어야 방금 적은 것이 지워지지 않는다. */
 function applyHold(h) {
-  cart = h.items.map(i => ({ id: i.id, qty: i.qty }));
+  cart = h.items.map(i => ({ id: i.id, qty: i.qty, ...(Number.isFinite(i.price) ? { price: i.price } : {}) }));
   selectPayMethod(h.method || '계좌이체');
   setDiscountMode(h.discountMode === 'percent' ? 'percent' : 'amount');
   $('discount').value = h.discount || '';
@@ -2221,14 +2282,14 @@ function checkout() {
 
   const lines = cart.map(c => {
     const b = bookById(c.id);
-    return { book: b, qty: c.qty };
+    return { book: b, qty: c.qty, price: linePrice(c) };
   }).filter(l => l.book);
   /* 원가(cost)를 품목에 박아 둔다 — 나중에 그 책의 입고단가가 바뀌어도
      이미 판 건의 순수익이 흔들리면 안 되기 때문. 원가를 모르는 책은 null 로 둔다
      (0 으로 채우면 순수익이 부풀려져 거짓말이 된다). */
   const items = lines.map(l => ({
     title: l.book.title, category: catOf(l.book),
-    qty: l.qty, price: l.book.price, amount: l.book.price * l.qty,
+    qty: l.qty, price: l.price, amount: l.price * l.qty,
     cost: Number.isFinite(l.book.cost) ? l.book.cost : null,
   }));
 
@@ -3203,7 +3264,7 @@ const toLocalInput = iso => {
 
 /* ================= 거래 일시 고치기 =================
    계산대가 바빠 나중에 몰아서 등록하는 일이 있다. 그때 실제로 팔린 시각으로 되돌린다.
-   시트에도 그대로 반영한다: 옛 줄을 기록ID 로 지우고, 새 날짜로 다시 적는다.
+   시트에도 반영한다: 원장의 그 줄은 자리를 그대로 두고 날짜 칸만 고친다 (queueSheetEdit).
    (변동 이력 원장의 시각은 규칙상 고쳐 쓸 수 없어 그대로 남는다 — 안내한다) */
 function editTimeModal(t, onBack) {
   const desc = (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
@@ -3216,8 +3277,8 @@ function editTimeModal(t, onBack) {
       <input type="datetime-local" id="mWhen" value="${toLocalInput(t.time)}"></div>
     <div class="info-box" style="margin-top:4px">
       지금 기록: <b>${fmtDateTime(t.time)}</b><br>
-      스프레드시트 원장의 이 거래 줄도 <b>새 날짜로 다시 적습니다</b>
-      (옛 줄은 지웁니다). 변동 이력의 시각은 원장이라 그대로 남습니다.
+      스프레드시트 원장의 이 거래 줄은 <b>자리는 그대로 두고 날짜 칸만</b> 고칩니다.
+      변동 이력의 시각은 원장이라 그대로 남습니다.
     </div>
     <div class="modal-actions">
       <button class="btn ghost" id="mCancel">취소</button>
@@ -3236,14 +3297,12 @@ function editTimeModal(t, onBack) {
     if (iso === t.time) { closeModal(); return; }
 
     $('mSave').disabled = true; $('mSave').textContent = '저장 중…';
-    const oldKey = txSheetKey(t);
-    const newKey = `tx:${t.id}@${Date.now().toString(36)}`;
     try {
-      await updateDoc(doc(txCol, t.id), { time: iso, sheetKey: newKey });
-      /* 순서가 중요하다: 먼저 옛 줄을 지우라고 큐에 넣고(같은 키로 아직 못 보낸 줄이
-         있으면 그것도 같이 걷힌다), 그 다음 새 기록ID 로 새 줄을 넣는다. */
-      queueSheetDelete(oldKey);
-      queueForSheet(newKey, 'sale', sheetRecords({ ...t, time: iso, sheetKey: newKey }));
+      await updateDoc(doc(txCol, t.id), { time: iso });
+      // 날짜가 같은 날 안에서만 바뀌었으면 시트에는 고칠 것이 없다 (시트 날짜 칸엔 시각이 없다)
+      if (ymd(new Date(iso)) !== ymd(new Date(t.time))) {
+        queueSheetEdit(txSheetKey(t), { 날짜: ymd(new Date(iso)) });
+      }
       closeModal();
       toast(`일시를 ${fmtDateTime(iso)} 로 옮겼습니다.`, 'good');
     } catch (e) {
@@ -3439,8 +3498,8 @@ function deletePurchaseModal(p, onBack) {
 
 /* ================= 고객 정보 고치기 =================
    계좌이체를 받아 적을 때 입금자명을 잘못 치는 일이 있다. 앱만 고치면 시트의 고객명 칸은
-   틀린 채로 남아 입금 대조가 안 맞는다. 그래서 일시 수정과 같은 길을 쓴다 —
-   옛 줄을 기록ID 로 지우고, 새 기록ID 로 고친 줄을 다시 적는다. */
+   틀린 채로 남아 입금 대조가 안 맞는다. 그래서 원장의 그 줄도 그 자리에서 고친다
+   (queueSheetEdit — 줄 순서는 그대로, 고객명·연락처·주소 칸만 바뀐다). */
 function editCustomerModal(t, onBack) {
   const desc = (t.items || []).map(i => `${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
   openModal(`
@@ -3457,7 +3516,7 @@ function editCustomerModal(t, onBack) {
     </div>
     <div class="info-box" style="margin-top:4px">
       지금 기록: <b>${t.customer ? esc(t.customer) : '적혀 있지 않음'}</b><br>
-      스프레드시트 원장의 이 거래 줄도 <b>고쳐 다시 적습니다</b> (옛 줄은 지웁니다).
+      스프레드시트 원장의 이 거래 줄도 <b>그 자리에서</b> 고칩니다 (줄 순서는 그대로입니다).
     </div>
     <div class="modal-actions">
       <button class="btn ghost" id="mCancel">취소</button>
@@ -3473,18 +3532,11 @@ function editCustomerModal(t, onBack) {
     if (same) { (onBack || closeModal)(); return; }
 
     $('mSave').disabled = true; $('mSave').textContent = '저장 중…';
-    const oldKey = txSheetKey(t);
-    const newKey = `tx:${t.id}@${Date.now().toString(36)}`;
     try {
       await updateDoc(doc(txCol, t.id), {
-        customer: customer || null, phone: phone || null,
-        address: address || null, sheetKey: newKey,
+        customer: customer || null, phone: phone || null, address: address || null,
       });
-      /* 일시 수정과 같은 순서다: 먼저 옛 줄을 지우라고 큐에 넣고, 그 다음 새 기록ID 로
-         새 줄을 넣는다. 같은 기록ID 로 다시 쓰면 Apps Script 가 방금 쓴 줄까지 지운다. */
-      queueSheetDelete(oldKey);
-      queueForSheet(newKey, 'sale',
-        sheetRecords({ ...t, customer, phone, address, sheetKey: newKey }));
+      queueSheetEdit(txSheetKey(t), { 고객: customer, 연락처: phone, 주소: address });
       closeModal();
       toast(customer ? `고객명을 '${customer}' 로 고쳤습니다.` : '고객 정보를 지웠습니다.', 'good');
     } catch (e) {
@@ -3533,18 +3585,44 @@ function sheetMethod(t) {
   return label ? `${t.method}(${label})` : (t.method || '');
 }
 /* 정가합계와 실제 받은 금액의 차액(할인 · 반품 차감)을 품목에 정가 비율대로 나눠 담는다.
-   반올림 오차는 마지막 품목이 흡수하므로 출고금액 합계는 실제 금액과 정확히 일치한다. */
+   반올림 오차는 마지막 품목이 흡수하므로 출고금액 합계는 실제 금액과 정확히 일치한다.
+
+   **택배비는 할인을 나눠 받지 않는다.** 할인은 책값을 깎는 것이고, 택배비는 그 건에 적은
+   금액 그대로 시트 택배비 줄에 남아야 택배비모음 합계가 실제로 낸 택배비와 맞는다.
+   다만 할인이 책값 전체보다 크면(0원 출고 등) 책은 0원까지만 깎고 남는 만큼은 택배비가
+   진다 — 그래야 출고금액 합이 받은 금액과 어긋나지 않는다. 분할결제처럼 몫의 금액이
+   정가보다 많아지는 경우(받은 돈이 더 많음)도 그 차이는 책이 받는다.
+   교환은 돌려받은 책(음수)과 새 책(양수)이 섞여 있어 예전처럼 전체에 나눈다. */
+function spreadCut(list, cut) {
+  const gross = list.reduce((s, i) => s + i.amount, 0);
+  let left = cut;
+  return list.map((i, idx) => {
+    // 합이 0이면(+/− 줄이 맞비김) 비율을 못 낸다 — 마지막 줄이 전부 진다 (합은 그대로 맞는다)
+    const c = (idx === list.length - 1) ? left : (gross ? Math.round(cut * i.amount / gross) : 0);
+    left -= c;
+    return i.amount - c;
+  });
+}
 function netAmounts(t) {
   const items = t.items || [];
   const gross = items.reduce((s, i) => s + i.amount, 0);
   const received = (typeof t.received === 'number') ? t.received : gross;
-  let left = gross - received;
-  if (!left || !gross) return items.map(i => i.amount);
-  return items.map((i, idx) => {
-    const cut = (idx === items.length - 1) ? left : Math.round((gross - received) * i.amount / gross);
-    left -= cut;
-    return i.amount - cut;
-  });
+  const cut = gross - received;
+  if (!cut || !gross) return items.map(i => i.amount);
+
+  const ship = i => String(i.title || '').includes('택배비');
+  const bookItems = items.filter(i => !ship(i)), shipItems = items.filter(ship);
+  const bookGross = bookItems.reduce((s, i) => s + i.amount, 0);
+  // 택배비만 있거나 책만 있거나 교환이면 예전 방식
+  if (t.type === 'exchange' || !shipItems.length || !bookGross) return spreadCut(items, cut);
+
+  // 책을 0원 아래로(반품이면 0원 위로) 깎을 수는 없다 — 넘치는 만큼만 택배비가 진다
+  const over = Math.sign(cut) === Math.sign(bookGross) && Math.abs(cut) > Math.abs(bookGross);
+  const bookCut = over ? bookGross : cut;
+  const bookNets = spreadCut(bookItems, bookCut);
+  const shipNets = (cut - bookCut) ? spreadCut(shipItems, cut - bookCut) : shipItems.map(i => i.amount);
+  let b = 0, s = 0;
+  return items.map(i => ship(i) ? shipNets[s++] : bookNets[b++]);
 }
 /* 거래 1건 → 시트 줄 여러 개 (품목당 하나). CSV 내보내기와 시트 미러가 함께 쓴다.
    Apps Script 쪽이 머리글 이름으로 열을 찾으므로 위치가 아니라 이름을 붙여 보낸다.
@@ -3643,7 +3721,7 @@ const QUEUE_KEY = 'sheetQueue';
 /* Apps Script 쪽 코드는 git push 로 배포되지 않는다 — 구글에서 따로 '새 버전' 배포를 해야 한다.
    그 단계를 잊으면 조용히 옛 코드가 돌기 때문에, 앱이 배포된 버전을 물어보고 알려준다.
    apps-script/Code.gs 를 고칠 때 MIRROR_VERSION 과 이 값을 같이 올린다. */
-const SHEET_MIRROR_VERSION = '2026-09-01d';
+const SHEET_MIRROR_VERSION = '2026-10-15a';
 let sheetMirrorVersion = null;      // 실제로 배포돼 있는 버전 (확인 전이면 null)
 
 const sheetMirrorStale = () =>
@@ -3690,9 +3768,8 @@ function queueForSheet(key, type, records) {
    아직 못 보낸 거래는 큐에서 빼되, 삭제 요청도 같이 넣는다 — 마침 전송 중이었을 수도 있기 때문.
    시트에 그 줄이 없으면 서버는 아무것도 안 지우고 조용히 넘어간다. */
 /* 이 거래가 시트 원장에서 쓰고 있는 기록ID.
-   일시를 고치면 옛 줄을 지우고 새 줄을 쓰는데, 같은 기록ID 로 다시 쓰면 안 된다 —
-   한 번의 요청에서 Apps Script 가 '쓰기 → 지우기' 순으로 도는 탓에 방금 쓴 줄까지
-   같이 지워지기 때문. 그래서 새 줄에는 새 기록ID 를 주고, 그 값을 거래에 적어 둔다. */
+   2026-10-14 까지는 일시·고객 정보를 고치면 옛 줄을 지우고 새 기록ID(tx:id@…)로 다시 써서,
+   그때 고친 거래는 sheetKey 에 그 새 값이 남아 있다. 지금은 그 자리에서 고치므로 키가 안 바뀐다. */
 const txSheetKey = t => t.sheetKey || ('tx:' + t.id);
 
 function queueSheetDelete(key) {
@@ -3700,6 +3777,20 @@ function queueSheetDelete(key) {
   const q = sheetQueue().filter(x => x.key !== key);
   if (q.some(x => x.key === delKey)) return;
   q.push({ key: delKey, op: 'delete', target: key });
+  setSheetQueue(q);
+  renderSheetBadge();
+  flushSheet();
+}
+
+/* 원장의 이 거래 줄을 **그 자리에서** 고친다 (입금자명 · 연락처 · 주소 · 날짜).
+   예전에는 옛 줄을 지우고 고친 줄을 새로 붙여서, 고친 거래가 원장 맨 밑으로 내려갔다.
+   그리고 '판매 가져오기' 로 들여온 손기록 줄은 지우는 것보다 '가져갔음' 표시가 늦게 가면
+   옛 줄이 안 지워진 채 새 줄만 붙어 **매출이 두 번** 잡힐 수 있었다.
+   이제는 기록ID 가 같은 줄의 그 칸만 바꾼다. 줄을 못 찾으면 아무것도 새로 만들지 않는다.
+   시트 쪽이 옛 배포라 고치기를 모르면 이 요청은 큐에 남아 있다가 새 배포 뒤에 간다. */
+function queueSheetEdit(key, set) {
+  const q = sheetQueue();
+  q.push({ key: `edit:${key}:${Date.now().toString(36)}`, op: 'edit', edit: { key, set } });
   setSheetQueue(q);
   renderSheetBadge();
   flushSheet();
@@ -3797,17 +3888,23 @@ async function flushSheet(loud = false) {
         marks: sending.filter(x => x.op === 'mark').map(x => x.mark),
         books: sending.filter(x => x.op === 'book').map(x => x.book),
         unbooks: sending.filter(x => x.op === 'unbook').map(x => x.unbook),
+        edits: sending.filter(x => x.op === 'edit').map(x => ({ id: x.key, ...x.edit })),
       }),
     });
     const out = await res.json();
     if (!out.ok) throw new Error(out.error || '시트가 거절했습니다.');
 
     const done = new Set(sending.map(x => x.key));
+    /* 옛 배포는 edits 를 모른 채 ok 만 돌려준다 — 그걸 '보냈다' 로 치면 고친 것이 사라진다.
+       edited 가 안 오면 고치기는 큐에 그대로 두고, 실패한 고치기도 남겨 다음에 다시 보낸다. */
+    if (out.edited === undefined) sending.forEach(x => { if (x.op === 'edit') done.delete(x.key); });
+    (out.editFailed || []).forEach(id => done.delete(id));
     setSheetQueue(sheetQueue().filter(x => !done.has(x.key)));
     renderSheetBadge();
     if (loud) toast(`시트에 ${out.written}줄 기록했습니다.` +
                     (out.removed ? ` · ${out.removed}줄 지웠습니다.` : '') +
                     (out.marked ? ` · ${out.marked}줄 표시했습니다.` : '') +
+                    (out.edited ? ` · ${out.edited}줄 고쳤습니다.` : '') +
                     (out.added ? ` · 재고관리에 ${out.added}종 추가했습니다.` : '') +
                     (out.dropped ? ` · 재고관리에서 ${out.dropped}종 뺐습니다.` : '') +
                     (out.bookKept ? ` (${out.bookKept.length}종은 거래가 있어 그대로 둠)` : '') +
@@ -4499,7 +4596,7 @@ function processReturn(t) {
 function cartSummaryHtml() {
   const lines = cart.map(c => {
     const b = bookById(c.id);
-    return b ? `<b>${esc(b.title)}</b> ×${c.qty} · ${won(b.price * c.qty)}` : '';
+    return b ? `<b>${esc(b.title)}</b> ×${c.qty} · ${won(linePrice(c) * c.qty)}` : '';
   }).filter(Boolean);
   return `${lines.join('<br>')}<br>합계 <b>${won(cartTotal())}</b>`;
 }
@@ -4650,7 +4747,7 @@ function buildExchange(t, picks, cartLines, paid, method) {
   });
   const outItems = cartLines.map(l => ({
     title: l.book.title, category: catOf(l.book),
-    qty: l.qty, price: l.book.price, amount: l.book.price * l.qty,
+    qty: l.qty, price: l.price, amount: l.price * l.qty,
     cost: Number.isFinite(l.book.cost) ? l.book.cost : null,
   }));
   const backTotal = backItems.reduce((s, i) => s + -i.amount, 0);
@@ -4686,7 +4783,7 @@ function processExchange(t) {
   });
   if (picks.length === 0) { toast('돌려받을 책을 고르세요.', 'bad'); return; }
 
-  const cartLines = cart.map(c => ({ book: bookById(c.id), qty: c.qty })).filter(l => l.book);
+  const cartLines = cart.map(c => ({ book: bookById(c.id), qty: c.qty, price: linePrice(c) })).filter(l => l.book);
   const paid = parseInt(digits($('exAdjust').value), 10) || 0;
   const exData = buildExchange(t, picks, cartLines, paid, $('exMethod').value);
 
@@ -5502,7 +5599,9 @@ function planSheetImport(rows) {
       if (!b) unknown.add(r.제품명);
       // 정가는 앱의 판매가를 쓴다 — 할인액을 역산하려면 정가가 필요하기 때문.
       // 앱에 없는 책은 받은 금액을 그대로 정가로 본다(할인 0).
-      const price = b ? b.price : (r._qty ? Math.round(r._amount / r._qty) : 0);
+      // 택배비는 건마다 금액이 달라 앱의 기본 금액과 비교하면 할인이 생겨 버린다 — 적힌 금액이 정가다.
+      const own = r._qty ? Math.round(r._amount / r._qty) : 0;
+      const price = (b && !title.includes('택배비')) ? b.price : own;
       return { title, category: b ? catOf(b) : cat, qty: r._qty, price, amount: price * r._qty, _net: r._amount };
     });
     const total = items.reduce((s, i) => s + i.amount, 0);

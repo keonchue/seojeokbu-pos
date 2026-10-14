@@ -62,7 +62,7 @@
 /* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
    앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
    주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
-var MIRROR_VERSION = '2026-09-01d';
+var MIRROR_VERSION = '2026-10-15a';
 
 // ── 원본 원장. 앱이 거래를 쓰는 곳은 여기 하나뿐이다 (새 책 줄만 재고관리에도) ──
 var LEDGER_TAB = '입출고기록';
@@ -144,8 +144,9 @@ function doPost(e) {
     var marks = body.marks || [];
     var books = body.books || [];
     var unbooks = body.unbooks || [];
-    if (!items.length && !deletes.length && !marks.length && !books.length && !unbooks.length) {
-      return json({ ok: true, written: 0, skipped: 0, removed: 0, marked: 0, added: 0, dropped: 0 });
+    var edits = body.edits || [];
+    if (!items.length && !deletes.length && !marks.length && !books.length && !unbooks.length && !edits.length) {
+      return json({ ok: true, written: 0, skipped: 0, removed: 0, marked: 0, added: 0, dropped: 0, edited: 0 });
     }
 
     return withLock(function (ss) {
@@ -160,6 +161,12 @@ function doPost(e) {
       out.marked = m.marked;
       if (m.mismatched.length) out.mismatched = m.mismatched;
       if (m.busy.length) out.busy = m.busy;
+      /* 고치기는 쓰기·표시 **뒤**다. 같은 묶음에 그 거래의 첫 줄(items)이나
+         '가져갔음' 표시(marks)가 아직 들어 있을 수 있는데, 먼저 고치면 찾을 줄이 없다. */
+      var ed = editRows(ss, edits);
+      out.edited = ed.edited;
+      if (ed.missing.length) out.editMissing = ed.missing;
+      if (ed.failed.length) out.editFailed = ed.failed;
       out.added = bk.added;
       out.bookSkipped = bk.skipped;
       if (bk.failed.length) out.bookErrors = bk.failed;
@@ -366,6 +373,59 @@ function deleteKeys(ss, keys) {
     }
   });
   return removed;
+}
+
+/* 앱에서 고친 거래(입금자명·연락처·주소·일시)를 원장의 **그 줄 그 자리에서** 고친다.
+   예전(2026-09-19 ~ 2026-10-14)에는 옛 줄을 지우고 고친 줄을 새로 붙였는데,
+   그러면 고친 거래가 원장 맨 밑으로 내려가 날짜 순서가 흐트러지고, 사람이 그 줄에
+   직접 적어 둔 것(수식·메모)도 같이 사라졌다. 이제는 칸 몇 개만 바꾼다.
+
+   - 기록ID 가 정확히 같은 줄만 건드린다. 손으로 적은 줄(기록ID 빈칸)은 절대 안 건드린다.
+   - 바꿀 수 있는 칸은 EDITABLE 에 있는 것뿐이다. 제품명·수량·금액·구분은 못 바꾼다 —
+     그건 재고·매출 수식이 읽는 칸이라, 바꾸려면 지우고 다시 넣는 게 맞다.
+   - 줄을 못 찾으면(이미 지웠거나 시트에 간 적이 없는 거래) 아무것도 새로 만들지 않는다.
+   - 한 건이 실패해도 나머지와 같은 묶음의 판매 기록은 그대로 간다 (실패만 알려 준다). */
+var EDITABLE = ['날짜', '고객', '연락처', '주소'];
+
+function editRows(ss, edits) {
+  var out = { edited: 0, missing: [], failed: [] };
+  if (!edits || !edits.length) return out;
+
+  var sheet = sheetByName(ss, LEDGER_TAB);
+  var h = findHeader(sheet);
+  var last = sheet.getLastRow();
+  var keys = (h.col.기록ID && last > h.row)
+    ? sheet.getRange(h.row + 1, h.col.기록ID, last - h.row, 1).getValues()
+    : [];
+
+  edits.forEach(function (e) {
+    var key = String((e && e.key) || '').trim();
+    var id = String((e && e.id) || key);
+    if (!key) return;
+    try {
+      var rows = [];
+      for (var i = 0; i < keys.length; i++) {
+        if (String(keys[i][0]).trim() === key) rows.push(h.row + 1 + i);
+      }
+      if (!rows.length) { out.missing.push(id); return; }
+
+      var set = (e && e.set) || {};
+      var fields = EDITABLE.filter(function (f) {
+        return Object.prototype.hasOwnProperty.call(set, f) && h.col[f];
+      });
+      rows.forEach(function (r) {
+        fields.forEach(function (f) {
+          var v = set[f];
+          if (v === null || v === undefined) v = '';
+          sheet.getRange(r, h.col[f]).setValue(f === '날짜' ? toDate(v) : v);
+        });
+      });
+      out.edited += rows.length;
+    } catch (err) {
+      out.failed.push(id);
+    }
+  });
+  return out;
 }
 
 // 월별 피벗이 '날짜 - 월'로 묶으려면 글자가 아니라 진짜 날짜여야 한다

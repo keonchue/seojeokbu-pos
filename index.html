@@ -303,6 +303,12 @@
   .sync.off { background: rgba(255,130,130,.16); border-color: rgba(255,130,130,.42); color: #ffd0d0; }
   .sync.off .dot { background: #ff8282; }
   @keyframes pulse { 50% { opacity: .3; } }
+  /* 시트로 오래 못 간 기록 · 시트와 다른 재고 — 어느 기기에서든 위쪽에 뜬다 */
+  .sheet-chip {
+    font-size: var(--fs-2xs); font-weight: 700; white-space: nowrap; cursor: pointer;
+    background: rgba(255,206,90,.15); border: 1px solid rgba(255,206,90,.4); color: #ffe3a3;
+    padding: 5px 11px; border-radius: var(--r-pill);
+  }
 
   /* ═══════════ Login ═══════════ */
   #loginScreen {
@@ -1154,6 +1160,7 @@
     <div class="hide-sm">영업일자 <b id="today"></b> <b id="clock" class="clock"></b></div>
     <div class="hdr-rev"><span class="k">매출</span> <b id="hdrRevenue">0원</b></div>
     <button id="bizChip" class="biz-chip off" title="개업 · 마감">–</button>
+    <button id="sheetChip" class="sheet-chip" style="display:none"></button>
     <div id="syncBadge" class="sync" role="status" tabindex="0"><span class="dot"></span><span id="syncText" class="sync-text">연결 중…</span></div>
     <button id="installBtn" class="icon-btn" style="display:none" title="홈 화면에 설치">⬇<span class="lbl">설치</span></button>
     <button id="settingsBtn" class="icon-btn" title="설정 · 백업">⚙</button>
@@ -1449,7 +1456,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs, setDoc,
-  onSnapshot, query, orderBy, limit, writeBatch, increment, arrayUnion }
+  onSnapshot, query, orderBy, limit, writeBatch, increment, arrayUnion, runTransaction }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig, STORE_EMAIL } from "./firebase-config.js";
 
@@ -1489,7 +1496,7 @@ const digits = v => String(v ?? '').replace(/[^\d]/g, '');
    어느 갈래인지는 제목 앞머리가 '개역개정' 인지로 정한다 — 책에 갈래를 따로 적어 두지 않은
    예전 책도 바로 갈라져 보이고, 손으로 고쳤던 책은 저장된 값이 그대로 이긴다. */
 /* 성경은 앱에서 네 갈래로 본다. 시트는 예나 지금이나 [성경] 하나뿐이고 앞으로도 그래야 하므로
-   sheetCat 에서 다시 [성경] 으로 합친다.
+   sheetCat 에서 다시 [성경] 으로 합친다. 단 '성경 - 어린이' 는 시트가 [어린이] 로 적어 와서 [어린이] 로 낸다.
    찬송가는 성경이 아니다 — 어린이·일반과 같은 줄의 독립 분류로 두되,
    시트에는 예전부터 [기타] 로 적어 왔으므로 그대로 [기타] 로 내보낸다. */
 const CATS = ['성경 - 개역개정', '성경 - 개역한글', '성경 - 한영/영어', '성경 - 어린이',
@@ -1509,8 +1516,12 @@ const bibleSub = title => /^\s*개역개정/.test(String(title ?? '')) ? '성경
 /* 책에도 거래 품목({title, category})에도 그대로 쓴다 */
 const catOf = o => CATS.includes(o?.category) ? o.category
                : (o?.category === '성경' ? bibleSub(o?.title) : '기타');
-/* 시트에 적을 이름 — 성경 갈래는 다시 하나로 합친다 */
-const sheetCat = c => BIBLE_SUBS.includes(c) ? '성경' : (SHEET_CATS.includes(c) ? c : '기타');
+/* 시트에 적을 이름 — 성경 갈래는 다시 하나로 합친다.
+   단 어린이 성경은 시트가 처음부터 [어린이] 로 적어 왔다. [성경] 으로 보내면 재고관리에 없는
+   이름이 돼 시트 재고가 안 줄고(2026-10-19 까지 그랬다 — 아직 한 권도 안 팔려 티가 안 났다),
+   원장 제품명 드롭다운에 걸려 줄이 거절될 수도 있다. */
+const sheetCat = c => c === '성경 - 어린이' ? '어린이'
+                    : BIBLE_SUBS.includes(c) ? '성경' : (SHEET_CATS.includes(c) ? c : '기타');
 const catSlug  = c => CAT_SLUG[c] || 'c-etc';
 const catShort = c => CAT_SHORT[c] || c;
 const catBadge = b => `<span class="cat-badge ${catSlug(catOf(b))}">${catShort(catOf(b))}</span>`;
@@ -2349,18 +2360,29 @@ function splitParts(t) {
   const { cash, transfer } = t.split;
   const sgn = (cash + transfer) < 0 ? -1 : 1;          // 반품이면 양쪽 다 음수
   const totalQty = items.reduce((s, i) => s + Math.abs(i.qty), 0);
-  const ratio = Math.abs(cash) / (Math.abs(cash) + Math.abs(transfer));
 
-  let cashQty = Math.round(totalQty * ratio);
-  // 책이 두 권 이상이면 양쪽 최소 한 권씩 — 0권짜리 줄은 만들지 않는다
-  if (totalQty >= 2) cashQty = Math.min(Math.max(cashQty, 1), totalQty - 1);
-  else cashQty = Math.min(Math.max(cashQty, 0), totalQty);
+  /* 어느 권을 현금 몫에 넣을지는 **금액**으로 고른다. 권을 한 장씩 펼쳐 비싼 것부터,
+     넣으면 현금 금액에 더 가까워지는 것만 현금 쪽에 담는다.
+     예전에는 권수 비율로 앞에서부터 잘라, 책 60,000원 + 택배비 3,100원을
+     현금 3,100 · 이체 60,000 으로 나눠 낸 건이 시트에 '책 3,100원 · 택배비 60,000원'
+     으로 뒤바뀌어 적혔다(2026-10-17). 같은 값의 책끼리는 예전과 결과가 같다. */
+  const units = [];
+  items.forEach((i, idx) => {
+    for (let n = 0; n < Math.abs(i.qty); n++) units.push({ idx, price: Math.abs(i.price || 0) });
+  });
+  const target = Math.abs(cash);
+  const order = units.map((u, k) => k).sort((a, b) => units[b].price - units[a].price || a - b);
+  const cashCount = items.map(() => 0);
+  let sum = 0;
+  order.forEach(k => {
+    const p = units[k].price;
+    if (Math.abs(sum + p - target) < Math.abs(sum - target)) { sum += p; cashCount[units[k].idx]++; }
+  });
+  const cashQty = cashCount.reduce((s, n) => s + n, 0);
 
   const cashItems = [], trItems = [];
-  let need = cashQty;
-  items.forEach(i => {
-    const q = Math.abs(i.qty), take = Math.min(q, need);
-    need -= take;
+  items.forEach((i, idx) => {
+    const q = Math.abs(i.qty), take = cashCount[idx];
     const cut = n => ({ ...i, qty: sgn * n, amount: sgn * i.price * n });
     if (take > 0) cashItems.push(cut(take));
     if (q - take > 0) trItems.push(cut(q - take));
@@ -3711,17 +3733,34 @@ function sheetRows(t) {
    FILTER 가 자랄 자리를 막아 탭을 통째로 #REF! 로 날린다.
    원칙: 이게 절대 결제를 막으면 안 된다.
    - 저장이 끝난 *뒤에* 큐에 넣고, 보내기는 따로 돈다.
-   - 못 보내면 localStorage 에 남아 다음 기회(온라인 복귀·앱 재시작)에 다시 간다.
+   - 못 보내면 Firestore 큐(sheetQueue)에 남아, 앱이 켜진 기기 아무 데서나 다시 보낸다.
    - 같은 키를 두 번 보내도 시트 쪽에서 걸러내므로 중복으로 적히지 않는다.
    웹앱 주소와 토큰은 코드가 아니라 Firestore meta/sheet 에 둔다 — 저장소가 public 이라
    주소가 노출되면 아무나 시트에 데이터를 밀어넣을 수 있기 때문. */
 let sheetCfg = null;
+
+/* 못 보낸 기록은 **Firestore `sheetQueue`** 에 둔다 (2026-10-19 부터).
+   그 전에는 기기마다 브라우저(localStorage)에 쌓았는데, 그러면
+   - 결제한 그 기기에서 앱을 다시 열 때까지 아무 데도 안 갔고 (2026-10-17 오후 기록이 그렇게 멈췄다)
+   - 다른 기기에서는 밀린 게 있는지조차 안 보였고
+   - 브라우저 저장소가 지워지면 기록이 영영 사라졌다.
+   이제는 어느 기기에서 넣든 한곳에 쌓이고, 앱이 켜진 기기 아무 데서나 보낸다.
+   localStorage 는 두 가지로만 남는다 — 옛 버전이 쌓아 둔 것을 옮겨 담는 출발지,
+   그리고 규칙(firestore.rules)을 아직 게시하지 않아 Firestore 에 못 쓸 때의 예비 자리. */
 const QUEUE_KEY = 'sheetQueue';
+const qCol = collection(db, 'sheetQueue');
+const qLeaseRef = doc(db, 'meta', 'sheetFlush');
+let qRemote = new Map();         // Firestore 에 있는 못 보낸 기록 (key → item)
+let qRemoteOk = true;            // false = 규칙 미게시 등으로 Firestore 큐를 못 씀 → 기기에 쌓는다
+let qStarted = false;
+let qSeq = 0;
+// 탭마다 다른 이름 — 같은 기기의 두 탭도 동시에 보내지 않게 잠금을 이걸로 잡는다
+const FLUSH_OWNER = Math.random().toString(36).slice(2, 10);
 
 /* Apps Script 쪽 코드는 git push 로 배포되지 않는다 — 구글에서 따로 '새 버전' 배포를 해야 한다.
    그 단계를 잊으면 조용히 옛 코드가 돌기 때문에, 앱이 배포된 버전을 물어보고 알려준다.
    apps-script/Code.gs 를 고칠 때 MIRROR_VERSION 과 이 값을 같이 올린다. */
-const SHEET_MIRROR_VERSION = '2026-10-15a';
+const SHEET_MIRROR_VERSION = '2026-10-19a';
 let sheetMirrorVersion = null;      // 실제로 배포돼 있는 버전 (확인 전이면 null)
 
 const sheetMirrorStale = () =>
@@ -3748,18 +3787,106 @@ async function pingSheetMirror() {
   renderSheetBadge();
 }
 
-const sheetQueue = () => {
+const localQueue = () => {
   try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
   catch { return []; }
 };
-const setSheetQueue = q => localStorage.setItem(QUEUE_KEY, JSON.stringify(q.slice(-800)));
+// 예전에는 800건을 넘으면 오래된 것부터 말없이 버렸다 — 기록을 버리는 일은 이제 없다
+const setLocalQueue = q => {
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
+  catch (e) { console.error('기기에 못 보낸 기록을 저장하지 못했습니다', e); }
+};
+// 문서 이름에 '/' 만 못 쓴다 (키에는 원래 없지만 혹시 몰라)
+const qDocId = key => String(key).replace(/\//g, '_');
+
+/* 못 보낸 기록 전부 — Firestore 것과 (있다면) 이 기기에 남은 것을 합쳐 넣은 순서대로.
+   옛 기기 큐의 항목은 순서값이 없어 맨 앞에 선다 (그게 실제로 더 오래된 것이다). */
+function sheetQueue() {
+  const seen = new Map();
+  localQueue().forEach(x => { if (x && x.key && !seen.has(x.key)) seen.set(x.key, x); });
+  qRemote.forEach((x, k) => { if (!seen.has(k)) seen.set(k, x); });
+  return [...seen.values()].sort((a, b) => (a.at || 0) - (b.at || 0));
+}
+
+/* 하나 넣기. 화면은 바로 반영하고, Firestore 가 거절하면(규칙 미게시 등) 기기에 남긴다.
+   오프라인이면 Firestore 가 기기에 들고 있다가 연결되면 올린다 (persistentLocalCache). */
+function putQ(item) {
+  const it = JSON.parse(JSON.stringify({ ...item, at: Date.now() + (qSeq++ % 1000) / 1000 }));
+  if (!qRemoteOk) {
+    setLocalQueue([...localQueue().filter(x => x.key !== it.key), it]);
+    return;
+  }
+  qRemote.set(it.key, it);
+  setDoc(doc(qCol, qDocId(it.key)), it).catch(e => {
+    console.error('못 보낸 기록을 Firestore 에 못 넣어 이 기기에 남깁니다', e);
+    qRemoteOk = false;
+    qRemote.delete(it.key);
+    setLocalQueue([...localQueue().filter(x => x.key !== it.key), it]);
+    renderSheetBadge();
+  });
+}
+function dropQ(keys) {
+  const ks = new Set(keys);
+  if (!ks.size) return Promise.resolve();
+  const local = localQueue();
+  const left = local.filter(x => !ks.has(x.key));
+  if (left.length !== local.length) setLocalQueue(left);
+  const jobs = [];
+  ks.forEach(k => {
+    if (!qRemote.has(k)) return;
+    qRemote.delete(k);
+    jobs.push(deleteDoc(doc(qCol, qDocId(k))).catch(e => console.error('보낸 기록을 큐에서 못 지움', k, e)));
+  });
+  // 보내기 잠금을 풀기 전에 이걸 기다린다 — 안 그러면 다음 기기가 아직 안 지워진 걸 또 보낸다
+  return Promise.all(jobs);
+}
+
+/* 옛 버전이 이 기기에 쌓아 둔 것을 Firestore 로 옮긴다. 올라간 것만 기기에서 지운다. */
+let qMigrating = false;
+async function migrateLocalQueue() {
+  if (qMigrating || !qRemoteOk) return;
+  const local = localQueue();
+  if (!local.length) return;
+  qMigrating = true;
+  try {
+    for (const x of local) {
+      if (!x || !x.key) continue;
+      const it = JSON.parse(JSON.stringify({ ...x, at: x.at || 0 }));
+      await setDoc(doc(qCol, qDocId(it.key)), it);
+      qRemote.set(it.key, it);
+      setLocalQueue(localQueue().filter(y => y.key !== it.key));
+    }
+  } catch (e) {
+    console.error('기기에 남은 기록을 Firestore 로 못 옮김 — 기기에 그대로 둡니다', e);
+    if (e && e.code === 'permission-denied') qRemoteOk = false;
+  } finally {
+    qMigrating = false;
+    renderSheetBadge();
+  }
+}
+
+function startSheetQueue() {
+  if (qStarted) return;
+  qStarted = true;
+  onSnapshot(qCol, snap => {
+    const m = new Map();
+    snap.docs.forEach(d => { const x = d.data(); if (x && x.key) m.set(x.key, x); });
+    qRemote = m;
+    qRemoteOk = true;
+    renderSheetBadge();
+    migrateLocalQueue();
+    flushSheet();
+  }, err => {
+    console.error('Firestore 큐를 못 읽음 — firestore.rules 를 게시했는지 확인하세요', err);
+    qRemoteOk = false;
+    renderSheetBadge();
+  });
+}
 
 function queueForSheet(key, type, records) {
   if (!records || !records.length) return;
-  const q = sheetQueue();
-  if (q.some(x => x.key === key)) return;
-  q.push({ key, type, records });
-  setSheetQueue(q);
+  if (sheetQueue().some(x => x.key === key)) return;
+  putQ({ key, type, records });
   renderSheetBadge();
   flushSheet();
 }
@@ -3774,10 +3901,9 @@ const txSheetKey = t => t.sheetKey || ('tx:' + t.id);
 
 function queueSheetDelete(key) {
   const delKey = 'del:' + key;
-  const q = sheetQueue().filter(x => x.key !== key);
-  if (q.some(x => x.key === delKey)) return;
-  q.push({ key: delKey, op: 'delete', target: key });
-  setSheetQueue(q);
+  dropQ([key]);
+  if (sheetQueue().some(x => x.key === delKey)) return;
+  putQ({ key: delKey, op: 'delete', target: key });
   renderSheetBadge();
   flushSheet();
 }
@@ -3789,9 +3915,7 @@ function queueSheetDelete(key) {
    이제는 기록ID 가 같은 줄의 그 칸만 바꾼다. 줄을 못 찾으면 아무것도 새로 만들지 않는다.
    시트 쪽이 옛 배포라 고치기를 모르면 이 요청은 큐에 남아 있다가 새 배포 뒤에 간다. */
 function queueSheetEdit(key, set) {
-  const q = sheetQueue();
-  q.push({ key: `edit:${key}:${Date.now().toString(36)}`, op: 'edit', edit: { key, set } });
-  setSheetQueue(q);
+  putQ({ key: `edit:${key}:${Date.now().toString(36)}`, op: 'edit', edit: { key, set } });
   renderSheetBadge();
   flushSheet();
 }
@@ -3804,10 +3928,9 @@ function queueSheetEdit(key, set) {
 function dropQueuedFor(bookId) {
   const mine = k => k === `book:${bookId}` ||
                     k.startsWith(`adj:${bookId}:`) || k.startsWith(`stock:${bookId}:`);
-  const q = sheetQueue();
-  const left = q.filter(x => !mine(x.key));
-  if (left.length === q.length) return;
-  setSheetQueue(left);
+  const gone = sheetQueue().filter(x => mine(x.key)).map(x => x.key);
+  if (!gone.length) return;
+  dropQ(gone);
   renderSheetBadge();
 }
 
@@ -3816,12 +3939,10 @@ function dropQueuedFor(bookId) {
    ⚠ 스크립트가 **앱이 만든 줄만 앱이 되돌린다**는 조건으로 지운다 — 그 제품명으로
    판매 줄이나 손으로 적은 줄이 하나라도 있으면 아무것도 안 지우고 그대로 둔다. */
 function queueUnbook(b) {
-  const q = sheetQueue();
   const key = 'unbook:' + b.id;
-  if (q.some(x => x.key === key)) return;
+  if (sheetQueue().some(x => x.key === key)) return;
   // 이름은 반드시 미러가 적어 넣은 것과 같아야 찾는다 — sheetTitle 이 유일한 출처다
-  q.push({ key, op: 'unbook', unbook: { 제품명: sheetTitle(b), bookId: b.id } });
-  setSheetQueue(q);
+  putQ({ key, op: 'unbook', unbook: { 제품명: sheetTitle(b), bookId: b.id } });
   renderSheetBadge();
   flushSheet();
 }
@@ -3832,10 +3953,8 @@ function queueUnbook(b) {
    시트가 가나다 순이라 붙이는 자리는 스크립트가 찾는다. 이미 있는 이름이면 건너뛴다. */
 function queueSheetBook(bookId, book) {
   const key = 'book:' + bookId;
-  const q = sheetQueue();
-  if (q.some(x => x.key === key)) return;
-  q.push({ key, op: 'book', book });
-  setSheetQueue(q);
+  if (sheetQueue().some(x => x.key === key)) return;
+  putQ({ key, op: 'book', book });
   renderSheetBadge();
   flushSheet();
 }
@@ -3845,13 +3964,13 @@ function queueSheetBook(bookId, book) {
    mark 는 시트에 줄을 더하는 게 아니라 기록ID 칸만 채우므로, 여러 번 보내도 결과가 같다. */
 function queueSheetMark(marks) {
   if (!marks || !marks.length) return;
-  const q = sheetQueue();
+  const have = new Set(sheetQueue().map(x => x.key));
   marks.forEach(m => {
     const key = `mark:${m.key}:${m.row}`;
-    if (q.some(x => x.key === key)) return;
-    q.push({ key, op: 'mark', mark: m });
+    if (have.has(key)) return;
+    have.add(key);
+    putQ({ key, op: 'mark', mark: m });
   });
-  setSheetQueue(q);
   renderSheetBadge();
   flushSheet();
 }
@@ -3861,22 +3980,70 @@ async function loadSheetCfg() {
     const snap = await getDoc(doc(db, 'meta', 'sheet'));
     sheetCfg = snap.exists() ? snap.data() : null;
   } catch (e) { console.error('시트 설정 읽기 실패', e); sheetCfg = null; }
+  startSheetQueue();
   renderSheetBadge();
   pingSheetMirror();     // 시트 쪽에 새 배포를 안 했으면 설정 화면에서 알려준다
   flushSheet();
+  // 큐가 다 빠질 시간을 두고 시트 재고와 한 번 대조한다
+  setTimeout(() => checkSheetStock(), 20000);
+}
+
+/* 여러 기기(·탭)가 같은 큐를 동시에 보내지 않게 잡는 잠금.
+   시트 쪽도 같은 기록을 두 번 안 적게 막지만, 고치기(edit)는 늦게 도착한 옛 요청이
+   새 값을 덮을 수 있어 애초에 한 곳에서만 보낸다. 90초가 지나면 저절로 풀린다
+   (보내던 기기가 꺼져도 큐가 멈추지 않게). 기기 시계가 크게 틀려 터무니없이 먼 미래로
+   잡힌 잠금은 무시한다. */
+const LEASE_MS = 90000;
+async function takeFlushLease() {
+  return runTransaction(db, async tr => {
+    const s = await tr.get(qLeaseRef);
+    const d = s.exists() ? s.data() : {};
+    const now = Date.now();
+    const held = d.owner && d.owner !== FLUSH_OWNER &&
+                 d.until > now && d.until - now <= LEASE_MS * 2;
+    if (held) return false;
+    tr.set(qLeaseRef, { owner: FLUSH_OWNER, until: now + LEASE_MS });
+    return true;
+  });
+}
+function releaseFlushLease() {
+  runTransaction(db, async tr => {
+    const s = await tr.get(qLeaseRef);
+    if (s.exists() && s.data().owner === FLUSH_OWNER) tr.set(qLeaseRef, { owner: null, until: 0 });
+  }).catch(e => console.error('보내기 잠금을 못 풂 — 90초 뒤 저절로 풀립니다', e));
 }
 
 let flushing = false;
+let sheetLastError = null;   // 마지막 전송 실패 이유 (성공하면 비운다)
 async function flushSheet(loud = false) {
-  const q = sheetQueue();
-  if (loud && !q.length) { toast('보낼 것이 없습니다.', 'good'); return; }
-  if (flushing || !q.length) return;
+  const q0 = sheetQueue();
+  if (loud && !q0.length) { toast('보낼 것이 없습니다.', 'good'); return; }
+  if (flushing || !q0.length) return;
   if (!sheetCfg || !sheetCfg.url) { if (loud) toast('시트 연동이 설정되지 않았습니다.', 'bad'); return; }
   if (!navigator.onLine) { if (loud) toast('오프라인입니다. 연결되면 자동으로 보냅니다.', 'bad'); return; }
 
   flushing = true;
-  const sending = q.slice(0, 50);
+  let leased = false, more = false;
   try {
+    // Firestore 큐를 쓸 수 있으면 잠금부터 — 기기에만 쌓는 예비 상태면 이 기기 것만 보내니 필요 없다
+    if (qRemoteOk) {
+      try { leased = await takeFlushLease(); }
+      catch (e) {
+        // 잠금 문서만 규칙에 막힌 경우 — 잠금 없이라도 보낸다 (시트가 같은 거래를 두 번 안 적는다)
+        if (!(e && e.code === 'permission-denied')) throw e;
+        console.error('보내기 잠금을 못 잡음 (규칙) — 잠금 없이 보냅니다', e);
+        leased = null;
+      }
+      if (leased === false) {
+        if (loud) toast('다른 기기가 지금 보내는 중입니다. 곧 같이 반영됩니다.', 'good');
+        return;
+      }
+    }
+    /* 고치기는 맨 뒤로 — 줄을 못 찾아 다시 보내려고 남겨 둔 고치기가 앞을 막아
+       판매 기록이 50건 묶음에 못 끼는 일이 없게. 시트도 한 묶음 안에서는 쓰기 뒤에 고친다. */
+    const qAll = sheetQueue();
+    const sending = [...qAll.filter(x => x.op !== 'edit'), ...qAll.filter(x => x.op === 'edit')].slice(0, 50);
+    if (!sending.length) return;
     // text/plain 으로 보내야 프리플라이트(OPTIONS)가 안 뜬다 — Apps Script 는 이를 처리하지 못한다
     const res = await fetch(sheetCfg.url, {
       method: 'POST',
@@ -3899,8 +4066,21 @@ async function flushSheet(loud = false) {
        edited 가 안 오면 고치기는 큐에 그대로 두고, 실패한 고치기도 남겨 다음에 다시 보낸다. */
     if (out.edited === undefined) sending.forEach(x => { if (x.op === 'edit') done.delete(x.key); });
     (out.editFailed || []).forEach(id => done.delete(id));
-    setSheetQueue(sheetQueue().filter(x => !done.has(x.key)));
+    /* 줄을 못 찾은 고치기는 그 거래의 첫 줄이 아직 안 간 것일 수 있다 (다른 기기에서 늦게 오는 중).
+       그 거래가 큐에 있거나 고친 지 하루가 안 됐으면 남겨 두고 다음에 다시 보낸다.
+       그보다 오래됐는데도 없으면 시트에서 지워진 줄이라 버린다. */
+    const byKey = new Map(sending.map(x => [x.key, x]));
+    const queuedKeys = new Set(sheetQueue().map(x => x.key));
+    (out.editMissing || []).forEach(id => {
+      const x = byKey.get(id);
+      if (!x || !x.edit) return;
+      if (queuedKeys.has(x.edit.key) || (x.at || 0) > Date.now() - 86400000) done.delete(id);
+    });
+    await dropQ([...done]);
     renderSheetBadge();
+    // 50건씩 보내므로 남은 게 있으면 바로 이어서 (예전에는 2분 뒤 다음 차례까지 기다렸다)
+    // 남은 게 방금 '다시 보내려고 남긴' 고치기뿐이면 바로 또 보내지 않는다 (2분 뒤 차례에)
+    more = sheetQueue().some(x => !byKey.has(x.key));
     if (loud) toast(`시트에 ${out.written}줄 기록했습니다.` +
                     (out.removed ? ` · ${out.removed}줄 지웠습니다.` : '') +
                     (out.marked ? ` · ${out.marked}줄 표시했습니다.` : '') +
@@ -3911,28 +4091,138 @@ async function flushSheet(loud = false) {
                     (out.skipped ? ` (${out.skipped}건은 이미 있음)` : ''), 'good');
   } catch (e) {
     console.error('시트 전송 실패 — 큐에 남겨 두고 다음에 다시 보냅니다', e);
-    if (loud) toast('시트 전송 실패 · ' + (e.message || '연결 확인'), 'bad');
+    sheetLastError = e.message || '연결 확인';
+    renderSheetBadge();
+    if (loud) toast('시트 전송 실패 · ' + sheetLastError, 'bad');
+    return;
   } finally {
     flushing = false;
+    if (leased) releaseFlushLease();
   }
+  sheetLastError = null;
+  renderSheetBadge();
+  if (more) setTimeout(() => flushSheet(), 300);
 }
 
+/* ================= 시트 재고 자동 대조 =================
+   시트 재고관리의 현재재고와 앱 재고를 비교해 다른 책을 세어 둔다. 고치지는 않는다 —
+   어느 쪽이 맞는지는 사람이 봐야 하고, 맞추는 건 '🧮 재고 맞추기' 가 한다.
+   예전에는 벌어져도 아무도 몰랐다가 수십 권이 어긋난 뒤에야 눈에 띄었다.
+   못 보낸 기록이 있으면 시트가 그만큼 뒤처져 있어 비교가 무의미하므로 건너뛴다. */
+let sheetDiff = null;   // { at, gaps: [{book, sheetStock, delta}], missing: [title] } 또는 { skipped: 이유 }
+
+/* 시트 재고관리 줄 → 앱 책과 맞춰 차이 목록을 만든다 ('재고 맞추기' 와 같은 셈) */
+function stockGaps(rows) {
+  // 시트 제품명은 '[분류] 제목' 이라 분류까지 보고 앱 책과 맞춘다 (제목이 겹치는 책이 있다)
+  const bySheet = new Map(), sheetName = new Map();
+  rows.forEach(r => {
+    const { cat, title } = stripCat(r.제품명);
+    bySheet.set(bookKey(title, cat), sheetNum(r.현재재고));
+    sheetName.set(bookKey(title, cat), String(r.제품명).trim());
+  });
+  const missing = [], gaps = [], seen = new Set();
+  books.forEach(b => {
+    // 택배비는 재고 개념이 아니다. 원장에서 구분이 '택배비'라 시트 현재재고 수식이 세지 않으므로
+    // (입고도 출고도 아니다) 앱 재고와 영영 벌어진다 — 맞추려 들면 조정 줄만 계속 쌓인다.
+    if (String(b.title).includes('택배비')) return;
+    const k = bookKey(b.title, catOf(b));
+    seen.add(k);
+    if (!bySheet.has(k)) { missing.push(b.title); return; }
+    const sheetStock = bySheet.get(k);
+    if (sheetStock === null) return;               // 시트 쪽이 수식 오류 — 건너뛴다
+    const delta = (b.stock || 0) - sheetStock;
+    if (delta) gaps.push({ book: b, sheetStock, delta });
+  });
+  // 시트에만 있고 앱에는 없는 책 — 재고가 0이 아니면 시트 합계를 틀리게 만든다
+  const sheetOnly = [];
+  bySheet.forEach((v, k) => {
+    if (seen.has(k) || !v || String(sheetName.get(k)).includes('택배비')) return;
+    sheetOnly.push({ name: sheetName.get(k), stock: v });
+  });
+  return { gaps, missing, sheetOnly };
+}
+
+let checkingStock = false;
+async function checkSheetStock() {
+  if (checkingStock || !sheetCfg || !sheetCfg.url || !navigator.onLine) return;
+  const pending = sheetQueue().length;
+  if (pending) {
+    sheetDiff = { skipped: `못 보낸 기록 ${pending}건을 보낸 뒤에 비교합니다` };
+    renderSheetBadge();
+    return;
+  }
+  checkingStock = true;
+  try {
+    const res = await askSheet({ action: 'books' });
+    // 읽는 사이에 새 기록이 생겼으면 시트가 또 뒤처진 것이다 — 이번 결과는 버린다
+    if (sheetQueue().length) return;
+    sheetDiff = { at: Date.now(), ...stockGaps(res.books || []) };
+  } catch (e) {
+    console.error('시트 재고 대조 실패', e);
+  } finally {
+    checkingStock = false;
+    renderSheetBadge();
+  }
+}
+setInterval(() => checkSheetStock(), 3 * 3600 * 1000);
+
+/* 오래 머문 기록만 '밀림' 으로 친다 — 결제 직후 몇 초 동안 숫자가 깜빡이지 않게 */
+const STUCK_MS = 3 * 60 * 1000;
+
 function renderSheetBadge() {
+  const q = sheetQueue();
+  const n = q.length;
+  const stuck = q.filter(x => (x.at || 0) < Date.now() - STUCK_MS).length;
+  const gaps = sheetDiff && sheetDiff.gaps
+    ? sheetDiff.gaps.length + sheetDiff.missing.length + sheetDiff.sheetOnly.length : 0;
+
+  // 화면 위쪽 — 어느 기기에서든 보인다 (큐가 Firestore 에 있으므로)
+  const chip = $('sheetChip');
+  if (chip) {
+    let txt = '';
+    if (!qRemoteOk) txt = '⚠ 시트 큐 규칙 미게시';
+    else if (stuck) txt = `⚠ 시트 대기 ${n}건`;
+    else if (gaps) txt = `⚠ 시트 재고 ${gaps}종 다름`;
+    chip.style.display = txt ? '' : 'none';
+    chip.textContent = txt;
+    chip.title = txt ? txt + ' — 눌러서 설정 열기' : '';
+  }
+
   const el = $('sheetPending');
   if (!el) return;
-  const n = sheetQueue().length;
   el.textContent = n ? `못 보낸 기록 ${n}건` : '밀린 것 없음';
   const warn = $('sheetStale');
   if (warn) {
-    warn.style.display = sheetMirrorStale() ? '' : 'none';
-    warn.innerHTML = sheetMirrorStale()
-      ? `⚠ <b>시트 스크립트가 옛 버전입니다.</b> 배포된 것 <b>${esc(sheetMirrorVersion)}</b> ·
+    const msgs = [];
+    if (sheetMirrorStale()) msgs.push(`⚠ <b>시트 스크립트가 옛 버전입니다.</b> 배포된 것 <b>${esc(sheetMirrorVersion)}</b> ·
          필요한 것 <b>${esc(SHEET_MIRROR_VERSION)}</b><br>
          Apps Script 에 <code>apps-script/Code.gs</code> 를 다시 붙여넣고
-         <b>배포 → 배포 관리 → 수정 → 새 버전</b> 을 해주세요.`
-      : '';
+         <b>배포 → 배포 관리 → 수정 → 새 버전</b> 을 해주세요.`);
+    if (!qRemoteOk) msgs.push(`⚠ <b>못 보낸 기록을 Firestore 에 못 쓰고 있습니다.</b>
+         지금은 이 기기에만 쌓입니다. Firebase 콘솔 → Firestore → 규칙에
+         <code>firestore.rules</code> 를 붙여넣고 게시해 주세요.`);
+    if (stuck && sheetLastError) msgs.push(`⚠ 시트 전송이 실패하고 있습니다 · ${esc(sheetLastError)}`);
+    warn.style.display = msgs.length ? '' : 'none';
+    warn.innerHTML = msgs.join('<br><br>');
+  }
+  const diffEl = $('sheetDiff');
+  if (diffEl) {
+    if (!sheetDiff) { diffEl.innerHTML = '<span class="dim">시트 재고 대조 중…</span>'; return; }
+    if (sheetDiff.skipped) { diffEl.innerHTML = `<span class="dim">${esc(sheetDiff.skipped)}</span>`; return; }
+    const when = new Date(sheetDiff.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    const list = [
+      ...sheetDiff.gaps.map(g =>
+        `${esc(g.book.title)} <span class="dim">시트 ${g.sheetStock} · 앱 ${g.book.stock}</span>`),
+      ...sheetDiff.missing.map(t => `${esc(t)} <span class="dim">시트 재고관리에 없음</span>`),
+      ...sheetDiff.sheetOnly.map(x => `${esc(x.name)} <span class="dim">앱에 없음 · 시트 ${x.stock}</span>`),
+    ].slice(0, 40).join('<br>');
+    diffEl.innerHTML = gaps
+      ? `<div class="warn-box" style="margin:0">시트와 앱 재고가 다른 책 <b>${gaps}종</b> <span class="dim">(${when} 기준)</span>
+           <div class="sub" style="max-height:120px;overflow:auto;color:inherit;margin-top:4px">${list}${gaps > 40 ? '<br>…' : ''}</div></div>`
+      : `<span class="dim">✓ 시트와 앱 재고가 모두 같습니다 (${when} 기준)</span>`;
   }
 }
+setInterval(() => renderSheetBadge(), 30000);   // '오래 머문 기록' 판정이 시간이 지나며 바뀐다
 
 window.addEventListener('online', () => flushSheet());
 setInterval(() => flushSheet(), 120000);   // 실패분을 2분마다 조용히 재시도
@@ -4872,6 +5162,7 @@ function settingsModal() {
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn ghost" id="sSheetStock" style="width:100%">🧮 재고 맞추기</button>
       </div>
+      <div id="sheetDiff" style="margin-top:8px;font-size:var(--fs-xs)"></div>
     </div>
 
     <div class="field">
@@ -4920,6 +5211,7 @@ function settingsModal() {
   $('sSheetBuy').onclick = importBuysModal;
   $('sSheetStock').onclick = syncStockModal;
   pingSheetMirror();   // 설정을 열 때마다 시트 쪽 버전을 다시 확인한다
+  checkSheetStock();   // 시트와 앱 재고도 다시 대조한다
   $('sReset').onclick = resetAll;
   renderSheetBadge();
   const inst = $('sInstall');
@@ -5222,27 +5514,9 @@ function syncStockModal() {
         return;
       }
 
-      const rows = res.books || [];
-      // 시트 제품명은 '[분류] 제목' 이라 분류까지 보고 앱 책과 맞춘다 (제목이 겹치는 책이 있다)
-      const bySheet = new Map();
-      rows.forEach(r => {
-        const { cat, title } = stripCat(r.제품명);
-        bySheet.set(bookKey(title, cat), sheetNum(r.현재재고));
-      });
-
-      const missing = [];
-      gaps = [];
-      books.forEach(b => {
-        // 택배비는 재고 개념이 아니다. 원장에서 구분이 '택배비'라 시트 현재재고 수식이 세지 않으므로
-        // (입고도 출고도 아니다) 앱 재고와 영영 벌어진다 — 맞추려 들면 조정 줄만 계속 쌓인다.
-        if (String(b.title).includes('택배비')) return;
-        const k = bookKey(b.title, catOf(b));
-        if (!bySheet.has(k)) { missing.push(b.title); return; }
-        const sheetStock = bySheet.get(k);
-        if (sheetStock === null) return;               // 시트 쪽이 수식 오류 — 건너뛴다
-        const delta = (b.stock || 0) - sheetStock;
-        if (delta) gaps.push({ book: b, sheetStock, delta });
-      });
+      const r = stockGaps(res.books || []);
+      const missing = r.missing;
+      gaps = r.gaps;
 
       const up = gaps.filter(g => g.delta > 0), down = gaps.filter(g => g.delta < 0);
       const lines = g => g.slice(0, 30).map(x =>
@@ -5920,6 +6194,7 @@ $('posExchangeBtn').onclick = exchangeStart;
 $('addBookBtn').onclick = addBookModal;
 $('allLogsBtn').onclick = () => logModal(null);
 $('settingsBtn').onclick = settingsModal;
+$('sheetChip').onclick = settingsModal;
 $('mbOpen').onclick = () => { if (barAction) barAction(); };
 $('sheetClose').onclick = closeSheet;
 $('sheetBackdrop').onclick = closeSheet;

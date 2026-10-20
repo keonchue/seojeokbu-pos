@@ -62,7 +62,7 @@
 /* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
    앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
    주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
-var MIRROR_VERSION = '2026-10-15a';
+var MIRROR_VERSION = '2026-10-19a';
 
 // ── 원본 원장. 앱이 거래를 쓰는 곳은 여기 하나뿐이다 (새 책 줄만 재고관리에도) ──
 var LEDGER_TAB = '입출고기록';
@@ -157,6 +157,9 @@ function doPost(e) {
       var bk = addBooks(ss, books);
       var out = writeItems(ss, items);
       out.removed = deleteKeys(ss, deletes);
+      /* 지운 거래의 키를 '보냄' 으로도 적어 둔다. 다른 기기에서 늦게 도착한 그 거래의 첫 줄이
+         지운 뒤에 와도 되살아나지 않게 — 그 키는 다시 적을 일이 없다. */
+      forgetForever(ss, deletes);
       var m = markRows(ss, marks);
       out.marked = m.marked;
       if (m.mismatched.length) out.mismatched = m.mismatched;
@@ -185,11 +188,17 @@ function doPost(e) {
 }
 
 // 시트를 동시에 건드리면 줄이 겹쳐 쓰일 수 있어 잠근다
+/* 잠금을 풀기 **전에** 반드시 SpreadsheetApp.flush() 로 쓴 것을 내려 보낸다.
+   Apps Script 는 쓰기를 모아 뒀다 나중에 반영해서, 안 그러면 바로 뒤에 들어온 요청이
+   방금 적은 '_전송기록' 을 못 보고 같은 거래를 또 적는다. 2026-09-07 ~ 09-26 에 실제로
+   새 책 초기 재고 줄 다섯 개가 같은 기록ID 로 두 번씩 들어가 시트 재고가 그만큼 부풀었다. */
 function withLock(fn) {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    return json(fn(SpreadsheetApp.getActiveSpreadsheet()));
+    var out = fn(SpreadsheetApp.getActiveSpreadsheet());
+    SpreadsheetApp.flush();
+    return json(out);
   } finally {
     lock.releaseLock();
   }
@@ -912,6 +921,12 @@ function sentKeys(ss) {
     });
   }
   return map;
+}
+
+function forgetForever(ss, keys) {
+  var sent = sentKeys(ss);
+  var fresh = (keys || []).map(String).filter(function (k) { return k && !sent[k]; });
+  if (fresh.length) rememberKeys(ss, fresh);
 }
 
 function rememberKeys(ss, keys) {

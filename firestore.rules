@@ -31,7 +31,12 @@ service cloud.firestore {
       allow update: if false;
     }
 
-    // 초기 세팅 플래그
+    // 구글 시트로 아직 못 보낸 기록 (어느 기기에서 넣든 한곳에 쌓고, 아무 기기에서나 보낸다)
+    match /sheetQueue/{itemId} {
+      allow read, write: if isStore();
+    }
+
+    // 초기 세팅 플래그 · 시트 연동 설정 · 시트 보내기 잠금(meta/sheetFlush)
     match /meta/{docId} {
       allow read, write: if isStore();
     }

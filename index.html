@@ -3609,6 +3609,8 @@ function isFreeTx(t) {
 const SHEET_DISC_LABELS = ['할인', '직원할인', '지역할인'];
 const discLabelOf = t => t.discountLabel || ((t.discount > 0) ? '할인' : null);
 function sheetMethod(t) {
+  // 차액 없는 교환은 원 거래의 결제수단을 물려받는다 — 그게 '분할' 이면 결제방식 목록에 없다
+  if (t.type === 'exchange' && t.method !== '현금' && t.method !== '계좌이체') return '교환';
   if (isFreeTx(t)) return t.method || '';
   const label = discLabelOf(t);
   if (!label) return t.method || '';
@@ -3684,7 +3686,10 @@ function sheetRecords(t) {
   const nets = netAmounts(t);
   const date = ymd(new Date(t.time)), isReturn = t.type === 'return';
   // 환불 줄의 결제방식은 '현금 환불' 처럼 수단 + 환불 (할인 종류는 원 거래에만 붙인다)
-  const method = isReturn ? `${t.method || ''} 환불`.trim() : sheetMethod(t);
+  /* 환불 수단은 현금·계좌이체 둘뿐이다(결제방식 목록). 분할결제 건을 0원으로 반품하면 원 거래의
+     '분할' 이 남는데, 돈이 안 오갔으니 수단은 뜻이 없다 — 목록에 있는 '현금 환불' 로 적는다. */
+  const refundBase = (t.method === '현금' || t.method === '계좌이체') ? t.method : '현금';
+  const method = isReturn ? `${refundBase} 환불` : sheetMethod(t);
   return items.map((i, idx) => {
     const amount = nets[idx];                      // 반품이면 음수
     const qty = Math.abs(i.qty);                   // 수량은 언제나 양수
@@ -4211,6 +4216,7 @@ function renderSheetBadge() {
   if (chip) {
     let txt = '';
     if (!qRemoteOk) txt = '⚠ 시트 큐 규칙 미게시';
+    else if (sheetRejected.size) txt = `⚠ 시트가 거절 ${sheetRejected.size}건`;
     else if (stuck) txt = `⚠ 시트 대기 ${n}건`;
     else if (gaps) txt = `⚠ 시트 재고 ${gaps}종 다름`;
     chip.style.display = txt ? '' : 'none';
@@ -4592,6 +4598,14 @@ function editBookModal(b) {
     const category = $('mCat').value;
     const supplier = $('mSupplier').value.trim() || null;
     const dead = $('mDead').checked;
+    const oldName = sheetTitle(b), newName = `[${sheetCat(category)}] ${title}`;
+    /* 이미 있는 이름으로 바꾸면 시트에서 두 책이 한 줄을 나눠 쓰게 된다(재고가 합쳐지고 판매가
+       어느 책 것인지 모름). 다른 책이 그 이름을 쓰고 있거나, 시트에만 그 이름이 남아 있으면 막는다. */
+    if (oldName !== newName) {
+      const taken = books.some(o => o.id !== b.id && sheetTitle(o) === newName) ||
+        !!(sheetDiff && sheetDiff.sheetOnly && sheetDiff.sheetOnly.some(x => x.name === newName));
+      if (taken) { toast(`'${newName}' 은(는) 이미 있는 이름입니다. 다른 이름이나 분류로 바꿔 주세요.`, 'bad'); return; }
+    }
 
     updateDoc(doc(booksCol, b.id), {
       title, price, stock, category, supplier,
@@ -4599,6 +4613,26 @@ function editBookModal(b) {
       safety: isNaN(safety) ? 0 : safety,
       discontinued: dead,
     }).catch(e => { console.error(e); toast('저장 실패 · 연결 확인', 'bad'); });
+
+    /* 이름이나 분류가 바뀌면 시트에 적힐 제품명('[분류] 제목')이 바뀐다. 원장 제품명 칸은
+       재고관리 목록에 있는 이름만 받으므로, 새 이름 줄이 없으면 이 책의 다음 판매부터 시트가
+       거절한다(2026-10-26 전에는 그랬다). 그래서
+       ① 재고관리에 새 이름 줄을 만들고(book) ② 지금 재고를 옛 이름에서 새 이름으로 옮긴다
+       (옛 이름 '출고' · 새 이름 '입고' 재고조정 줄 한 쌍). 지난 기록은 옛 이름 그대로 둔다 —
+       옛 이름 줄의 재고는 0이 되고, 새 이름 줄이 이어받는다. */
+    if (oldName !== newName) {
+      const time = new Date().toISOString();
+      putQ({ key: `book:${b.id}:${time}`, op: 'book',
+             book: { 제품명: newName, 단가: price, 안전재고: isNaN(safety) ? 0 : safety } });
+      if (b.stock) {
+        queueForSheet(`rename:${b.id}:${time}`, 'adjust', [
+          adjustRecord({ title: b.title, category: catOf(b), delta: -b.stock, note: `이름 바꿈 → ${newName}`, time }),
+          adjustRecord({ title, category, delta: b.stock, note: `이름 바꿈 ← ${oldName}`, time }),
+        ]);
+      } else {
+        renderSheetBadge(); flushSheet();
+      }
+    }
 
     const logs = [];
     if (stock !== b.stock) {

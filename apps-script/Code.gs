@@ -62,7 +62,7 @@
 /* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
    앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
    주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
-var MIRROR_VERSION = '2026-10-19a';
+var MIRROR_VERSION = '2026-10-26a';
 
 // ── 원본 원장. 앱이 거래를 쓰는 곳은 여기 하나뿐이다 (새 책 줄만 재고관리에도) ──
 var LEDGER_TAB = '입출고기록';
@@ -224,22 +224,79 @@ function writeItems(ss, items) {
   var newKeys = [];
   var skipped = 0;
 
+  var groups = [];
   items.forEach(function (item) {
     if (!item || !item.key) return;
     if (sent[item.key]) { skipped++; return; }   // 이미 보낸 거래 — 다시 안 적는다
-    (item.records || []).forEach(function (rec) {
-      entries.push({ key: item.key, rec: rec });
-    });
-    newKeys.push(item.key);
+    var es = (item.records || []).map(function (rec) { return { key: item.key, rec: rec }; });
+    if (es.length) groups.push({ key: item.key, entries: es });
     sent[item.key] = true;
   });
 
-  var written = entries.length
-    ? appendRecords(sheetByName(ss, LEDGER_TAB), entries)
-    : 0;
-  if (newKeys.length) rememberKeys(ss, newKeys);
+  /* 거래 하나씩 적는다. 한 거래가 시트 입력 규칙에 걸려도 나머지는 그대로 적히고,
+     걸린 거래만 'rejected' 로 돌려준다(앱은 그것만 큐에 남긴다).
+     예전에는 묶음 전체가 실패해 '_전송기록' 이 안 남았는데, 걸리기 전까지 쓴 줄은 이미
+     시트에 남아 있어서 앱이 다시 보낼 때마다 같은 줄이 또 붙었다(2026-10-17 ~ 10-26, 수백 줄). */
+  // '보냄' 표시(_전송기록)는 appendItems 가 거래마다 줄과 함께 남긴다
+  var res = groups.length
+    ? appendItems(ss, sheetByName(ss, LEDGER_TAB), groups)
+    : { written: 0, ok: [], rejected: [] };
 
-  return { ok: true, written: written, skipped: skipped };
+  var out = { ok: true, written: res.written, skipped: skipped };
+  if (res.rejected.length) out.rejected = res.rejected;
+  return out;
+}
+
+/* 거래별로 줄을 붙인다. 쓰고 나서 **바로 flush** 해야 입력 규칙 위반이 여기서 터진다
+   (Apps Script 는 쓰기를 모아 뒀다 나중에 반영해서, flush 없이는 오류가 엉뚱한 곳에서 나고
+   그때는 이미 반쯤 써진 줄을 지울 기회가 없다). 터지면 그 거래의 줄만 지우고 다음으로 간다. */
+function appendItems(ss, sheet, groups) {
+  var h = findHeader(sheet);
+  ensureKeyColumn(sheet, h);
+  var width = 1;
+  Object.keys(h.col).forEach(function (k) { width = Math.max(width, h.col[k]); });
+
+  var start = Math.max(lastFilledRow(sheet, h) + 1, h.row + 1);
+  var out = { written: 0, ok: [], rejected: [] };
+  groups.forEach(function (g) {
+    var values = g.entries.map(function (entry) { return recordRow(h, width, entry); });
+    var target = sheet.getRange(start, 1, values.length, width);
+    try {
+      assertNoMerge(sheet, target, '기록을 붙일 자리(' + start + '행부터)');
+      target.setValues(values);
+      SpreadsheetApp.flush();
+      /* 줄과 '보냄' 표시를 한 몸으로 남긴다 — 줄만 남고 표시가 빠지면 앱이 다시 보낼 때
+         같은 줄이 또 붙는다. 표시를 못 남기면 방금 쓴 줄도 지우고 거절로 돌린다. */
+      rememberKeys(ss, [g.key]);
+      SpreadsheetApp.flush();
+      start += values.length;
+      out.written += values.length;
+      out.ok.push(g.key);
+    } catch (err) {
+      var cleared = false;
+      try { target.clearContent(); SpreadsheetApp.flush(); cleared = true; } catch (e) {}
+      // 못 지웠으면 그 자리를 건너뛴다 — 다음 거래가 반쪽 줄 위에 겹쳐 쓰지 않게
+      if (!cleared) start += values.length;
+      out.rejected.push({ key: g.key, error: String(err && err.message || err) });
+    }
+  });
+  return out;
+}
+
+/* 기록 하나 → 원장 한 줄 (머리글 이름으로 열을 찾는다) */
+function recordRow(h, width, entry) {
+  var rec = entry.rec;
+  var row = [];
+  for (var i = 0; i < width; i++) row.push('');
+  Object.keys(rec).forEach(function (key) {
+    var c = h.col[key];
+    if (!c || c > width) return;          // 이 탭에 없는 열은 버린다
+    var v = rec[key];
+    if (v === null || v === undefined || v === '') return;
+    row[c - 1] = (key === '날짜') ? toDate(v) : v;
+  });
+  row[h.col.기록ID - 1] = entry.key;       // 나중에 이 줄을 되찾기 위한 표시
+  return row;
 }
 
 function sheetByName(ss, name) {
@@ -310,6 +367,7 @@ function appendRecords(sheet, entries) {
   assertNoMerge(sheet, target, '기록을 붙일 자리(' + start + '행부터)');
   try {
     target.setValues(values);
+    SpreadsheetApp.flush();   // 규칙 위반이 여기서 터져야 아래에서 지울 수 있다
   } catch (err) {
     /* setValues 는 통째로 적용되지 않는다 — 데이터 확인 규칙에 걸리면
        그 칸 앞까지는 이미 써진 채 멈춘다. 실제로 2026-09-01 에 원장 1690행이
@@ -1096,4 +1154,83 @@ function ledgerKind(kind, pay, amount) {
   if (k === '반품') return '입고';
   if (k === '') return (Number(amount || 0) < 0) ? '입고' : '출고';
   return k;
+}
+
+
+/* ===================== 반복 줄 정리 (직접 실행 · 2026-10-26) =====================
+   2026-10-17 ~ 10-26 에 결제방식 입력 규칙에 걸린 거래 때문에, 앱이 같은 묶음을 다시 보낼
+   때마다 원장 맨 아래에 줄이 또 붙었다. 이 함수가 그 찌꺼기만 골라 지운다.
+
+   지우는 것 (둘 다 규칙으로 고른다 — 행 번호를 박아 두지 않는다):
+   ① 기록ID 가 있는 줄 가운데 기록ID·제품명·구분·수량·금액·결제방식까지 똑같은 줄의 두 번째부터.
+      (같은 거래는 한 번만 적혀야 한다. 첫 줄은 남긴다)
+   ② 기록ID 도 결제방식도 비어 있는 '출고' 줄 가운데, 같은 날짜·제품명·수량·출고금액의
+      제대로 된 줄(기록ID 있는 줄)이 따로 있는 것 — 결제방식 칸 앞에서 끊긴 반쪽 줄이다.
+   손으로 적은 줄은 결제방식이 적혀 있거나 짝이 되는 앱 줄이 없어서 걸리지 않는다.
+
+   먼저 '반복줄_정리_미리보기' 로 몇 줄이 지워지는지 로그를 보고, 맞으면 '반복줄_정리_실행'. */
+function 반복줄_정리_미리보기() { 반복줄_정리_(false); }
+function 반복줄_정리_실행() { 반복줄_정리_(true); }
+
+function 반복줄_정리_(really) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sheet = sheetByName(ss, LEDGER_TAB);
+    var h = findHeader(sheet);
+    if (!h.col.기록ID) { Logger.log('기록ID 열이 없습니다 — 지울 것 없음'); return; }
+    var last = lastFilledRow(sheet, h);
+    if (last <= h.row) { Logger.log('원장이 비어 있습니다'); return; }
+    var width = Math.max(h.width, h.col.기록ID);
+    var grid = sheet.getRange(h.row + 1, 1, last - h.row, width).getValues();
+    var v = function (row, k) { var c = h.col[k]; return c ? row[c - 1] : ''; };
+    var s = function (x) { return (x === null || x === undefined) ? '' : String(x).trim(); };
+    var day = function (x) { return x instanceof Date ? Utilities.formatDate(x, ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd') : s(x); };
+
+    var seen = {}, twin = {}, kill = [];
+    grid.forEach(function (row) {
+      if (!s(v(row, '기록ID'))) return;
+      twin[[day(v(row, '날짜')), s(v(row, '제품명')), s(v(row, '수량')), s(v(row, '출고금액'))].join('|')] = true;
+    });
+    var dupN = 0, halfN = 0;
+    /* 범위를 사고가 난 기간으로 묶는다. 같은 기록 두 번 적기는 2026-09-07 부터(flush 없던 스크립트),
+       반쪽 줄은 2026-10-17 ~ 10-26 에만 생겼다. 그 밖의 줄은 규칙에 걸려도 건드리지 않는다
+       (예: 8월 '판매 가져오기' 로 한 기록ID 를 함께 받은 손기록 줄). */
+    var DUP_FROM = '2026-09-07', HALF_FROM = '2026-10-17', HALF_TO = '2026-10-26';
+    grid.forEach(function (row, i) {
+      var key = s(v(row, '기록ID'));
+      if (!s(v(row, '제품명'))) return;
+      var d = day(v(row, '날짜'));
+      if (key) {
+        if (d < DUP_FROM) return;
+        var sig = [key, s(v(row, '제품명')), s(v(row, '구분')), s(v(row, '수량')),
+                   s(v(row, '출고금액')), s(v(row, '입고금액')), s(v(row, '결제'))].join('|');
+        if (seen[sig]) { kill.push(h.row + 1 + i); dupN++; } else seen[sig] = true;
+        return;
+      }
+      var half = d >= HALF_FROM && d <= HALF_TO &&
+        !s(v(row, '결제')) && s(v(row, '구분')) === '출고' &&
+        twin[[day(v(row, '날짜')), s(v(row, '제품명')), s(v(row, '수량')), s(v(row, '출고금액'))].join('|')];
+      if (half) { kill.push(h.row + 1 + i); halfN++; }
+    });
+
+    Logger.log('지울 줄: ' + kill.length + '개 (같은 기록 두 번째부터 ' + dupN + ' · 반쪽 줄 ' + halfN + ')');
+    if (kill.length) Logger.log('처음 몇 줄: ' + kill.slice(0, 10).join(', ') + ' … 마지막: ' + kill[kill.length - 1]);
+    if (!really) { Logger.log('미리보기입니다. 맞으면 반복줄_정리_실행 을 돌리세요.'); return; }
+
+    // 아래에서 위로, 붙어 있는 줄은 한 번에 지운다
+    var n = 0;
+    for (var j = kill.length - 1; j >= 0; ) {
+      var end = kill[j], startRow = end;
+      while (j - 1 >= 0 && kill[j - 1] === startRow - 1) { j--; startRow--; }
+      sheet.deleteRows(startRow, end - startRow + 1);
+      n += end - startRow + 1;
+      j--;
+    }
+    SpreadsheetApp.flush();
+    Logger.log('지웠습니다: ' + n + '줄');
+  } finally {
+    lock.releaseLock();
+  }
 }

@@ -3600,10 +3600,34 @@ function isFreeTx(t) {
 }
 /* 무상 출고는 결제 열에 (열람용)을 붙이지 않는다 — 시트에서 '현금' 으로 깔끔히 모여야
    현금 합계 필터가 안 깨진다. 적어 둔 특이사항은 고객명 열로 간다(아래 sheetRecords). */
+/* 시트 원장의 결제방식 칸에는 **입력 규칙(드롭다운)** 이 걸려 있어 정해진 값만 들어간다.
+   괄호 안에 올 수 있는 건 할인 · 직원할인 · 지역할인 셋뿐이다. 할인 종류 칸에 다른 말
+   (손님 이름, '차액 현금으로 드림' 같은 메모)을 적으면 '계좌이체(김인숙)' 처럼 규칙 밖의 값이
+   돼서 시트가 그 줄을 결제방식 칸 앞까지만 쓰고 거절했다 — 앱은 실패로 알고 같은 묶음을
+   계속 다시 보내, 반쯤 써진 줄이 수백 개 쌓이고 그 뒤 기록 전부가 막혔다(2026-10-17 ~ 10-26).
+   그래서 규칙 밖의 할인 이름은 '(할인)' 으로 적고, 그 말은 고객명 칸으로 보낸다(sheetCustomer). */
+const SHEET_DISC_LABELS = ['할인', '직원할인', '지역할인'];
+const discLabelOf = t => t.discountLabel || ((t.discount > 0) ? '할인' : null);
 function sheetMethod(t) {
   if (isFreeTx(t)) return t.method || '';
-  const label = t.discountLabel || ((t.discount > 0) ? '할인' : null);
-  return label ? `${t.method}(${label})` : (t.method || '');
+  const label = discLabelOf(t);
+  if (!label) return t.method || '';
+  return `${t.method}(${SHEET_DISC_LABELS.includes(label) ? label : '할인'})`;
+}
+/* 고객명 칸 — 무상 출고는 '왜 나갔는지', 규칙 밖의 할인 이름은 고객명 뒤에 붙인다 */
+function sheetCustomer(t) {
+  if (isFreeTx(t)) return t.discountLabel || '무상';
+  const label = discLabelOf(t);
+  const extra = label && !SHEET_DISC_LABELS.includes(label) ? label : '';
+  const name = t.customer || '';
+  return extra ? (name ? `${name} (${extra})` : extra) : name;
+}
+/* 이미 큐에 들어가 있던 옛 줄도 보내기 직전에 같은 규칙으로 고친다 */
+const SHEET_PAY_RE = /^(현금|계좌이체)\((.+)\)$/;
+function sheetSafeRecord(r) {
+  const m = SHEET_PAY_RE.exec(r && r.결제 || '');
+  if (!m || SHEET_DISC_LABELS.includes(m[2])) return r;
+  return { ...r, 결제: `${m[1]}(할인)`, 고객: r.고객 ? `${r.고객} (${m[2]})` : m[2] };
 }
 /* 정가합계와 실제 받은 금액의 차액(할인 · 반품 차감)을 품목에 정가 비율대로 나눠 담는다.
    반올림 오차는 마지막 품목이 흡수하므로 출고금액 합계는 실제 금액과 정확히 일치한다.
@@ -3679,7 +3703,7 @@ function sheetRecords(t) {
       출고금액: amount,
       결제: method,
       // 무상 출고는 입금자명이 있을 수 없다 — 그 자리에 '왜 나갔는지' 를 적는다
-      고객: (isFreeTx(t) ? (t.discountLabel || '무상') : t.customer) || '',
+      고객: isReturn ? (t.customer || '') : sheetCustomer(t),
       연락처: t.phone || '',
       주소: t.address || '',
     };
@@ -3759,7 +3783,7 @@ const FLUSH_OWNER = Math.random().toString(36).slice(2, 10);
 /* Apps Script 쪽 코드는 git push 로 배포되지 않는다 — 구글에서 따로 '새 버전' 배포를 해야 한다.
    그 단계를 잊으면 조용히 옛 코드가 돌기 때문에, 앱이 배포된 버전을 물어보고 알려준다.
    apps-script/Code.gs 를 고칠 때 MIRROR_VERSION 과 이 값을 같이 올린다. */
-const SHEET_MIRROR_VERSION = '2026-10-19a';
+const SHEET_MIRROR_VERSION = '2026-10-26a';
 let sheetMirrorVersion = null;      // 실제로 배포돼 있는 버전 (확인 전이면 null)
 
 const sheetMirrorStale = () =>
@@ -4014,6 +4038,7 @@ function releaseFlushLease() {
 
 let flushing = false;
 let sheetLastError = null;   // 마지막 전송 실패 이유 (성공하면 비운다)
+const sheetRejected = new Map();   // 시트가 줄 단위로 거절한 기록: key → 이유
 async function flushSheet(loud = false) {
   const q0 = sheetQueue();
   if (loud && !q0.length) { toast('보낼 것이 없습니다.', 'good'); return; }
@@ -4041,7 +4066,9 @@ async function flushSheet(loud = false) {
     /* 고치기는 맨 뒤로 — 줄을 못 찾아 다시 보내려고 남겨 둔 고치기가 앞을 막아
        판매 기록이 50건 묶음에 못 끼는 일이 없게. 시트도 한 묶음 안에서는 쓰기 뒤에 고친다. */
     const qAll = sheetQueue();
-    const sending = [...qAll.filter(x => x.op !== 'edit'), ...qAll.filter(x => x.op === 'edit')].slice(0, 50);
+    // 시트가 거절했던 기록은 맨 뒤로 — 그 몇 건이 50건 묶음을 차지해 다른 기록을 막지 않게
+    const later = x => x.op === 'edit' || sheetRejected.has(x.key);
+    const sending = [...qAll.filter(x => !later(x)), ...qAll.filter(later)].slice(0, 50);
     if (!sending.length) return;
     // text/plain 으로 보내야 프리플라이트(OPTIONS)가 안 뜬다 — Apps Script 는 이를 처리하지 못한다
     const res = await fetch(sheetCfg.url, {
@@ -4049,7 +4076,7 @@ async function flushSheet(loud = false) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         token: sheetCfg.token || '',
-        items: sending.filter(x => !x.op),
+        items: sending.filter(x => !x.op).map(x => ({ ...x, records: (x.records || []).map(sheetSafeRecord) })),
         deletes: sending.filter(x => x.op === 'delete').map(x => x.target),
         marks: sending.filter(x => x.op === 'mark').map(x => x.mark),
         books: sending.filter(x => x.op === 'book').map(x => x.book),
@@ -4065,6 +4092,10 @@ async function flushSheet(loud = false) {
        edited 가 안 오면 고치기는 큐에 그대로 두고, 실패한 고치기도 남겨 다음에 다시 보낸다. */
     if (out.edited === undefined) sending.forEach(x => { if (x.op === 'edit') done.delete(x.key); });
     (out.editFailed || []).forEach(id => done.delete(id));
+    /* 시트가 줄 단위로 거절한 기록(입력 규칙 등) — 나머지는 이미 적혔다. 거절된 것만 남기고
+       이유를 설정 화면에 보여 준다. 예전 스크립트는 한 건만 걸려도 묶음 전체를 실패시켰다. */
+    sheetRejected.clear();
+    (out.rejected || []).forEach(r => { done.delete(r.key); sheetRejected.set(r.key, r.error || '시트가 거절'); });
     /* 줄을 못 찾은 고치기는 그 거래의 첫 줄이 아직 안 간 것일 수 있다 (다른 기기에서 늦게 오는 중).
        그 거래가 큐에 있거나 고친 지 하루가 안 됐으면 남겨 두고 다음에 다시 보낸다.
        그보다 오래됐는데도 없으면 시트에서 지워진 줄이라 버린다. */
@@ -4201,6 +4232,8 @@ function renderSheetBadge() {
          지금은 이 기기에만 쌓입니다. Firebase 콘솔 → Firestore → 규칙에
          <code>firestore.rules</code> 를 붙여넣고 게시해 주세요.`);
     if (stuck && sheetLastError) msgs.push(`⚠ 시트 전송이 실패하고 있습니다 · ${esc(sheetLastError)}`);
+    if (sheetRejected.size) msgs.push(`⚠ <b>시트가 거절한 기록 ${sheetRejected.size}건</b> — 나머지는 정상으로 갔습니다.<br>` +
+      [...sheetRejected.values()].slice(0, 3).map(esc).join('<br>'));
     warn.style.display = msgs.length ? '' : 'none';
     warn.innerHTML = msgs.join('<br><br>');
   }

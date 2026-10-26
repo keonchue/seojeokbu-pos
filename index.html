@@ -3780,6 +3780,7 @@ const qCol = collection(db, 'sheetQueue');
 const qLeaseRef = doc(db, 'meta', 'sheetFlush');
 let qRemote = new Map();         // Firestore 에 있는 못 보낸 기록 (key → item)
 let qRemoteOk = true;            // false = 규칙 미게시 등으로 Firestore 큐를 못 씀 → 기기에 쌓는다
+let qSeen = false;               // Firestore 큐를 한 번이라도 받아 봤나 (그 전엔 '0건' 이라고 알리지 않는다)
 let qStarted = false;
 let qSeq = 0;
 // 탭마다 다른 이름 — 같은 기기의 두 탭도 동시에 보내지 않게 잠금을 이걸로 잡는다
@@ -3788,7 +3789,7 @@ const FLUSH_OWNER = Math.random().toString(36).slice(2, 10);
 /* Apps Script 쪽 코드는 git push 로 배포되지 않는다 — 구글에서 따로 '새 버전' 배포를 해야 한다.
    그 단계를 잊으면 조용히 옛 코드가 돌기 때문에, 앱이 배포된 버전을 물어보고 알려준다.
    apps-script/Code.gs 를 고칠 때 MIRROR_VERSION 과 이 값을 같이 올린다. */
-const SHEET_MIRROR_VERSION = '2026-10-26a';
+const SHEET_MIRROR_VERSION = '2026-10-27a';
 let sheetMirrorVersion = null;      // 실제로 배포돼 있는 버전 (확인 전이면 null)
 
 const sheetMirrorStale = () =>
@@ -3901,6 +3902,7 @@ function startSheetQueue() {
     snap.docs.forEach(d => { const x = d.data(); if (x && x.key) m.set(x.key, x); });
     qRemote = m;
     qRemoteOk = true;
+    qSeen = true;
     renderSheetBadge();
     migrateLocalQueue();
     flushSheet();
@@ -4013,7 +4015,7 @@ async function loadSheetCfg() {
   pingSheetMirror();     // 시트 쪽에 새 배포를 안 했으면 설정 화면에서 알려준다
   flushSheet();
   // 큐가 다 빠질 시간을 두고 시트 재고와 한 번 대조한다
-  setTimeout(() => checkSheetStock(), 20000);
+  setTimeout(() => { checkSheetStock(); sendHeartbeat(); }, 20000);
 }
 
 /* 여러 기기(·탭)가 같은 큐를 동시에 보내지 않게 잡는 잠금.
@@ -4199,7 +4201,19 @@ async function checkSheetStock() {
     renderSheetBadge();
   }
 }
-setInterval(() => checkSheetStock(), 3 * 3600 * 1000);
+/* 시트에 '못 보낸 기록이 몇 건 · 가장 오래된 게 언제' 를 알린다. 시트의 매일 점검이 이걸 보고
+   기록이 하루 넘게 막혀 있으면 메일을 보낸다 — 아무도 앱 화면을 안 보고 있을 때를 위한 것.
+   옛 기기에서 옮겨 온 기록은 시각이 없어(at 0) 아주 오래된 것으로 친다. */
+function sendHeartbeat() {
+  if (!sheetCfg || !sheetCfg.url || !navigator.onLine) return;
+  // 공용 큐를 아직 못 받았으면 '0건' 이 거짓일 수 있다 — 다른 기기의 '막힘' 소식을 덮지 않게 보내지 않는다
+  if (qRemoteOk && !qSeen) return;
+  const q = sheetQueue();
+  const oldestAt = q.length ? Math.max(1, Math.min(...q.map(x => x.at || 1))) : 0;
+  askSheet({ action: 'heartbeat', pending: q.length, oldestAt, rejected: sheetRejected.size,
+             app: SHEET_MIRROR_VERSION }).catch(e => console.error('시트에 소식 못 보냄', e));
+}
+setInterval(() => { checkSheetStock(); sendHeartbeat(); }, 3 * 3600 * 1000);
 
 /* 오래 머문 기록만 '밀림' 으로 친다 — 결제 직후 몇 초 동안 숫자가 깜빡이지 않게 */
 const STUCK_MS = 3 * 60 * 1000;

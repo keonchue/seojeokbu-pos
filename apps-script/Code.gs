@@ -62,7 +62,7 @@
 /* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
    앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
    주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
-var MIRROR_VERSION = '2026-10-26a';
+var MIRROR_VERSION = '2026-10-27a';
 
 // ── 원본 원장. 앱이 거래를 쓰는 곳은 여기 하나뿐이다 (새 책 줄만 재고관리에도) ──
 var LEDGER_TAB = '입출고기록';
@@ -124,7 +124,26 @@ function doPost(e) {
       return json({ ok: false, error: '토큰이 맞지 않습니다.' });
     }
     // 앱이 '지금 배포된 버전이 뭐냐'만 물어볼 때 (버전은 json() 이 붙여 준다)
-    if (body.action === 'ping') return json({ ok: true });
+    if (body.action === 'ping') return json({ ok: true, sheet: SpreadsheetApp.getActiveSpreadsheet().getName() });
+
+    // 그 날짜의 원장 줄 수 (기록ID 있든 없든) — 시험 스크립트가 '정확히 몇 줄 들어갔나' 를 센다
+    if (body.action === 'countDate') {
+      return json({ ok: true, count: countLedgerDate(SpreadsheetApp.getActiveSpreadsheet(), String(body.date || '')) });
+    }
+
+    // 앱이 '못 보낸 기록이 몇 건 · 가장 오래된 게 언제' 를 알려 줄 때 (매일 점검이 읽는다)
+    if (body.action === 'heartbeat') {
+      PropertiesService.getScriptProperties().setProperty(HEARTBEAT_KEY, JSON.stringify({
+        at: Date.now(), pending: Number(body.pending) || 0, oldestAt: Number(body.oldestAt) || 0,
+        rejected: Number(body.rejected) || 0, app: String(body.app || ''),
+      }));
+      return json({ ok: true });
+    }
+
+    // 점검 결과만 돌려준다 (메일은 안 보낸다) — 시험 스크립트와 설정 화면이 쓴다
+    if (body.action === 'health') {
+      return json({ ok: true, problems: healthProblems(SpreadsheetApp.getActiveSpreadsheet()) });
+    }
 
     // 앱이 기준정보(단가·안전재고)를 읽어 갈 때
     if (body.action === 'books') {
@@ -277,7 +296,9 @@ function appendItems(ss, sheet, groups) {
       try { target.clearContent(); SpreadsheetApp.flush(); cleared = true; } catch (e) {}
       // 못 지웠으면 그 자리를 건너뛴다 — 다음 거래가 반쪽 줄 위에 겹쳐 쓰지 않게
       if (!cleared) start += values.length;
-      out.rejected.push({ key: g.key, error: String(err && err.message || err) });
+      var msg = String(err && err.message || err);
+      out.rejected.push({ key: g.key, error: msg });
+      logRejected(ss, g.key, msg);
     }
   });
   return out;
@@ -1233,4 +1254,167 @@ function 반복줄_정리_(really) {
   } finally {
     lock.releaseLock();
   }
+}
+
+
+/* ===================== 매일 점검 (2026-10-27) =====================
+   실제 사고는 코드 밖에서 난다 — 할인 칸에 손님 이름을 적는 일, 누가 드롭다운 목록이나 탭 이름을
+   바꾸는 일. 앱 화면의 경고는 아무도 앱을 안 볼 때는 소용이 없어서, 시트가 스스로 하루 한 번
+   원장을 훑고 이상이 있으면 메일을 보낸다(문제가 없으면 안 보낸다).
+
+   처음 한 번: Apps Script 편집기에서 '점검_트리거_설치' 실행 → 권한 승인(메일 보내기 포함).
+   바로 시험: '점검_지금_해보기' (문제가 없어도 결과를 메일로 보낸다). */
+var ALERT_EMAIL = 'keonchue@gmail.com';
+var HEARTBEAT_KEY = 'APP_HEARTBEAT';
+var REJECT_SHEET = '_거절기록';
+
+/* 앱이 결제방식 칸에 쓸 수 있는 값 — 시트 드롭다운에 이게 하나라도 빠지면 그 거래가 거절된다 */
+var APP_PAY_VALUES = ['현금', '현금(할인)', '현금(직원할인)', '현금(지역할인)',
+  '계좌이체', '계좌이체(할인)', '계좌이체(직원할인)', '계좌이체(지역할인)',
+  '현금 환불', '계좌이체 환불', '교환', '재고조정'];
+var APP_KIND_VALUES = ['입고', '출고', '택배비'];
+
+function countLedgerDate(ss, date) {
+  var sheet = sheetByName(ss, LEDGER_TAB), h = findHeader(sheet);
+  var last = lastFilledRow(sheet, h);
+  if (last <= h.row || !h.col.날짜) return 0;
+  var tz = ss.getSpreadsheetTimeZone();
+  return sheet.getRange(h.row + 1, h.col.날짜, last - h.row, 1).getValues().filter(function (r) {
+    var x = r[0];
+    return (x instanceof Date ? Utilities.formatDate(x, tz, 'yyyy-MM-dd') : String(x).trim()) === date;
+  }).length;
+}
+
+function logRejected(ss, key, msg) {
+  try {
+    var sh = ss.getSheetByName(REJECT_SHEET);
+    if (!sh) {
+      sh = ss.insertSheet(REJECT_SHEET);
+      sh.getRange(1, 1, 1, 3).setValues([['시각', '기록ID', '이유']]);
+      sh.hideSheet();
+    }
+    sh.appendRow([new Date(), key, msg]);
+  } catch (e) {}   // 기록을 못 남겨도 본 작업은 계속한다
+}
+
+function 점검_트리거_설치() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === '매일_점검') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('매일_점검').timeBased().everyDays(1).atHour(9).create();
+  Logger.log('매일 오전 9시쯤 점검합니다. 문제가 있을 때만 ' + ALERT_EMAIL + ' 로 메일을 보냅니다.');
+}
+function 점검_지금_해보기() { sendHealthMail_(true); }
+function 매일_점검() { sendHealthMail_(false); }
+
+function sendHealthMail_(always) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var problems = healthProblems(ss);
+  Logger.log(problems.length ? problems.join('\n') : '문제 없음');
+  if (!problems.length && !always) return;
+  var subject = problems.length
+    ? '[서적부 POS] 시트 점검 — 확인할 것 ' + problems.length + '가지'
+    : '[서적부 POS] 시트 점검 — 문제 없음';
+  var body = (problems.length ? problems.map(function (p, i) { return (i + 1) + '. ' + p; }).join('\n\n')
+                              : '원장 · 드롭다운 · 앱 전송 모두 정상입니다.') +
+    '\n\n— ' + ss.getName() + '\n' + ss.getUrl() + '\n스크립트 버전 ' + MIRROR_VERSION;
+  MailApp.sendEmail(ALERT_EMAIL, subject, body);
+}
+
+/* 점검 항목. 사람이 읽을 문장 목록을 돌려준다 (없으면 빈 배열). */
+function healthProblems(ss) {
+  var out = [];
+  var tz = ss.getSpreadsheetTimeZone();
+  var ledger = ss.getSheetByName(LEDGER_TAB);
+  if (!ledger) return ['원장 탭 "' + LEDGER_TAB + '" 이 없습니다 (탭 이름이 바뀌었나요?). 앱 기록이 하나도 못 들어갑니다.'];
+  var h;
+  try { h = findHeader(ledger); } catch (e) { return ['원장 머리글을 못 찾습니다: ' + e.message]; }
+  ['날짜', '제품명', '구분', '수량', '결제'].forEach(function (k) {
+    if (!h.col[k]) out.push('원장 머리글에 "' + k + '" 열이 없습니다. 앱 기록이 그 칸을 비운 채 들어갑니다.');
+  });
+  if (!ss.getSheetByName(STOCK_TAB)) out.push('재고관리 탭 "' + STOCK_TAB + '" 이 없습니다.');
+
+  // ① 드롭다운 목록이 앱이 쓰는 값을 다 받는지
+  /* 새 줄이 붙을 자리(마지막 기록 다음 줄)의 규칙을 본다 — 맨 위 줄 규칙만 보면, 아래쪽에 다른 규칙이
+     걸려 있을 때 놓친다. 규칙이 아예 없으면 무엇이든 들어가니 문제가 아니다(null).
+     '목록' 이든 '범위의 값' 이든 실제 허용 값 목록으로 바꿔 돌려준다. */
+  var landing = Math.max(lastFilledRow(ledger, h) + 1, h.row + 1);
+  var listOf = function (col) {
+    if (!col) return null;
+    try {
+      var r = ledger.getRange(landing, col).getDataValidation();
+      if (!r) return null;
+      var T = SpreadsheetApp.DataValidationCriteria;
+      var type = r.getCriteriaType(), vals = r.getCriteriaValues();
+      if (type === T.VALUE_IN_LIST) return vals[0].map(String);
+      if (type === T.VALUE_IN_RANGE) return vals[0].getValues().map(function (x) { return String(x[0]).trim(); });
+      return ['(알 수 없는 규칙: ' + type + ')'];
+    } catch (e) { return null; }
+  };
+  var pay = listOf(h.col.결제);
+  if (pay) {
+    var missP = APP_PAY_VALUES.filter(function (v) { return pay.indexOf(v) < 0; });
+    if (missP.length) out.push('결제방식 드롭다운에 앱이 쓰는 값이 빠졌습니다: ' + missP.join(', ') +
+      ' — 이 결제로 판 거래는 시트가 거절합니다. 드롭다운에 다시 넣어 주세요.');
+  }
+  var kind = listOf(h.col.구분);
+  if (kind) {
+    var missK = APP_KIND_VALUES.filter(function (v) { return kind.indexOf(v) < 0; });
+    if (missK.length) out.push('입출고구분 드롭다운에 앱이 쓰는 값이 빠졌습니다: ' + missK.join(', '));
+  }
+
+  // ② 원장 훑기 — 반쪽 줄 · 같은 기록 두 번
+  var last = lastFilledRow(ledger, h);
+  if (last > h.row && h.col.기록ID) {
+    var width = Math.max(h.width, h.col.기록ID);
+    var grid = ledger.getRange(h.row + 1, 1, last - h.row, width).getValues();
+    var v = function (row, k) { var c = h.col[k]; return c ? row[c - 1] : ''; };
+    var str = function (x) { return (x === null || x === undefined) ? '' : String(x).trim(); };
+    var day = function (x) { return x instanceof Date ? Utilities.formatDate(x, tz, 'yyyy-MM-dd') : str(x); };
+    var twin = {}, seen = {}, half = [], dup = [];
+    grid.forEach(function (row) {
+      if (str(v(row, '기록ID'))) twin[[day(v(row, '날짜')), str(v(row, '제품명')), str(v(row, '수량')), str(v(row, '출고금액'))].join('|')] = true;
+    });
+    grid.forEach(function (row, i) {
+      if (!str(v(row, '제품명'))) return;
+      var key = str(v(row, '기록ID')), rn = h.row + 1 + i;
+      if (key) {
+        var sig = [key, str(v(row, '제품명')), str(v(row, '구분')), str(v(row, '수량')),
+                   str(v(row, '출고금액')), str(v(row, '입고금액')), str(v(row, '결제'))].join('|');
+        if (seen[sig]) dup.push(rn); else seen[sig] = true;
+      } else if (!str(v(row, '결제')) && str(v(row, '구분')) === '출고' &&
+                 twin[[day(v(row, '날짜')), str(v(row, '제품명')), str(v(row, '수량')), str(v(row, '출고금액'))].join('|')]) {
+        half.push(rn);
+      }
+    });
+    if (half.length) out.push('결제방식 칸 앞에서 끊긴 반쪽 줄 ' + half.length + '개: ' + half.slice(0, 10).join(', ') + '행' +
+      (half.length > 10 ? ' …' : '') + ' — 시트가 어떤 기록을 반만 받고 거절한 흔적입니다.');
+    if (dup.length) out.push('같은 기록이 두 번 적힌 줄 ' + dup.length + '개: ' + dup.slice(0, 10).join(', ') + '행' +
+      (dup.length > 10 ? ' …' : ''));
+  }
+
+  // ③ 최근 하루 사이 시트가 거절한 기록
+  var rej = ss.getSheetByName(REJECT_SHEET);
+  if (rej && rej.getLastRow() > 1) {
+    var since = Date.now() - 24 * 3600 * 1000;
+    var recent = rej.getRange(2, 1, rej.getLastRow() - 1, 3).getValues()
+      .filter(function (r) { return r[0] instanceof Date && r[0].getTime() >= since; });
+    if (recent.length) out.push('최근 하루 동안 시트가 거절한 기록 ' + recent.length + '건. 예: ' +
+      recent.slice(0, 3).map(function (r) { return r[1] + ' — ' + String(r[2]).slice(0, 120); }).join(' / '));
+  }
+
+  // ④ 앱이 보낸 마지막 소식 — 못 보낸 기록이 오래 쌓여 있는지
+  var hbRaw = PropertiesService.getScriptProperties().getProperty(HEARTBEAT_KEY);
+  if (!hbRaw) out.push('앱에서 아직 소식이 없습니다. 앱을 한 번 열면 사라집니다 (계속 나오면 시트 연동 설정을 확인해 주세요).');
+  if (hbRaw) {
+    var hb = {};
+    try { hb = JSON.parse(hbRaw); } catch (e) {}
+    var fmt = function (t) { return Utilities.formatDate(new Date(t), tz, 'M/d HH:mm'); };
+    if (hb.pending && hb.oldestAt && hb.oldestAt < Date.now() - 24 * 3600 * 1000)
+      out.push('앱에 시트로 못 보낸 기록이 ' + hb.pending + '건 있고, 가장 오래된 것이 ' + fmt(hb.oldestAt) +
+        ' 것입니다 (앱 소식 ' + fmt(hb.at) + '). 앱 ⚙ 설정의 구글 시트 칸에서 이유를 확인해 주세요.');
+    if (hb.at && hb.at < Date.now() - 7 * 24 * 3600 * 1000)
+      out.push('앱에서 ' + fmt(hb.at) + ' 이후 소식이 없습니다 (일주일 넘게 아무 기기에서도 앱을 안 열었거나 시트 연동이 끊김).');
+  }
+  return out;
 }

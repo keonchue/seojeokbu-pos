@@ -115,7 +115,9 @@ self.addEventListener('fetch', event => {
      글꼴만 시스템 글꼴로 튀어 글자 폭이 달라지고 표가 흔들린다. */
   const isVendor = url.hostname === 'www.gstatic.com'
                 || url.hostname === 'fonts.googleapis.com'
-                || url.hostname === 'fonts.gstatic.com';
+                || url.hostname === 'fonts.gstatic.com'
+                // Pretendard — 주소에 버전(v1.3.9)이 박혀 있다. jsdelivr 의 다른 경로는 안 받는다
+                || (url.hostname === 'cdn.jsdelivr.net' && url.pathname.startsWith('/gh/orioncactus/pretendard@'));
   const isOwn = url.origin === self.location.origin;
   if (!isVendor && !isOwn) return;
 

@@ -7,9 +7,8 @@
 <meta name="description" content="서적부 판매·재고 관리 포스">
 
 <!-- 글꼴 — 못 받아와도 시스템 글꼴로 내려가므로 앱은 그대로 뜬다 -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 
 <!-- PWA (홈화면 설치 / 오프라인 실행) -->
 <link rel="manifest" href="./manifest.json">
@@ -83,14 +82,14 @@
        자간과 행간은 크기마다 다르다. 하나로 고정하면 어느 크기에선가 반드시 틀린다:
        글자가 커질수록 사이가 벌어져 보여 자간을 좁히고, 작아질수록 붙어 보여 넓힌다.
        행간은 반대로 — 큰 글자는 좁게, 본문은 넉넉하게. */
-    --fs-2xs: 12px;   --tr-2xs: .012em;  --lh-2xs: 1.45;
-    --fs-xs: 13px;    --tr-xs: .006em;   --lh-xs: 1.5;
-    --fs-sm: 14px;    --tr-sm: 0;        --lh-sm: 1.55;
-    --fs-md: 15px;    --tr-md: -.002em;  --lh-md: 1.5;
-    --fs-lg: 17px;    --tr-lg: -.012em;  --lh-lg: 1.35;
-    --fs-xl: 20px;    --tr-xl: -.018em;  --lh-xl: 1.25;
-    --fs-2xl: 26px;   --tr-2xl: -.024em; --lh-2xl: 1.15;
-    --fs-3xl: 34px;   --tr-3xl: -.03em;  --lh-3xl: 1.05;
+    --fs-2xs: 13px;   --tr-2xs: .012em;  --lh-2xs: 1.45;
+    --fs-xs: 14px;    --tr-xs: .006em;   --lh-xs: 1.5;
+    --fs-sm: 15px;    --tr-sm: 0;        --lh-sm: 1.55;
+    --fs-md: 16px;    --tr-md: -.002em;  --lh-md: 1.5;
+    --fs-lg: 18px;    --tr-lg: -.012em;  --lh-lg: 1.35;
+    --fs-xl: 21px;    --tr-xl: -.018em;  --lh-xl: 1.25;
+    --fs-2xl: 27px;   --tr-2xl: -.024em; --lh-2xl: 1.15;
+    --fs-3xl: 35px;   --tr-3xl: -.03em;  --lh-3xl: 1.05;
 
     /* 누르는 느낌 — 버튼은 두께가 있는 물건이다.
        평소엔 아래에 2px 짜리 '옆면'이 보이고, 누르면 그 두께만큼 내려앉는다. */
@@ -106,11 +105,13 @@
   }
 
   html, body { height: 100%; }
+  b, strong { font-weight: 600; }
   body {
     /* 기본 시스템 글꼴(윈도우에서는 맑은 고딕)은 '아무것도 고르지 않은' 얼굴이다.
-       IBM Plex Sans KR 은 자소가 네모지고 획 끝이 정직해 장부·계산대에 어울리고,
-       숫자 폭이 안정적이라 금액을 세로로 훑기 좋다. 못 받아오면 시스템 글꼴로 내려간다. */
-    font-family: 'IBM Plex Sans KR', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont,
+       Pretendard 는 획이 고르고 얇은 굵기에서도 또렷해서, 글자를 한 단계 키우고 굵기를
+       한 단계 낮춰도(2026-11-03, 운영자 요청 '조금 더 크게, 얇게, 깔끔하게') 금액이 잘 읽힌다.
+       가변 글꼴이라 굵기마다 파일을 따로 받지 않는다. 못 받아오면 시스템 글꼴로 내려간다. */
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
                  'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
     background: var(--bg);
     color: var(--text);
@@ -244,19 +245,19 @@
   }
   /* 좁아지면 이름이 먼저 줄어든다 — 오른쪽 도구(개업·연결·설정)는 무슨 일이 있어도 화면 안에 남는다 */
   header .brand {
-    font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--tr-lg); white-space: nowrap;
+    font-size: var(--fs-lg); font-weight: 500; letter-spacing: var(--tr-lg); white-space: nowrap;
     min-width: 0; overflow: hidden; text-overflow: ellipsis;
   }
   header .brand span { color: var(--on-ink-dim); font-weight: 500; font-size: var(--fs-2xs); margin-left: 8px; }
   header .info { font-size: var(--fs-xs); color: var(--on-ink-dim); display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
   header .info > div { white-space: nowrap; }
-  header .info b { color: #fff; font-weight: 700; }
+  header .info b { color: #fff; font-weight: 600; }
   header .clock { font-variant-numeric: tabular-nums; }
 
   /* ═══════════ 개업 / 마감 ═══════════ */
   .biz-chip {
     border: 1px solid transparent; border-radius: var(--r-pill); padding: 5px 12px;
-    font-size: var(--fs-2xs); font-weight: 700; cursor: pointer; white-space: nowrap;
+    font-size: var(--fs-2xs); font-weight: 600; cursor: pointer; white-space: nowrap;
   }
   .biz-chip.on  { background: rgba(84,214,150,.16); border-color: rgba(84,214,150,.42); color: #a7ebc7; }
   .biz-chip.off { background: rgba(255,190,110,.16); border-color: rgba(255,190,110,.45); color: #ffd8a8; }
@@ -277,21 +278,21 @@
     background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-md);
     padding: 14px 16px; margin-bottom: 20px; font-size: var(--fs-xs); text-align: left; line-height: 1.7;
   }
-  .biz-last .big { font-size: var(--fs-xl); font-weight: 800; }
+  .biz-last .big { font-size: var(--fs-xl); font-weight: 700; }
   .close-sum { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; }
   .close-sum .row { display: flex; justify-content: space-between; font-size: var(--fs-sm); }
-  .close-sum .row.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 9px; font-size: var(--fs-lg); font-weight: 800; }
+  .close-sum .row.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 9px; font-size: var(--fs-lg); font-weight: 700; }
   .close-sum .row .dim { color: var(--muted); }
   .icon-btn {
     background: rgba(255,255,255,.10); color: #fff; border: 1px solid rgba(255,255,255,.20);
     border-radius: var(--r-sm); min-width: 38px; height: 34px; padding: 0 11px;
-    font-size: var(--fs-xs); font-weight: 700; cursor: pointer; display: inline-flex;
+    font-size: var(--fs-xs); font-weight: 600; cursor: pointer; display: inline-flex;
     align-items: center; justify-content: center; gap: 5px;
   }
   @media (hover: hover) { .icon-btn:hover { background: rgba(255,255,255,.2); } }
 
   .sync {
-    display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: 700;
+    display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: 600;
     background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.18);
     padding: 5px 11px; border-radius: var(--r-pill); white-space: nowrap; color: #cbd6e6;
     cursor: pointer; user-select: none;
@@ -305,7 +306,7 @@
   @keyframes pulse { 50% { opacity: .3; } }
   /* 시트로 오래 못 간 기록 · 시트와 다른 재고 — 어느 기기에서든 위쪽에 뜬다 */
   .sheet-chip {
-    font-size: var(--fs-2xs); font-weight: 700; white-space: nowrap; cursor: pointer;
+    font-size: var(--fs-2xs); font-weight: 600; white-space: nowrap; cursor: pointer;
     background: rgba(255,206,90,.15); border: 1px solid rgba(255,206,90,.4); color: #ffe3a3;
     padding: 5px 11px; border-radius: var(--r-pill);
   }
@@ -319,7 +320,7 @@
     background: var(--surface); border-radius: var(--r-lg); padding: 36px 32px; width: 360px; max-width: 100%;
     box-shadow: var(--sh-3); display: flex; flex-direction: column;
   }
-  .login-brand { font-size: var(--fs-2xl); font-weight: 700; color: var(--text); text-align: center; letter-spacing: var(--tr-2xl); }
+  .login-brand { font-size: var(--fs-2xl); font-weight: 600; color: var(--text); text-align: center; letter-spacing: var(--tr-2xl); }
   .login-sub { font-size: var(--fs-xs); color: var(--muted); text-align: center; margin: 8px 0 24px; }
   .login-card input {
     padding: 14px; border: 2px solid var(--line); border-radius: var(--r-sm); font-size: 16px;
@@ -328,17 +329,17 @@
   .login-card input:focus { outline: none; border-color: var(--blue); background: #fff; }
   .login-card button {
     padding: 15px 0; border: none; border-radius: var(--r-sm); background: var(--blue); color: #fff;
-    font-size: var(--fs-md); font-weight: 800; cursor: pointer; margin-top: 6px;
+    font-size: var(--fs-md); font-weight: 700; cursor: pointer; margin-top: 6px;
     --btn-edge: #0e3287;
   }
   .login-card button:disabled { background: #93a4c6; cursor: progress; }
-  .login-err { color: var(--red); font-size: var(--fs-xs); font-weight: 700; text-align: center; min-height: 18px; margin-top: 12px; }
+  .login-err { color: var(--red); font-size: var(--fs-xs); font-weight: 600; text-align: center; min-height: 18px; margin-top: 12px; }
 
   /* ═══════════ Tabs ═══════════ */
   .tabs { display: flex; background: var(--ink-2); flex-shrink: 0; }
   .tabs button {
     flex: 1; border: none; background: transparent; color: var(--on-ink-dim);
-    font-size: var(--fs-sm); font-weight: 600; padding: 13px 4px; cursor: pointer;
+    font-size: var(--fs-sm); font-weight: 500; padding: 13px 4px; cursor: pointer;
     min-height: var(--tap); white-space: nowrap; position: relative; letter-spacing: var(--tr-sm);
   }
   .tabs button::after {
@@ -374,7 +375,7 @@
   .cart-pane.open { transform: translateX(0); }
   .cart-head {
     display: grid; grid-template-columns: 1fr 84px 108px 44px;
-    background: var(--ink-2); color: #fff; font-size: var(--fs-xs); font-weight: 600;
+    background: var(--ink-2); color: #fff; font-size: var(--fs-xs); font-weight: 500;
     padding: 13px 16px; gap: 6px; position: relative; align-items: center;
   }
   .cart-head span:nth-child(2){ text-align:center; }
@@ -383,7 +384,7 @@
     display: block;
     position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
     background: rgba(255,255,255,.14); border: none; color: #fff; width: 30px; height: 30px;
-    border-radius: 50%; font-size: 15px; font-weight: 700; cursor: pointer;
+    border-radius: 50%; font-size: 15px; font-weight: 600; cursor: pointer;
   }
   .cart-items { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
   .cart-empty { flex: 1; }
@@ -392,24 +393,24 @@
     align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--line-soft);
     font-size: var(--fs-sm);
   }
-  .cart-row .title { font-weight: 600; line-height: 1.35; }
+  .cart-row .title { font-weight: 500; line-height: 1.35; }
   .cart-row .qty { display: flex; align-items: center; justify-content: center; gap: 4px; }
   .cart-row .qty button {
     width: 28px; height: 28px; border: 1px solid var(--line); background: var(--gray);
-    border-radius: 7px; cursor: pointer; font-size: 15px; font-weight: 700; line-height: 1; color: var(--text);
+    border-radius: 7px; cursor: pointer; font-size: 15px; font-weight: 600; line-height: 1; color: var(--text);
   }
-  .cart-row .qty span { min-width: 20px; text-align: center; font-weight: 700; }
-  .cart-row .amt { text-align: right; font-weight: 700; }
+  .cart-row .qty span { min-width: 20px; text-align: center; font-weight: 600; }
+  .cart-row .amt { text-align: right; font-weight: 600; }
   /* 택배비 줄만 금액을 누를 수 있다 — 크기·무게마다 달라서. 밑줄 점선이 '눌러서 고침' 표시 */
   .cart-row .amt-edit {
-    border: none; background: none; padding: 4px 0; font: inherit; font-weight: 700;
+    border: none; background: none; padding: 4px 0; font: inherit; font-weight: 600;
     color: var(--blue); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px;
   }
-  .cart-row .title .ship-note { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+  .cart-row .title .ship-note { display: block; font-size: 13px; font-weight: 500; color: var(--muted); }
   .cart-row .del { text-align: center; }
   .cart-row .del button {
     width: 30px; height: 30px; border: none; background: var(--red-wash); color: var(--red);
-    border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700;
+    border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;
   }
   .cart-empty {
     height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -418,22 +419,22 @@
 
   .summary { border-top: 1px solid var(--line); padding: 13px 16px; background: var(--surface-2); }
   .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 2px; font-size: var(--fs-md); }
-  .sum-row.total { font-size: 22px; font-weight: 700; color: var(--text); border-top: 1px solid var(--line); margin-top: 7px; padding-top: 12px; letter-spacing: var(--tr-2xl); }
+  .sum-row.total { font-size: 22px; font-weight: 600; color: var(--text); border-top: 1px solid var(--line); margin-top: 7px; padding-top: 12px; letter-spacing: var(--tr-2xl); }
   .sum-row .k { color: var(--muted); }
   .sum-row .disc-input { display: flex; align-items: center; gap: 6px; }
-  .sum-row .disc-input input { width: 92px; text-align: right; padding: 8px 10px; border: 2px solid var(--line); border-radius: 8px; font-size: var(--fs-md); font-weight: 700; color: var(--red); background:#fff; }
+  .sum-row .disc-input input { width: 92px; text-align: right; padding: 8px 10px; border: 2px solid var(--line); border-radius: 8px; font-size: var(--fs-md); font-weight: 600; color: var(--red); background:#fff; }
   .sum-row .disc-input input:focus { outline: none; border-color: var(--red); }
   .sum-row .disc-input em { font-style: normal; color: var(--muted); font-size: var(--fs-sm); width: 14px; }
   .disc-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  .disc-toggle button { border: none; background: #fff; color: var(--muted); font-size: var(--fs-xs); font-weight: 700; padding: 8px 12px; cursor: pointer; }
+  .disc-toggle button { border: none; background: #fff; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; padding: 8px 12px; cursor: pointer; }
   .disc-toggle button.on { background: var(--ink-2); color: #fff; }
   .sum-row.disc-calc { padding: 0 2px 4px; margin-top: -4px; min-height: 18px; }
-  .sum-row.disc-calc #discCalc { color: var(--red); font-size: var(--fs-xs); font-weight: 700; }
+  .sum-row.disc-calc #discCalc { color: var(--red); font-size: var(--fs-xs); font-weight: 600; }
 
   .pay-methods { display: flex; gap: 6px; padding: 0 16px 10px; }
   .pay-methods button {
     flex: 1; min-height: var(--tap); border: 2px solid var(--line); background: #fff; padding: 0 4px;
-    border-radius: var(--r-sm); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; color: var(--muted);
+    border-radius: var(--r-sm); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; color: var(--muted);
     white-space: nowrap;
   }
   .pay-methods button.sel { border-color: var(--blue); background: var(--blue-wash); color: var(--blue-dark); }
@@ -443,17 +444,17 @@
   .split-pay { padding: 0 16px 10px; }
   .split-pay.hide { display: none; }
   .sp-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 2px; font-size: var(--fs-md); }
-  .sp-row .sp-k { color: var(--muted); font-weight: 700; }
+  .sp-row .sp-k { color: var(--muted); font-weight: 600; }
   .sp-row input {
     width: 118px; text-align: right; padding: 9px 11px; border: 2px solid var(--line);
-    border-radius: 8px; font-size: 16px; font-weight: 800; color: var(--green-dark); background: #fff;
+    border-radius: 8px; font-size: 16px; font-weight: 700; color: var(--green-dark); background: #fff;
   }
   .sp-row input:focus { outline: none; border-color: var(--green); }
   .sp-row em { font-style: normal; color: var(--muted); font-size: var(--fs-sm); margin-left: 5px; }
-  .sp-row .sp-v { font-size: 16px; font-weight: 800; color: var(--blue-dark); }
+  .sp-row .sp-v { font-size: 16px; font-weight: 700; color: var(--blue-dark); }
   .sp-row .sp-v.bad { color: var(--red); }
   .sp-hint { font-size: var(--fs-2xs); color: var(--muted); padding: 2px 2px 0; }
-  .sp-hint.bad { color: var(--red); font-weight: 700; }
+  .sp-hint.bad { color: var(--red); font-weight: 600; }
   .sp-row.total { border-top: 1px solid var(--line); margin-top: 5px; padding-top: 9px; }
   #mRefundCash, #mRefundTr { width: 130px; }
   #mRefundTr { color: var(--blue-dark); }
@@ -461,16 +462,16 @@
 
   .customer { padding: 0 16px 10px; }
   .customer.hide { display: none; }
-  .customer label { font-size: var(--fs-2xs); color: var(--muted); display:block; margin-bottom:5px; font-weight: 600; }
+  .customer label { font-size: var(--fs-2xs); color: var(--muted); display:block; margin-bottom:5px; font-weight: 500; }
   .customer input {
     width: 100%; padding: 11px 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
-    font-size: 16px; font-weight: 700; background: #fff; color: inherit;
+    font-size: 16px; font-weight: 600; background: #fff; color: inherit;
   }
   .customer input:focus { outline: none; border-color: var(--blue); }
   .customer label + input + label, .contact-extra label { margin-top: 8px; }
   .more-toggle {
     margin-top: 8px; background: none; border: none; padding: 0; cursor: pointer;
-    font-size: var(--fs-2xs); font-weight: 700; color: var(--blue);
+    font-size: var(--fs-2xs); font-weight: 600; color: var(--blue);
   }
   .contact-extra.hide { display: none; }
 
@@ -480,7 +481,7 @@
   .pay-actions .clear {
     flex: 0 0 auto; padding: 0 14px; min-height: 52px; border: none; border-radius: var(--r-sm);
     background: var(--gray);
-    color: var(--ink-3); font-size: var(--fs-md); font-weight: 700; cursor: pointer;
+    color: var(--ink-3); font-size: var(--fs-md); font-weight: 600; cursor: pointer;
     --btn-edge: #d5d0c5;
   }
   /* 대기는 앰버다 — 이 앱에서 앰버는 이미 '아직 안 끝난 것'(분할결제·재고 부족)을 뜻한다.
@@ -488,13 +489,13 @@
   .pay-actions .hold {
     flex: 0 0 auto; padding: 0 14px; min-height: 52px; border: 1px solid var(--amber-line);
     border-radius: var(--r-sm); background: var(--amber-wash);
-    color: var(--amber); font-size: var(--fs-md); font-weight: 700; cursor: pointer;
+    color: var(--amber); font-size: var(--fs-md); font-weight: 600; cursor: pointer;
     --btn-edge: #e0c68d;
   }
   .pay-actions .hold:disabled { opacity: .42; cursor: not-allowed; box-shadow: none; --btn-edge: transparent; }
   .pay-actions .checkout {
     flex: 1; min-height: 52px; border: none; border-radius: var(--r-sm); background: var(--green);
-    color: #fff; font-size: var(--fs-lg); font-weight: 700; cursor: pointer; letter-spacing: var(--tr-lg);
+    color: #fff; font-size: var(--fs-lg); font-weight: 600; cursor: pointer; letter-spacing: var(--tr-lg);
     --btn-edge: #08472c;
   }
   .pay-actions .checkout:disabled { background: #b9bfc4; cursor: not-allowed; box-shadow: none; --btn-edge: transparent; }
@@ -515,7 +516,7 @@
     body.cart-open .mobile-bar { padding-left: calc(400px + 18px); }
   }
   .product-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
-  .product-head h3 { font-size: var(--fs-sm); color: var(--muted); font-weight: 700; }
+  .product-head h3 { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(208px, 1fr)); gap: 12px; }
   .book-btn {
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
@@ -529,24 +530,24 @@
   .book-btn:active:not(.out) { box-shadow: none; border-color: var(--blue); }
   .book-btn.out { opacity: .45; cursor: not-allowed; }
   .book-btn .bt {
-    font-size: var(--fs-md); font-weight: 700; line-height: 1.35;
+    font-size: var(--fs-md); font-weight: 600; line-height: 1.35;
     min-height: calc(2 * 1.35em);
   }
   /* 배지 자리는 첫 줄에서만 비운다. 제목 전체를 밀어내면 좁은 카드에서 글자 폭이 절반으로
      줄어 '42HB 단본 / 성경 (인디고 / 블루)' 처럼 잘게 쪼개진다. 제목은 절대 자르지 않는다. */
   .book-btn .bt::before { content: ''; float: right; width: 62px; height: 1.35em; }
-  .book-btn .bp { font-size: var(--fs-lg); font-weight: 700; color: var(--text); margin-top: auto; padding-top: 10px; }
+  .book-btn .bp { font-size: var(--fs-lg); font-weight: 600; color: var(--text); margin-top: auto; padding-top: 10px; }
   /* 재고도 칩을 씌우지 않는다. 카드마다 회색 알약이 하나씩 떠 있으면 그게 먼저 보인다.
      숫자만 두고 상태는 색으로 말한다 — 평소엔 흐리게, 모자라면 앰버, 품절이면 빨강. */
   .book-btn .bs {
-    position: absolute; top: 14px; right: 15px; font-size: var(--fs-2xs); font-weight: 700;
+    position: absolute; top: 14px; right: 15px; font-size: var(--fs-2xs); font-weight: 600;
     color: var(--muted); white-space: nowrap; background: none; padding: 0; border-radius: 0;
     font-variant-numeric: tabular-nums; text-align: right; line-height: 1.35;
   }
   .book-btn .bs.low  { color: var(--amber); }
   .book-btn .bs.zero { color: var(--red); }
   /* 대기에 잡힌 권수는 재고 바로 밑에 붙는다 — '재고가 왜 줄었지' 를 숫자 옆에서 바로 답한다 */
-  .book-btn .bs em { display: block; font-style: normal; color: var(--amber); font-size: 11px; }
+  .book-btn .bs em { display: block; font-style: normal; color: var(--amber); font-size: 12px; }
 
   /* ═══════════ 결제대기 ═══════════
      손님이 몰릴 때 담다 만 장바구니를 통째로 옆에 세워 둔다.
@@ -559,7 +560,7 @@
   }
   .holds-bar.hide { display: none; }
   .holds-lbl {
-    flex: none; font-size: var(--fs-2xs); font-weight: 700; color: var(--amber); letter-spacing: .04em;
+    flex: none; font-size: var(--fs-2xs); font-weight: 600; color: var(--amber); letter-spacing: .04em;
   }
   .hold-chip {
     display: inline-flex; align-items: center; background: #fff;
@@ -571,13 +572,13 @@
     cursor: pointer; color: inherit; padding: 0 5px 0 14px;
     min-height: var(--pill-h); font-size: var(--fs-2xs);
   }
-  .hold-chip .hc-open b { font-weight: 700; }
+  .hold-chip .hc-open b { font-weight: 600; }
   .hold-chip .hc-qty { color: var(--muted); font-variant-numeric: tabular-nums; }
-  .hold-chip .hc-amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hold-chip .hc-amt { font-weight: 600; font-variant-numeric: tabular-nums; }
   .hold-chip.compact .hc-open { padding: 0 3px 0 13px; }
   .hold-chip .hc-drop {
     border: none; background: none; cursor: pointer; color: var(--muted);
-    width: 32px; min-height: var(--pill-h); font-size: 12px; font-weight: 700;
+    width: 32px; min-height: var(--pill-h); font-size: 13px; font-weight: 600;
   }
   /* 칩은 알약 하나로 읽혀야 한다 — 안쪽 버튼만 2px 내려앉으면 껍질이 남아 어긋나 보인다.
      그래서 누름은 자리 이동이 아니라 바탕색으로 말한다. */
@@ -606,21 +607,21 @@
     display: flex; justify-content: space-between; align-items: center;
     font-size: var(--fs-xs); color: var(--muted); padding: 3px 0;
   }
-  .ex-diff .ex-row b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .ex-diff .ex-row b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 500; }
   .ex-diff .ex-total {
     display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
     border-top: 1px solid var(--line); margin-top: 8px; padding-top: 11px;
   }
-  .ex-diff .ex-total .k { font-size: var(--fs-sm); font-weight: 700; }
+  .ex-diff .ex-total .k { font-size: var(--fs-sm); font-weight: 600; }
   .ex-diff .ex-total .v {
-    font-size: var(--fs-2xl); font-weight: 700; letter-spacing: var(--tr-2xl);
+    font-size: var(--fs-2xl); font-weight: 600; letter-spacing: var(--tr-2xl);
     font-variant-numeric: tabular-nums;
   }
   .ex-diff.get   .ex-total .k, .ex-diff.get   .ex-total .v { color: var(--green-dark); }
   .ex-diff.give  .ex-total .k, .ex-diff.give  .ex-total .v { color: var(--red); }
   .ex-diff.even  .ex-total .v { color: var(--muted); }
   .ex-cart { font-size: var(--fs-xs); line-height: 1.6; }
-  .ex-cart b { font-weight: 700; }
+  .ex-cart b { font-weight: 600; }
 
   /* ═══════════ 항상 보이는 액션 바 ═══════════
      어느 화면에서든 바닥에 '지금 할 일'이 고정돼 있다. 폰 세로에서는 이게 엄지 자리다. */
@@ -638,11 +639,11 @@
     padding-bottom: var(--safe-b);
   }
   .mobile-bar .mb-sum { flex: 1; min-width: 0; }
-  .mobile-bar .mb-qty { font-size: var(--fs-2xs); color: var(--on-ink-dim); font-weight: 600; }
-  .mobile-bar .mb-amt { font-size: 26px; font-weight: 700; color: #fff; }
+  .mobile-bar .mb-qty { font-size: var(--fs-2xs); color: var(--on-ink-dim); font-weight: 500; }
+  .mobile-bar .mb-amt { font-size: 26px; font-weight: 600; color: #fff; }
   .mobile-bar .mb-open {
     border: none; background: var(--green); color: #fff; border-radius: var(--r-sm);
-    min-height: 48px; padding: 0 24px; font-size: var(--fs-md); font-weight: 800; cursor: pointer;
+    min-height: 48px; padding: 0 24px; font-size: var(--fs-md); font-weight: 700; cursor: pointer;
     --btn-edge: #08472c;
   }
   .mobile-bar .mb-open:disabled { background: #3a4353; color: #8b95a6; box-shadow: none; --btn-edge: transparent; cursor: not-allowed; }
@@ -661,7 +662,7 @@
   .panel-head .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .btn {
     padding: 0 16px; min-height: 40px; border: none; border-radius: var(--r-sm); font-size: var(--fs-sm);
-    font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   }
   .btn.primary { background: var(--blue); color: #fff; --btn-edge: #0e3287; }
   .btn.green { background: var(--green); color: #fff; --btn-edge: #08472c; }
@@ -688,10 +689,10 @@
   .filters .chk {
     display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 13px;
     border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff;
-    font-size: var(--fs-xs); font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap;
+    font-size: var(--fs-xs); font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap;
   }
   .filters .chk input { width: 15px; height: 15px; accent-color: var(--blue); cursor: pointer; }
-  .filters .count { font-size: var(--fs-xs); color: var(--muted); font-weight: 700; margin-left: auto; white-space: nowrap; }
+  .filters .count { font-size: var(--fs-xs); color: var(--muted); font-weight: 600; margin-left: auto; white-space: nowrap; }
   .filters .count b { color: var(--text); }
   .filters.on .search { border-color: var(--blue); }
 
@@ -699,16 +700,16 @@
   .cats { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
   .cats button {
     padding: 0 15px; min-height: var(--pill-h); border: 1px solid var(--line); background: #fff;
-    border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; color: var(--muted);
+    border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 600; cursor: pointer; color: var(--muted);
   }
   .cats button.on { background: var(--ink-2); border-color: var(--ink-2); color: #fff; }
-  .cats button .n { font-weight: 600; opacity: .65; margin-left: 5px; font-size: var(--fs-2xs); }
+  .cats button .n { font-weight: 500; opacity: .65; margin-left: 5px; font-size: var(--fs-2xs); }
   /* 분류는 알약에 담지 않는다. 색 채운 둥근 칩은 어느 UI 키트에나 있는 얼굴이고,
      제목 옆에 붙으면 제목보다 먼저 눈에 든다. 장부의 방주(傍註)처럼
      앞에 색 눈금 하나 세우고 글자만 남긴다 — 조용하지만 색으로 바로 갈린다. */
   .cat-badge {
     display: inline-flex; align-items: center; gap: 5px;
-    font-size: var(--fs-2xs); font-weight: 700; color: var(--muted);
+    font-size: var(--fs-2xs); font-weight: 600; color: var(--muted);
     margin-right: 9px; vertical-align: middle; letter-spacing: .01em;
     background: none; padding: 0; border-radius: 0;
   }
@@ -746,19 +747,19 @@
   .stat { padding: 14px 18px 15px; border-left: 1px solid var(--line-soft); background: transparent; }
   .stat:first-child { border-left: none; padding-left: 0; }
   .stat .lbl {
-    font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 7px; font-weight: 600;
+    font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 7px; font-weight: 500;
     letter-spacing: .02em;
   }
-  .stat .val { font-size: var(--fs-2xl); font-weight: 700; color: var(--text); }
+  .stat .val { font-size: var(--fs-2xl); font-weight: 600; color: var(--text); }
   .stat .val.green { color: var(--green-dark); }
   .stat .val.red { color: var(--red); }
   .stat .val.muted { color: var(--muted); }
   .stat .sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 6px; line-height: 1.45; }
-  .stat .sub .warn-text { color: var(--amber); font-weight: 700; }
+  .stat .sub .warn-text { color: var(--amber); font-weight: 600; }
   /* 대표 숫자는 글자가 큰 만큼 자리도 두 칸을 쓴다 — 안 그러면 '1,842,000 / 원' 으로 갈라진다 */
   .stat.hero { grid-column: span 2; }
-  .stat.hero .val { font-size: var(--fs-3xl); font-weight: 700; }
-  .stat.hero .lbl { color: var(--ink-3); font-weight: 700; }
+  .stat.hero .val { font-size: var(--fs-3xl); font-weight: 600; }
+  .stat.hero .lbl { color: var(--ink-3); font-weight: 600; }
 
   /* ═══════════ 리포트 요약 — 내려가도 따라온다 ═══════════
      책별 순수익을 훑으러 아래로 내려가면 '무슨 기간, 얼마'가 화면에서 사라진다.
@@ -789,7 +790,7 @@
   /* 줄어드는 폭은 일부러 작게 잡았다. 26 → 17 처럼 크게 줄이면 눈이 '글자가 바뀌었다'로 읽는다.
      한 걸음만 물러나야 '멀어졌다'로 읽힌다 — 아낀 높이는 그래도 28px 남짓이다. */
   .sticky-sum.stuck .stat { padding-top: 9px; padding-bottom: 10px; }
-  .sticky-sum.stuck .stat .lbl { font-size: 11px; margin-bottom: 3px; }
+  .sticky-sum.stuck .stat .lbl { font-size: 12px; margin-bottom: 3px; }
   .sticky-sum.stuck .stat .val { font-size: 19px; }
   .sticky-sum.stuck .stat.hero .val { font-size: 24px; }
   .sticky-sum.stuck .stat .sub { max-height: 0; margin-top: 0; opacity: 0; }
@@ -797,7 +798,7 @@
   .rank-head { margin-bottom: 12px; }
   .rank-head h3 { font-size: var(--fs-lg); letter-spacing: var(--tr-lg); }
   .rank-sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 4px; line-height: 1.55; }
-  .rank-sub .warn-text { color: var(--amber); font-weight: 700; }
+  .rank-sub .warn-text { color: var(--amber); font-weight: 600; }
   td .pos { color: var(--green-dark); }
   td .neg { color: var(--red); }
 
@@ -805,7 +806,7 @@
   .table-wrap { overflow-x: auto; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); box-shadow: var(--sh-1); }
   table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
   thead th {
-    background: var(--surface-2); color: var(--muted); font-size: var(--fs-2xs); font-weight: 700;
+    background: var(--surface-2); color: var(--muted); font-size: var(--fs-2xs); font-weight: 600;
     text-align: left; padding: 11px 14px; white-space: nowrap; border-bottom: 1px solid var(--line);
     position: sticky; top: 0; z-index: 2;
   }
@@ -817,7 +818,7 @@
   @media (hover: hover) { tbody tr:hover td { background: var(--surface-2); } }
   .mini-btn {
     height: 30px; padding: 0 11px; border: 1px solid var(--line); background: #fff; border-radius: 8px;
-    font-size: var(--fs-2xs); font-weight: 700; cursor: pointer; color: var(--text);
+    font-size: var(--fs-2xs); font-weight: 600; cursor: pointer; color: var(--text);
     display: inline-flex; align-items: center; justify-content: center;
   }
   .mini-btn + .mini-btn { margin-left: 5px; }
@@ -830,7 +831,7 @@
 
   /* 표식은 밑줄 한 겹으로. 채운 알약을 줄마다 깔면 표가 사탕 상자가 된다. */
   .pill {
-    display:inline-block; padding: 2px 1px 3px; font-size: var(--fs-2xs); font-weight: 700;
+    display:inline-block; padding: 2px 1px 3px; font-size: var(--fs-2xs); font-weight: 600;
     white-space: nowrap; border-bottom: 2px solid currentColor; border-radius: 0;
   }
   .pill.cash { color: var(--green-dark); }
@@ -841,13 +842,15 @@
   .pill.split { color: var(--amber); }
   .pill.out { color: var(--green-dark); }
   .pill.in  { color: var(--amber); }
+  /* 매입 필요 — 알약을 밑에 달면 줄이 두 칸이 된다. 숫자 자체를 빨강으로 (2026-11-03) */
+  .stock-low { color: var(--red); }
   .pay-lines { display: flex; flex-direction: column; gap: 3px; }
   .pay-lines .pill { text-align: center; }
 
   /* 절판 — 시트의 회색 칠한 줄과 같은 뜻이다. 지우는 게 아니라 물러나 있는 것이라
      글자를 흐리게만 하고 줄은 그대로 둔다. 제목과 남은 재고는 읽혀야 하므로 너무 죽이지 않는다. */
   tbody tr.dead-row { background: var(--surface-2); color: var(--muted); }
-  tbody tr.dead-row .cell-main b { font-weight: 600; color: var(--muted); }
+  tbody tr.dead-row .cell-main b { font-weight: 500; color: var(--muted); }
   tbody tr.dead-row .cat-badge { opacity: .5; }
   .dead-tag { margin-left: 8px; vertical-align: middle; }
 
@@ -855,7 +858,7 @@
   .period { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
   .period button {
     padding: 0 15px; min-height: var(--pill-h); border: 1px solid var(--line); background: #fff;
-    border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; color: var(--muted);
+    border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 600; cursor: pointer; color: var(--muted);
   }
   .period button.on { background: var(--ink-2); border-color: var(--ink-2); color: #fff; }
   .period .custom { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
@@ -865,7 +868,7 @@
   .period .custom span { color: var(--muted); font-size: var(--fs-xs); }
 
   .chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 20px; box-shadow: var(--sh-1); margin-bottom: 20px; }
-  .chart-title { font-size: var(--fs-sm); font-weight: 700; margin-bottom: 3px; }
+  .chart-title { font-size: var(--fs-sm); font-weight: 600; margin-bottom: 3px; }
   .chart-sub { font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 18px; }
   .chart { position: relative; }
   .chart-plot {
@@ -881,19 +884,19 @@
   @media (hover: hover) { .chart-col:hover .bar { background: var(--blue-dark); } }
   .chart-col .peak-label {
     position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 6px;
-    font-size: 11px; font-weight: 700; color: var(--blue-dark); white-space: nowrap;
+    font-size: 12px; font-weight: 600; color: var(--blue-dark); white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
   .chart-x { display: flex; gap: 2px; margin-top: 8px; }
-  .chart-x span { flex: 1; min-width: 0; text-align: center; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .chart-x span { flex: 1; min-width: 0; text-align: center; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; }
   .chart-tip {
     position: absolute; pointer-events: none; opacity: 0; transition: opacity .12s;
-    background: var(--ink); color: #fff; font-size: var(--fs-2xs); font-weight: 700;
+    background: var(--ink); color: #fff; font-size: var(--fs-2xs); font-weight: 600;
     padding: 8px 12px; border-radius: 8px; white-space: nowrap; z-index: 5; transform: translate(-50%, -100%);
     box-shadow: var(--sh-2); font-variant-numeric: tabular-nums;
   }
   .chart-tip.show { opacity: 1; }
-  .chart-tip .t-d { color: #a8b4c6; font-weight: 600; display: block; font-size: 11px; }
+  .chart-tip .t-d { color: #a8b4c6; font-weight: 500; display: block; font-size: 12px; }
   .chart-empty { height: 170px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: var(--fs-sm); }
 
   /* ═══════════ Modal ═══════════ */
@@ -911,7 +914,7 @@
   .modal h3 { font-size: var(--fs-lg); margin-bottom: 15px; }
   .modal p.desc { font-size: var(--fs-xs); color: var(--muted); margin-bottom: 15px; line-height: 1.65; }
   .field { margin-bottom: 14px; }
-  .field label { display:block; font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 6px; font-weight: 700; }
+  .field label { display:block; font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 6px; font-weight: 600; }
   .field input {
     width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm); font-size: 16px;
     background: #fff; color: inherit;
@@ -919,7 +922,7 @@
   .field input:focus, .field select:focus { outline: none; border-color: var(--blue); }
   .field select {
     width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
-    font-size: 16px; background: #fff; color: inherit; font-weight: 700;
+    font-size: 16px; background: #fff; color: inherit; font-weight: 600;
   }
   .field textarea {
     width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
@@ -929,7 +932,7 @@
   .field textarea:focus { outline: none; border-color: var(--blue); }
   .chkline {
     display: flex; align-items: center; gap: 9px; padding: 8px 0;
-    font-size: var(--fs-xs); font-weight: 700; cursor: pointer;
+    font-size: var(--fs-xs); font-weight: 600; cursor: pointer;
   }
   .chkline input { width: 17px; height: 17px; accent-color: var(--blue); cursor: pointer; flex-shrink: 0; }
   .field-row { display: flex; gap: 10px; }
@@ -942,7 +945,7 @@
      줄 하나가 곧 할 일 하나고, 되돌릴 수 없는 일(삭제)만 맨 아래에서 붉게 선다. */
   .act-head { padding: 0 2px 13px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
   .act-head .ah-when { font-size: var(--fs-2xs); color: var(--muted); }
-  .act-head .ah-what { font-size: var(--fs-sm); font-weight: 700; line-height: 1.5; margin-top: 4px; }
+  .act-head .ah-what { font-size: var(--fs-sm); font-weight: 600; line-height: 1.5; margin-top: 4px; }
   .act-head .ah-meta { font-size: var(--fs-xs); color: var(--muted); margin-top: 4px; }
   .act-list { border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
   .act-row {
@@ -955,7 +958,7 @@
   .act-row:active { background: var(--surface-2); }
   .act-ico { font-size: 17px; width: 22px; text-align: center; flex-shrink: 0; }
   .act-body { flex: 1; min-width: 0; }
-  .act-name { display: block; font-size: var(--fs-sm); font-weight: 700; }
+  .act-name { display: block; font-size: var(--fs-sm); font-weight: 600; }
   .act-sub { display: block; font-size: var(--fs-2xs); color: var(--muted); margin-top: 2px;
              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .act-arrow { color: var(--muted); opacity: .5; font-size: 15px; flex-shrink: 0; }
@@ -966,18 +969,18 @@
   .ret-list { max-height: 290px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
   .ret-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; border-bottom: 1px solid var(--line-soft); }
   .ret-row:last-child { border-bottom: none; }
-  .ret-title { font-size: var(--fs-sm); font-weight: 700; line-height: 1.4; }
+  .ret-title { font-size: var(--fs-sm); font-weight: 600; line-height: 1.4; }
   .ret-sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 3px; }
   .ret-qty { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .ret-qty button { width: 34px; height: 34px; border: 1px solid var(--line); background: var(--gray); border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 700; line-height: 1; color: var(--text); }
-  .ret-qty input { width: 52px; text-align: center; padding: 7px 4px; border: 2px solid var(--line); border-radius: 8px; font-size: var(--fs-md); font-weight: 700; }
+  .ret-qty button { width: 34px; height: 34px; border: 1px solid var(--line); background: var(--gray); border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; line-height: 1; color: var(--text); }
+  .ret-qty input { width: 52px; text-align: center; padding: 7px 4px; border: 2px solid var(--line); border-radius: 8px; font-size: var(--fs-md); font-weight: 600; }
   .pick-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 13px; border-bottom: 1px solid var(--line-soft); }
   .pick-row:last-child { border-bottom: none; }
   .log-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
   .log-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 11px 13px; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-xs); }
   .log-row:last-child { border-bottom: none; }
-  .log-when { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
-  .log-delta { font-weight: 800; white-space: nowrap; }
+  .log-when { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .log-delta { font-weight: 700; white-space: nowrap; }
   .log-delta.up { color: var(--green-dark); }
   .log-delta.down { color: var(--red); }
   .log-delta.flat { color: var(--muted); }
@@ -987,7 +990,7 @@
     position: fixed; bottom: calc(var(--bar-h) + var(--safe-b) + 18px); left: 50%;
     transform: translateX(-50%) translateY(16px);
     background: var(--ink); color: #fff; padding: 14px 24px; border-radius: var(--r-pill); font-size: var(--fs-md);
-    font-weight: 700; opacity: 0; transition: opacity .22s, transform .22s; z-index: 300; pointer-events: none;
+    font-weight: 600; opacity: 0; transition: opacity .22s, transform .22s; z-index: 300; pointer-events: none;
     box-shadow: var(--sh-3); max-width: calc(100vw - 32px); text-align: center;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -995,11 +998,11 @@
   #toast.bad { background: var(--red); }
   #updateBar {
     display: none; align-items: center; justify-content: center; gap: 12px;
-    background: #ffcb45; color: #3d2d05; font-size: var(--fs-xs); font-weight: 700;
+    background: #ffcb45; color: #3d2d05; font-size: var(--fs-xs); font-weight: 600;
     padding: 10px 14px; flex-shrink: 0;
   }
   #updateBar.show { display: flex; }
-  #updateBar button { border: none; background: #3d2d05; color: #ffcb45; border-radius: 7px; padding: 7px 14px; font-size: var(--fs-xs); font-weight: 700; cursor: pointer; --btn-edge: #241b03; }
+  #updateBar button { border: none; background: #3d2d05; color: #ffcb45; border-radius: 7px; padding: 7px 14px; font-size: var(--fs-xs); font-weight: 600; cursor: pointer; --btn-edge: #241b03; }
 
   /* ═══════════ 태블릿 / 휴대폰 ═══════════ */
   @media (max-width: 899px) {
@@ -1107,10 +1110,10 @@
     }
     tbody td + td { border-top: 1px solid var(--line-soft); }
     tbody td::before {
-      content: attr(data-label); color: var(--muted); font-weight: 700; font-size: var(--fs-2xs);
+      content: attr(data-label); color: var(--muted); font-weight: 600; font-size: var(--fs-2xs);
       text-align: left; flex: 0 0 auto; white-space: nowrap;
     }
-    tbody td.cell-main { font-size: var(--fs-md); font-weight: 600; }
+    tbody td.cell-main { font-size: var(--fs-md); font-weight: 500; }
     tbody td.cell-main::before { content: none; }
     tbody td.cell-main { justify-content: flex-start; text-align: left; }
     tbody td:empty { display: none; }
@@ -1318,7 +1321,6 @@
           <thead><tr>
             <th>책 제목</th><th class="num">판매가</th><th class="num">입고단가</th>
             <th class="num">현재 재고</th><th class="num">안전재고</th>
-            <th class="center">결제 방법</th>
             <th class="num">누적 판매</th><th class="center">관리</th>
           </tr></thead>
           <tbody id="invBody"></tbody>
@@ -1530,7 +1532,7 @@ const sheetTitle = b => `[${sheetCat(catOf(b))}] ${b.title}`;
    절판은 다시 들이지 않는 책이라 재고가 모자라도 매입필요가 아니다 — 이걸 빼먹으면
    남은 재고가 있는 절판 책이 '매입 필요' 걸러보기·알약·하단 건수에 섞여 나온다. */
 const safetyOf = b => Number.isFinite(b?.safety) ? b.safety : 0;
-const isLow = b => !b.discontinued && b.stock < safetyOf(b);
+const isLow = b => !b.discontinued && !isShipping(b) && b.stock < safetyOf(b);
 
 let posCat = '전체', invCat = '전체';
 /* pool — 그 화면이 실제로 보여 줄 수 있는 책. 칩의 숫자가 눌렀을 때 나오는 수와 같아야 한다 */
@@ -1585,8 +1587,14 @@ const isSharedTitle = (counts, title) => (counts.get(titleKey(title)) || 0) > 1;
 /* 목록 정렬: 재고 있는 책이 위, 품절이 아래. 그 안에서 제목 가나다순.
    품절 판정은 장바구니를 뺀 값이 아니라 b.stock 으로 한다 —
    담을 때마다 카드 위치가 튀면 누르기 어렵기 때문. */
+const soldOut = b => !isShipping(b) && b.stock <= 0;   // 택배비는 재고 무제한이라 품절이 없다
 const byStockThenName = (a, b) =>
-  ((a.stock <= 0) - (b.stock <= 0)) || String(a.title).localeCompare(String(b.title), 'ko');
+  (soldOut(a) - soldOut(b)) || String(a.title).localeCompare(String(b.title), 'ko');
+/* 판매 화면은 값이 싼 책부터 (2026-11-03, 운영자 요청). 품절이 아래인 것과
+   같은 값끼리 가나다순인 것은 그대로다 — 담을 때마다 카드가 자리를 바꾸지 않게. */
+const byStockThenPrice = (a, b) =>
+  (soldOut(a) - soldOut(b)) || ((a.price || 0) - (b.price || 0)) ||
+  String(a.title).localeCompare(String(b.title), 'ko');
 const $ = id => document.getElementById(id);
 
 /* ================= 연결 상태 (오프라인 감지) ================= */
@@ -1648,6 +1656,7 @@ function startListeners() {
                      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     syncMeta.books = readMeta(snap);
     renderSync(); renderAll();
+    if (!snap.metadata.fromCache && !snap.metadata.hasPendingWrites) mergeShippingBooks();
   }, e => console.error('books listener', e));
 
   onSnapshot(query(txCol, orderBy('time', 'desc')), { includeMetadataChanges: true }, snap => {
@@ -1731,6 +1740,18 @@ const purchaseMemo = note => String(note || '')
 /* 원장 한 줄 → 매입 기록. 구조화된 필드가 있으면 그대로, 없으면 예전 메모 글자에서 푼다.
    예전 메모 모양: '거래처 성서원 · 입고단가 30,000원 · 입고금액 90,000원' */
 function purchaseOf(l) {
+  /* 새 책을 등록하며 넣은 초기 재고도 입고 목록에 띄운다 — 등록할 때 권수를 잘못 치는 일이
+     있어서, 여기 떠 있어야 '수정' 으로 고칠 수 있다. 사 온 값이 아니라 매입 합계에는 안 넣는다.
+     시트 기준정보에서 가져와 만든 책은 원장에 줄을 만든 적이 없어 뺀다. */
+  if (l && l.reason === '등록') {
+    if (!(l.delta > 0) || l.note === '스프레드시트에서 가져옴') return null;
+    /* 입고단가를 적고 등록했으면 그 권수는 '신규 등록 입고' 줄이 맡는다. 그 입고 줄을 지운 뒤에도
+       등록 줄이 다시 떠오르면 안 되니, 짝 입고가 남아 있는지가 아니라 등록 메모로 가른다 */
+    if (/입고단가 /.test(String(l.note || ''))) return null;
+    return { id: l.id, time: l.time, bookId: l.bookId, title: l.title,
+             category: l.category || null, qty: l.delta, cost: null, amount: null,
+             supplier: null, note: '신규 등록 (초기 재고)', exact: false, reg: true };
+  }
   if (!l || l.reason !== '입고') return null;
   const qty = Number.isFinite(l.qty) ? l.qty
             : (Number.isFinite(l.delta) ? Math.abs(l.delta) : null);
@@ -1756,7 +1777,12 @@ function purchaseOf(l) {
 }
 /* 화면·집계가 쓰는 매입 목록 (최신순) */
 function purchaseList() {
-  return stockLogs.map(purchaseOf).filter(Boolean);
+  // 입고단가를 적고 등록한 책은 '신규 등록 입고' 줄이 따로 있다 — 등록 줄까지 띄우면 두 번 뜬다
+  const boughtAtReg = new Set(stockLogs
+    .filter(l => l.reason === '입고' && String(l.note || '').startsWith('신규 등록 입고'))
+    .map(l => l.bookId));
+  return stockLogs.map(purchaseOf)
+    .filter(p => p && !(p.reg && boughtAtReg.has(p.bookId)));
 }
 /* 원장 기록은 '판매'와 분리된 별도 쓰기다.
    기록이 실패해도(권한/네트워크) 판매·입고 자체는 절대 막히면 안 되기 때문에
@@ -1798,16 +1824,18 @@ function renderBookGrid() {
      212종 사이에 섞여 있으면 찾는 책이 그만큼 늦게 나온다.
      남은 재고는 재고 탭에서 그대로 보인다. */
   const list = books.filter(b => !b.discontinued && matchTitle(b.title, q) && matchCat(b, posCat))
-                    .sort(byStockThenName);
+                    .sort(byStockThenPrice);
   const shared = sharedTitles();
   list.forEach(b => {
     const inCart = cart.find(c => c.id === b.id);
     // 대기에 잡혀 있는 권수는 재고에서 미리 뺀다 — 그래야 화면의 숫자가 실제로 팔 수 있는 수다
     const held = heldQty(b.id);
+    const ship = isShipping(b);   // 택배비는 금액을 그때그때 적는다
     const remaining = b.stock - (inCart ? inCart.qty : 0) - held;
-    const out = remaining <= 0;
-    let cls = 'bs', label = `재고 ${remaining}`;
-    if (remaining <= 0) { cls += ' zero'; label = '품절'; }
+    const out = !ship && remaining <= 0;
+    let cls = 'bs', label = ship ? '재고 무제한' : `재고 ${remaining}`;
+    if (ship) { /* 품절·부족 표시 없음 */ }
+    else if (remaining <= 0) { cls += ' zero'; label = '품절'; }
     else if (remaining < safetyOf(b) || remaining <= 10) cls += ' low';
     if (held) label += `<em>대기 ${held}</em>`;   // 재고가 왜 줄었는지 바로 밑에서 답한다
     const el = document.createElement('button');
@@ -1816,7 +1844,7 @@ function renderBookGrid() {
     const tag = isSharedTitle(shared, b.title) ? catBadge(b) : '';
     el.innerHTML = `<span class="${cls}">${label}</span>
       <div class="bt">${tag}${esc(b.title)}</div>
-      <div class="bp">${won(b.price)}</div>`;
+      <div class="bp">${ship ? '눌러서 입력' : won(b.price)}</div>`;
     el.onclick = () => addToCart(b.id);
     grid.appendChild(el);
   });
@@ -1831,14 +1859,18 @@ function renderBookGrid() {
   }
 }
 
-/* ================= 택배비 금액 =================
-   택배비는 '[기타] 택배비' 라는 상품 하나로 판다. 그런데 금액이 크기·무게마다 달라서
-   상품 가격(3,100원) 하나로는 못 받는다. 그래서 장바구니 줄에 그 건의 금액(price)을
-   따로 적어 둘 수 있게 한다. 상품 가격은 그대로라 다음 손님은 다시 3,100원부터다.
+/* ================= 택배비 =================
+   택배비는 '[기타] 택배비' 상품 **하나**로 판다. 금액은 크기·무게마다 달라 정해 둔 값이 없다 —
+   담을 때마다 그 건의 금액을 직접 적는다(장바구니 줄의 price).
+   재고는 무제한이다 (2026-11-03, 운영자 요청) — 몇 개를 팔든 막지 않고 품절·매입 필요도 안 뜬다.
+   숫자는 그래도 책처럼 팔면 줄고 입고하면 는다. 시트 원장에 판매가 '출고' 로 가서 시트 현재재고도
+   같이 줄기 때문에, 앱 숫자를 따로 멈추면 재고 맞추기가 어긋난다.
+   2026-10-21 전에는 3,100 · 3,700 · 5,200원짜리 택배비 상품이 따로 셋 있었다 →
+   mergeShippingBooks 가 하나로 합치고, 재고는 시트 재고관리의 현재재고로 맞춘다.
 
-   시트에는 아무것도 새로 생기지 않는다 — 원장 줄은 지금과 똑같이 구분 '택배비' ·
-   제품명 '[기타] 택배비' 이고, 출고단가·출고금액 숫자만 그 건의 금액이 된다.
-   택배비모음(제품명으로 거름) · 월별정리(금액 합) 모두 그대로 맞는다. */
+   시트 원장 줄: 제품명 '[기타] 택배비', 출고단가·출고금액은 그 건에 적은 금액.
+   구분은 판매 '출고' · 입고 '입고' (예전에는 판매를 구분 '택배비' 로 적어 시트 재고가 안 줄었다).
+   택배비모음(제품명으로 거름) · 계좌이체모음 · 현금모음(결제방식) · 입고모음(구분 '입고') 모두 잡힌다. */
 const isShipping = b => !!b && String(b.title || '').includes('택배비');
 /* 장바구니(또는 결제대기) 한 줄의 한 개당 금액 — 따로 적은 금액이 있으면 그것 */
 function linePrice(c) {
@@ -1846,44 +1878,119 @@ function linePrice(c) {
   const b = bookById(c.id);
   return b ? b.price : 0;
 }
+/* 금액을 아직 안 적은 택배비 줄 (예전 결제대기에서 돌아온 줄 등) */
+const shipUnpriced = c => isShipping(bookById(c.id)) && !(Number.isFinite(c.price) && c.price > 0);
 
+/* 택배비 금액 적기. 장바구니에 없으면 적은 금액으로 새로 담고, 있으면 그 줄 금액을 바꾼다. */
 function shippingPriceModal(id) {
-  const c = cart.find(x => x.id === id), b = bookById(id);
-  if (!c || !b) return;
-  const now = linePrice(c);
+  const b = bookById(id);
+  if (!b) return;
+  const c = cart.find(x => x.id === id);
+  const now = c && Number.isFinite(c.price) && c.price > 0 ? c.price : null;
   openModal(`
     <h3>택배비 금액</h3>
-    <p class="desc">이번 건에만 적용됩니다. 기본 금액은 <b>${won(b.price)}</b> 그대로입니다.</p>
+    <p class="desc">이번 건의 택배비를 적어 주세요. 크기·무게마다 달라서 정해 둔 금액이 없습니다.</p>
     <div class="field"><label>한 건당 금액 (원)</label>
-      <input id="mShip" inputmode="numeric" value="${now.toLocaleString('ko-KR')}"></div>
+      <input id="mShip" inputmode="numeric" placeholder="예) 3,100" value="${now ? now.toLocaleString('ko-KR') : ''}"></div>
     <div class="modal-actions">
-      <button class="btn ghost" id="mReset">${won(b.price)}로</button>
       <button class="btn ghost" id="mCancel">취소</button>
-      <button class="btn primary" id="mSave">적용</button>
+      <button class="btn primary" id="mSave">${c ? '적용' : '담기'}</button>
     </div>`);
   const inp = $('mShip');
   inp.addEventListener('input', () => {
     const v = digits(inp.value);
     inp.value = v === '' ? '' : parseInt(v, 10).toLocaleString('ko-KR');
   });
-  const apply = price => {
-    const line = cart.find(x => x.id === id);
-    if (!line) { closeModal(); return; }
-    if (price === b.price) delete line.price; else line.price = price;
-    closeModal();
-    renderCart();
-  };
   $('mCancel').onclick = closeModal;
-  $('mReset').onclick = () => apply(b.price);
   $('mSave').onclick = () => {
     const v = digits(inp.value);
     const price = v === '' ? NaN : parseInt(v, 10);
     if (!Number.isFinite(price) || price <= 0) { toast('금액을 입력하세요.', 'bad'); return; }
     if (price > 1000000) { toast('금액이 너무 큽니다. 다시 확인하세요.', 'bad'); return; }
-    apply(price);
+    const line = cart.find(x => x.id === id);
+    if (line) line.price = price;
+    else { cart.push({ id, qty: 1, price }); playAddSound(); }
+    closeModal();
+    renderCart();
   };
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') $('mSave').click(); });
   setTimeout(() => { inp.focus(); inp.select(); }, 60);
+}
+
+/* 예전에 따로 있던 택배비 상품들을 하나로 합친다 (판매 수를 더해 남기고 나머지는 지운다).
+   지난 매출은 품목에 제목·분류로 적혀 있어 어느 문서였는지와 상관없이 그대로 '[기타] 택배비' 다.
+   재고는 셋을 더하지 않고 **시트 재고관리의 '[기타] 택배비' 현재재고**로 맞춘다 — 예전 앱은
+   택배비를 상품마다 따로 셌고, 시트는 실제 입고를 다 받아 적은 한 줄이라 그쪽이 기준이다.
+   시트에는 보낼 것이 없다(시트는 이미 그 숫자다). 그래서 책 삭제(deleteBook)도, 재고 조정
+   (queueAdjust)도 쓰지 않는다 — 그건 시트에 정리·조정 줄을 보낸다.
+   시트를 못 읽으면(오프라인 · 연동 전) 합치지 않고 다음에 다시 한다.
+   여러 기기가 동시에 해도 한 번만 되게 트랜잭션으로 읽고 지운다. */
+let shipMerging = false;
+async function mergeShippingBooks() {
+  const ships = books.filter(isShipping);
+  if (ships.length <= 1 || shipMerging) return;
+  if (!sheetCfg || !sheetCfg.url || !navigator.onLine) return;
+  // 못 보낸 기록이 있으면 시트 재고가 그만큼 뒤처져 있다 — 다 보낸 뒤에 맞춘다
+  if (sheetQueue().length) return;
+  shipMerging = true;
+  try {
+    const before = new Map(ships.map(b => [b.id, b.stock]));   // 시트를 읽기 전의 재고
+    const res = await askSheet({ action: 'books' });
+    const row = (res.books || []).find(r => String(r.제품명).trim() === '[기타] 택배비');
+    const sheetStock = row ? sheetNum(row.현재재고) : null;
+    if (sheetStock === null) throw new Error('시트 재고관리에서 [기타] 택배비 현재재고를 못 읽음');
+    const keep = [...ships].sort((a, b) => (b.sold || 0) - (a.sold || 0) || (a.id < b.id ? -1 : 1))[0];
+    const others = ships.filter(b => b.id !== keep.id);
+    /* 시트를 읽는 사이에 택배비가 팔리거나 들어왔으면 그 시트 숫자는 이미 옛것이다 —
+       그 상태로 덮으면 방금 판 것이 되살아난다. 시트를 읽기 전의 재고와 트랜잭션 안의 재고가
+       하나라도 다르면, 또는 그새 못 보낸 기록이 생겼으면 이번엔 그만두고 다음에 다시 한다. */
+    const seenStock = before;
+    if (sheetQueue().length) return;
+    const merged = await runTransaction(db, async tr => {
+      const k = await tr.get(doc(booksCol, keep.id));
+      if (!k.exists()) return null;
+      const snaps = [];
+      for (const o of others) snaps.push(await tr.get(doc(booksCol, o.id)));
+      const live = snaps.filter(x => x.exists());
+      if (!live.length) return null;              // 다른 기기가 이미 합쳤다
+      if ([k, ...live].some(x => x.data().stock !== seenStock.get(x.id))) return null;
+      const sold = live.reduce((n, x) => n + (x.data().sold || 0), k.data().sold || 0);
+      tr.update(doc(booksCol, keep.id), { sold, stock: sheetStock, price: 0, discontinued: false });
+      live.forEach(x => tr.delete(x.ref));
+      return { before: k.data().stock, gone: live.map(x => ({ id: x.id, ...x.data() })) };
+    });
+    if (!merged) return;
+    // 장바구니에 지운 쪽 택배비가 담겨 있었으면 남긴 쪽으로 옮긴다
+    const gone = new Set(merged.gone.map(m => m.id));
+    // 한 장바구니에 택배비 줄이 둘이 되면 하나로 — 줄은 id 로 찾으므로 겹치면 안 된다.
+    // 앞 줄의 금액을 쓰고, 금액이 없으면 결제 전에 다시 묻는다(shipUnpriced).
+    const remap = list => {
+      let moved = false;
+      const out = [];
+      list.forEach(c => {
+        if (gone.has(c.id)) { c.id = keep.id; moved = true; }
+        const same = c.id === keep.id && out.find(x => x.id === keep.id);
+        if (same) { same.qty += c.qty; if (!Number.isFinite(same.price)) same.price = c.price; moved = true; }
+        else out.push(c);
+      });
+      return { out, moved };
+    };
+    cart = remap(cart).out;
+    let heldMoved = false;
+    holds.forEach(h => { const r = remap(h.items || []); h.items = r.out; heldMoved = heldMoved || r.moved; });
+    if (heldMoved) saveHolds();
+    writeLogs([
+      ...merged.gone.map(m => ({ bookId: m.id, title: m.title, reason: '삭제', before: m.stock, after: 0,
+                                 note: '택배비 상품 하나로 합침' })),
+      { bookId: keep.id, title: keep.title, reason: '조정', before: merged.before, after: sheetStock,
+        note: '택배비 상품 하나로 합침 · 시트 재고에 맞춤' },
+    ]);
+    renderCart();
+  } catch (e) {
+    console.error('택배비 상품 합치기 실패 — 다음에 다시 합니다', e);
+  } finally {
+    shipMerging = false;
+  }
 }
 
 function renderCart() {
@@ -1902,8 +2009,8 @@ function renderCart() {
     const row = document.createElement('div');
     row.className = 'cart-row';
     row.innerHTML = `
-      <div class="title">${esc(b.title)}${ship && unit !== b.price
-        ? `<span class="ship-note">이번 건 ${won(unit)} (기본 ${won(b.price)})</span>` : ''}</div>
+      <div class="title">${esc(b.title)}${ship && shipUnpriced(c)
+        ? '<span class="ship-note">금액을 눌러 적어 주세요</span>' : ''}</div>
       <div class="qty">
         <button data-a="dec" aria-label="수량 줄이기">−</button><span>${c.qty}</span><button data-a="inc" aria-label="수량 늘리기">＋</button>
       </div>
@@ -2034,6 +2141,10 @@ const shortMsg = id => heldQty(id) ? '남은 재고가 결제대기에 잡혀 �
 
 function addToCart(id) {
   const b = bookById(id); if (!b) return;
+  if (isShipping(b)) {                                       // 택배비는 금액부터 적는다
+    if (!cart.some(c => c.id === id) && availableOf(b) <= 0) { toast(shortMsg(id), 'bad'); return; }
+    shippingPriceModal(id); return;
+  }
   const inCart = cart.find(c => c.id === id);
   if ((inCart ? inCart.qty : 0) >= availableOf(b)) { toast(shortMsg(id), 'bad'); return; }
   if (inCart) inCart.qty++; else cart.push({ id, qty: 1 });
@@ -2073,7 +2184,7 @@ function clearCart() {
    고객 이름·연락처·주소까지 넘길 때 모습 그대로 담고, 그대로 되돌린다.
    목록이었다면 불러온 뒤 할인을 다시 쳐야 한다.
 
-   저장은 이 기기 localStorage 다. 대기는 계산대에 손님이 서 있는 몇 분만 사는 물건이고,
+   저장은 이 기기 localStorage 다. 대기는 몇 분에서 며칠까지 살고(마감해도 남는다),
    넘긴 그 기기에서 그대로 불러간다. Firestore 에 올리면 두 기기가 같은 대기를 동시에
    불러 이중 결제가 나고, 보안 규칙도 다시 게시해야 한다.
    새로고침·앱 재시작·인터넷 끊김에는 이대로도 살아남는다. */
@@ -2102,7 +2213,7 @@ function heldQty(id) {
     s + h.items.reduce((t, i) => t + (i.id === id ? i.qty : 0), 0), 0);
 }
 /* 지금 장바구니에 담을 수 있는 최대 권수 */
-const availableOf = b => b.stock - heldQty(b.id);
+const availableOf = b => isShipping(b) ? Infinity : b.stock - heldQty(b.id);
 
 const holdQtyOf = h => h.items.reduce((s, i) => s + i.qty, 0);
 const holdTotal = h => h.items.reduce((s, i) =>
@@ -2227,12 +2338,12 @@ function dropHold(no) {
   };
 }
 
-/* 마감과 함께 비운다 — 다음 개업 때 어제 손님 장바구니가 튀어나오면 안 된다 */
-function clearHolds() {
-  if (holds.length === 0) return;
-  holds = [];
-  saveHolds();
-  renderCart();
+/* 대기는 마감해도 지우지 않는다 (2026-11-03 부터) — 결제를 미뤄 두고 며칠 뒤에 연락 오는
+   손님이 많다. 대신 오늘 넣은 게 아니면 칩에 날짜를 붙여, 오래 묵은 대기가 눈에 띄게 한다. */
+function holdAge(h) {
+  const at = new Date(h.at);
+  if (isNaN(at) || ymd(at) === ymd(new Date())) return '';
+  return `${at.getMonth() + 1}/${at.getDate()}`;
 }
 
 function renderHolds() {
@@ -2243,10 +2354,12 @@ function renderHolds() {
 
   const compact = holds.length >= HOLDS_COMPACT_AT;
   bar.innerHTML = '<span class="holds-lbl">결제대기</span>' + holds.map(h => {
-    const full = `${holdName(h)} · ${holdQtyOf(h)}권 · ${won(holdPayable(h))}`;
+    const age = holdAge(h);
+    const full = `${holdName(h)} · ${holdQtyOf(h)}권 · ${won(holdPayable(h))}${age ? ` · ${age} 대기` : ''}`;
     const body = compact
-      ? `<b>대기 ${h.no}</b>`
-      : `<b>${esc(holdName(h))}</b><span class="hc-qty">${holdQtyOf(h)}권</span>` +
+      ? `<b>대기 ${h.no}</b>${age ? `<span class="hc-qty">${age}</span>` : ''}`
+      : `<b>${esc(holdName(h))}</b>${age ? `<span class="hc-qty">${age}</span>` : ''}` +
+        `<span class="hc-qty">${holdQtyOf(h)}권</span>` +
         `<span class="hc-amt">${won(holdPayable(h))}</span>`;
     return `<span class="hold-chip${compact ? ' compact' : ''}">
       <button type="button" class="hc-open" data-no="${h.no}" title="${esc(full)} — 눌러서 불러오기">${body}</button>
@@ -2262,6 +2375,9 @@ function renderHolds() {
 function checkout() {
   if (cart.length === 0) return;
   if (!requireOpen('판매')) return;
+  // 택배비는 정해 둔 금액이 없다 — 안 적은 채 결제하면 0원 택배비가 시트로 간다
+  const unpriced = cart.find(shipUnpriced);
+  if (unpriced) { toast('택배비 금액을 먼저 적어 주세요.', 'bad'); shippingPriceModal(unpriced.id); return; }
   const total = cartTotal();
   const discount = currentDiscount();
   const discPct = discountMode === 'percent' ? discountPct() : null;
@@ -2429,35 +2545,6 @@ function methodText(t) {
 }
 
 /* ================= 재고 화면 ================= */
-/* 제목이 같고 분류만 다른 책이 있으므로 분류까지 맞춰 센다.
-   옛 기록에는 분류가 없을 수 있어, 그럴 땐 제목만 맞으면 센다. */
-/* 분할결제는 여기서 가르지 않는다 — 가게에서는 '분할로 판 책'이 한 갈래다.
-   payParts 로 쪼개면 같은 한 권이 현금 줄과 계좌이체 줄에 흩어져,
-   '이 책은 어떻게 팔리나' 를 보러 온 눈에는 도리어 답이 흐려진다. */
-function payBreakdown(book, txList = transactions) {
-  const cat = catOf(book);
-  let cash = 0, transfer = 0, split = 0;
-  txList.forEach(tx => {
-    (tx.items || []).forEach(i => {
-      if (i.title !== book.title) return;
-      if (knownCat(i.category) && catOf(i) !== cat) return;
-      if (isSplitTx(tx)) split += i.qty;
-      else if (tx.method === '현금') cash += i.qty;
-      else transfer += i.qty;
-    });
-  });
-  return { cash, transfer, split };
-}
-/* 0권짜리 줄은 적지 않는다 — 예전에는 안 팔린 책마다 '현금 0권 / 계좌이체 0권' 두 줄이
-   찍혀, 표 전체가 0으로 도배되고 정작 팔린 책이 묻혔다. 아무것도 안 팔렸으면 — 하나. */
-function payLines(pay) {
-  const rows = [
-    pay.cash     ? `<span class="pill cash">현금 ${pay.cash}권</span>` : '',
-    pay.transfer ? `<span class="pill transfer">계좌이체 ${pay.transfer}권</span>` : '',
-    pay.split    ? `<span class="pill split">분할결제 ${pay.split}권</span>` : '',
-  ].filter(Boolean);
-  return rows.length ? `<div class="pay-lines">${rows.join('')}</div>` : '<span class="dim">—</span>';
-}
 /* 재고 표 정렬. 같은 값이 여럿이면 제목 가나다로 묶어 줘야 순서가 매번 바뀌지 않는다 —
    숫자만으로 세우면 재고 0권짜리들이 새로 그릴 때마다 자리를 바꿔 눈이 미끄러진다. */
 function invSorter() {
@@ -2482,7 +2569,7 @@ function renderInventory() {
      절판은 빼고 센다 — '매입 필요'는 다시 들일 책에만 뜻이 있고,
      재고 자산도 팔 수 있는 책으로 잡아야 숫자가 거짓말을 안 한다. */
   let totalStock = 0, asset = 0, lowCount = 0;
-  books.filter(b => !b.discontinued).forEach(b => {
+  books.filter(b => !b.discontinued && !isShipping(b)).forEach(b => {
     totalStock += b.stock; asset += b.stock * b.price; if (isLow(b)) lowCount++;
   });
 
@@ -2503,25 +2590,20 @@ function renderInventory() {
     : `판매 중 <b>${live}종</b>${books.length > live ? ` <span class="dim">· 절판 ${books.length - live}종</span>` : ''}`;
 
   list.forEach(b => {
-    const pay = payBreakdown(b);
     const low = isLow(b);
     const safety = safetyOf(b);
     const tr = document.createElement('tr');
     if (b.discontinued) tr.className = 'dead-row';
     tr.innerHTML = `
       <td class="cell-main" data-label="책">${catBadge(b)}<b>${esc(b.title)}</b>${
-        b.discontinued ? '<span class="pill mute dead-tag">절판</span>' : ''}${
-        b.supplier ? `<div class="sub">거래처 ${esc(b.supplier)}</div>` : ''}</td>
-      <td class="num" data-label="판매가">${won(b.price)}</td>
+        b.discontinued ? '<span class="pill mute dead-tag">절판</span>' : ''}</td>
+      <td class="num" data-label="판매가">${isShipping(b) ? '<span class="dim">건마다</span>' : won(b.price)}</td>
       <td class="num" data-label="입고단가">${b.cost ? won(b.cost) : '<span class="dim">—</span>'}</td>
-      <td class="num" data-label="현재 재고"><b>${b.stock}</b>권
-        ${low ? '<div><span class="pill warn">매입 필요</span></div>' : ''}</td>
+      <td class="num" data-label="현재 재고">${isShipping(b) ? '<b title="택배비는 재고 무제한">∞</b>' : low
+        ? `<b class="stock-low" title="매입 필요 (안전재고 미만)">${b.stock}</b>` : `<b>${b.stock}</b>`}</td>
       <td class="num" data-label="안전재고">${
-        safety ? `${safety}권` : '<span class="dim">—</span>'}</td>
-      <td class="center" data-label="결제 방법">
-        ${payLines(pay)}
-      </td>
-      <td class="num" data-label="누적 판매">${b.sold || 0}권</td>
+        safety ? safety : '<span class="dim">—</span>'}</td>
+      <td class="num" data-label="누적 판매">${b.sold || 0}</td>
       <td class="center" data-label="관리">
         <button class="mini-btn plus" data-a="restock">＋ 입고</button>
         <button class="mini-btn" data-a="log">이력</button>
@@ -2535,7 +2617,7 @@ function renderInventory() {
     body.appendChild(tr);
   });
   if (list.length === 0) {
-    body.innerHTML = `<tr class="empty-row"><td colspan="8">${
+    body.innerHTML = `<tr class="empty-row"><td colspan="7">${
       books.length === 0
         ? '등록된 책이 없습니다. “＋ 새 책 등록”을 눌러 추가하세요.'
         : '검색 조건에 맞는 책이 없습니다.'
@@ -2713,12 +2795,13 @@ function buyRow(p) {
   const tr = document.createElement('tr');
   const sup = p.supplier ? esc(p.supplier) : '<span class="dim">-</span>';
   const amt = p.amount != null ? won(p.amount)
+            : p.reg ? '<span class="dim">-</span>'
             : '<span class="dim" title="입고금액이 적혀 있지 않습니다">모름</span>';
   const unit = p.cost != null ? won(p.cost) : '<span class="dim">-</span>';
   const manage = '<button class="mini-btn" data-a="manage">수정</button>';
   tr.innerHTML = flowTab === 'all'
     ? `<td data-label="일시">${fmtDateTime(p.time)}</td>
-       <td class="center" data-label="구분"><span class="pill in">입고</span></td>
+       <td class="center" data-label="구분"><span class="pill in">${p.reg ? '등록' : '입고'}</span></td>
        <td class="cell-main" data-label="내역">${esc(p.title)}${p.qty != null ? ` ×${p.qty}` : ''}</td>
        <td data-label="고객·거래처">${sup}</td>
        <td class="num" data-label="수량">${p.qty != null ? p.qty + '권' : '-'}</td>
@@ -2763,7 +2846,7 @@ function renderSales() {
   });
   let buyAmount = 0, buyQty = 0, buyUnknown = 0;
   buyList.forEach(p => {
-    if (p.amount != null) buyAmount += p.amount; else buyUnknown++;
+    if (p.amount != null) buyAmount += p.amount; else if (!p.reg) buyUnknown++;
     if (p.qty != null) buyQty += p.qty;
   });
 
@@ -2961,7 +3044,8 @@ function closeBizModal() {
       <b>결제대기 ${holds.length}건이 아직 남아 있습니다.</b>
       <ul>${holds.map(h =>
         `<li>${esc(holdName(h))} · ${holdQtyOf(h)}권 · ${won(holdPayable(h))}</li>`).join('')}</ul>
-      <br>마감하면 이 대기는 사라집니다. 결제할 것이 있으면 먼저 불러오세요.
+      <br>대기는 마감해도 그대로 남고, 담긴 책은 계속 재고에서 잡아 둡니다.
+      다시 안 올 손님이면 판매 화면에서 ✕ 로 버리세요.
     </div>` : ''}
     <div class="info-box">
       마감하면 헤더 매출이 <b>0으로 돌아갑니다.</b> 거래 기록은 그대로 남으니
@@ -3002,8 +3086,7 @@ function closeBizModal() {
     } catch (e) {
       console.error('마감 요약 저장 실패 (마감 자체는 완료)', e);
     }
-    // 창에서 이미 알렸다 — 다음 개업 때 어제 손님 장바구니가 남아 있으면 안 된다
-    clearHolds();
+    // 결제대기는 마감해도 남긴다 — 며칠 뒤에 연락 와서 그대로 결제하는 손님이 많다
     closeModal();
     toast(`마감했습니다 · ${won(rec.revenue)}`, 'good');
   };
@@ -3442,23 +3525,110 @@ function manageTxModal(t) {
   on('drop',   () => deleteTxModal(t, back));
 }
 
-/* 입고 줄의 수정 레이어. 지금은 삭제 하나뿐인데도 레이어로 여는 이유가 있다 —
-   어느 책에 몇 권을 넣은 줄인지 보여 준 뒤에 지워야 '다른 품목에 잘못 넣었다' 가 고쳐진다. */
+/* 입고 줄의 수정 레이어. 어느 책에 몇 권을 넣은 줄인지 보여 준 뒤에 고치거나 지워야
+   '다른 품목에 잘못 넣었다' · '권수를 잘못 쳤다' 가 고쳐진다.
+   등록 줄(초기 재고)은 수량만 고친다 — 등록 자체를 없애려면 책을 지우는 게 맞다. */
 function managePurchaseModal(p) {
+  const log = stockLogs.find(l => l.id === p.id);
+  // 시트에서 가져온 입고는 앱 재고를 건드린 적이 없어 권수를 고칠 대상이 없다
+  const qtyOk = !!(log && Number.isFinite(log.delta) && log.delta > 0 && bookById(log.bookId));
   openModal(`
-    <h3>입고 기록 수정</h3>
+    <h3>${p.reg ? '등록 기록 수정' : '입고 기록 수정'}</h3>
     <div class="act-head">
       <div class="ah-when">${fmtDateTime(p.time)}</div>
       <div class="ah-what">${esc(p.title)}${p.qty != null ? ` ×${p.qty}권` : ''}</div>
-      <div class="ah-meta">${p.supplier ? esc(p.supplier) + ' · ' : ''}${
-        p.amount != null ? won(p.amount) : '금액 모름'}</div>
+      <div class="ah-meta">${p.reg ? '신규 등록 (초기 재고)' : (p.supplier ? esc(p.supplier) + ' · ' : '') + (
+        p.amount != null ? won(p.amount) : '금액 모름')}</div>
     </div>
-    <div class="act-list">${
-      actRow('🗑', '기록 삭제', '없던 일로 만듭니다', 'drop', 'danger')}</div>
+    <div class="act-list">${[
+      qtyOk ? actRow('✏️', '수량 고치기', '잘못 친 권수를 바로잡습니다 · 재고도 같이 맞춥니다', 'qty') : '',
+      p.reg ? '' : actRow('🗑', '기록 삭제', '없던 일로 만듭니다', 'drop', 'danger'),
+    ].join('')}</div>
     <div class="modal-actions"><button class="btn ghost" id="mCancel">닫기</button></div>`);
   $('mCancel').onclick = closeModal;
-  modal.querySelector('[data-a=drop]').onclick =
-    () => deletePurchaseModal(p, () => managePurchaseModal(p));
+  const on = (a, fn) => { const el = modal.querySelector(`[data-a="${a}"]`); if (el) el.onclick = fn; };
+  on('qty',  () => editPurchaseQtyModal(p, () => managePurchaseModal(p)));
+  on('drop', () => deletePurchaseModal(p, () => managePurchaseModal(p)));
+}
+
+/* 입고·등록 권수를 고친다. 차이만큼 앱 재고를 움직이고, 원장 기록과 시트 줄을 새 권수로 바꾼다.
+   - 원장 기록(stockLogs)은 보안 규칙이 고쳐 쓰기를 막아서, 옛 기록을 지우고 같은 시각으로 새로 쓴다.
+   - 금액이 있는 입고 줄은 시트에서 지우고 새 권수로 다시 넣는다 — 시트 스크립트가 수량 칸을
+     그 자리에서 못 고치게 막혀 있고(재고 수식이 읽는 칸), 입고금액도 같이 바뀌어야 해서다.
+   - 등록 줄(재고조정)은 차이만큼 재고조정 줄을 하나 더 붙인다. 옛 등록 줄은 기록ID 를 남기지 않아서
+     찾아 지울 수 없지만, 재고조정은 원래 차이를 적는 줄이라 이것으로 시트 현재재고가 맞는다. */
+function editPurchaseQtyModal(p, onBack) {
+  const log = stockLogs.find(l => l.id === p.id);
+  const b = log && bookById(log.bookId);
+  if (!log || !b) { toast('기록을 찾을 수 없습니다.', 'bad'); return; }
+  const old = log.delta;
+  openModal(`
+    <h3>수량 고치기</h3>
+    <p class="desc">${fmtDateTime(p.time)} · ${esc(p.title)}<br>
+      ${p.reg ? '등록할 때 넣은 초기 재고' : '이 입고'}: <b>${old}권</b> · 지금 재고 ${b.stock}권</p>
+    <div class="field"><label>바른 수량 (권)</label>
+      <input id="mQty" inputmode="numeric" value="${old}"></div>
+    <div class="sub" id="mQtyHint" style="margin:-6px 0 12px"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">취소</button>
+      <button class="btn primary" id="mSave">고치기</button>
+    </div>`);
+  $('mCancel').onclick = onBack || closeModal;
+  const read = () => parseInt(digits($('mQty').value), 10);
+  const hint = () => {
+    const n = read(), el = $('mQtyHint');
+    el.textContent = isNaN(n) || n === old ? ''
+      : `재고 ${b.stock}권 → ${b.stock + n - old}권`;
+  };
+  $('mQty').addEventListener('input', hint);
+  $('mSave').onclick = async () => {
+    const n = read();
+    const min = p.reg ? 0 : 1;
+    if (isNaN(n) || n < min) {
+      toast(p.reg ? '수량을 입력하세요.' : '1권 이상 입력하세요. 없던 입고라면 기록 삭제를 쓰세요.', 'bad');
+      return;
+    }
+    if (n === old) { (onBack || closeModal)(); return; }
+    const diff = n - old;
+    if (!isShipping(b) && b.stock + diff < 0) { toast(`그만큼 줄이면 재고가 ${b.stock + diff}권이 됩니다.`, 'bad'); return; }
+
+    $('mSave').disabled = true; $('mSave').textContent = '고치는 중…';
+    const fix = `수량 정정 ${old}→${n}권`;
+    const cost = Number.isFinite(log.cost) ? log.cost : null;
+    // 시트에 다시 넣는 입고 줄은 새 기록ID 로 — 옛 줄 지우기와 섞이지 않게
+    const newKey = p.reg ? null : `stock:${log.bookId}:${log.time}:${Date.now().toString(36)}`;
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(booksCol, b.id), { stock: increment(diff) });
+      batch.delete(doc(logsCol, log.id));
+      batch.set(doc(logsCol), logEntry({
+        bookId: log.bookId, title: log.title, reason: log.reason, time: log.time,
+        before: log.before, after: (log.before || 0) + n,
+        note: [log.note, fix].filter(Boolean).join(' · '),
+        ...(p.reg ? {} : {
+          category: log.category, qty: n, cost,
+          amount: cost != null ? cost * n : null, supplier: log.supplier, sheetKey: newKey,
+        }),
+      }));
+      await batch.commit();
+      if (p.reg) {
+        queueAdjust(b.id, { title: b.title, category: catOf(b), delta: diff, note: '신규 등록 ' + fix });
+      } else {
+        queueSheetDelete(purchaseSheetKey(log));
+        queueForSheet(newKey, 'stock', [stockRecord({
+          title: log.title, category: log.category || catOf(b), qty: n,
+          cost, supplier: log.supplier || '', time: log.time,
+        })]);
+      }
+      closeModal();
+      toast(`${b.title} ${fix} (재고 ${b.stock + diff}권)`, 'good');
+    } catch (e) {
+      console.error('수량 수정 실패', e);
+      $('mSave').disabled = false; $('mSave').textContent = '다시 시도';
+      toast('수정 실패 · 연결 확인', 'bad');
+    }
+  };
+  setTimeout(() => { $('mQty').focus(); $('mQty').select(); }, 60);
 }
 
 /* 이 입고가 시트 원장에서 쓰고 있는 기록ID. 앱에서 넣은 줄은 넣던 시각으로 키를 지었고
@@ -3701,8 +3871,11 @@ function sheetRecords(t) {
       /* 교환 한 건에는 돌려받은 책(음수)과 새로 준 책(양수)이 같이 들어 있어
          거래 종류로 한꺼번에 정할 수 없다. 줄의 부호가 정한다 —
          시트 현재재고가 SUMIFS(입고) − SUMIFS(출고*) 라서 이게 어긋나면 재고가 틀어진다. */
-      구분: isReturn ? '입고'
-          : (String(i.title).includes('택배비') ? '택배비' : (i.qty < 0 ? '입고' : '출고')),
+      /* 택배비도 책과 똑같이 판매는 '출고', 환불·돌려받기는 '입고' 다 (2026-10-21 부터).
+         예전에는 구분을 '택배비' 로 적어서 시트 재고 수식(입고 − 출고*)이 판매를 안 셌다 —
+         시트의 택배비 재고 250장은 입고만 더해진 숫자였다. 앱이 택배비 재고를 세기 시작했으니
+         시트도 같이 줄어야 두 숫자가 맞는다. 택배비모음은 제품명으로 거르니 그대로 잡힌다. */
+      구분: isReturn ? '입고' : (i.qty < 0 ? '입고' : '출고'),
       수량: qty,
       출고단가: unit,
       출고금액: amount,
@@ -4014,8 +4187,8 @@ async function loadSheetCfg() {
   renderSheetBadge();
   pingSheetMirror();     // 시트 쪽에 새 배포를 안 했으면 설정 화면에서 알려준다
   flushSheet();
-  // 큐가 다 빠질 시간을 두고 시트 재고와 한 번 대조한다
-  setTimeout(() => { checkSheetStock(); sendHeartbeat(); }, 20000);
+  // 큐가 다 빠질 시간을 두고 시트 재고와 한 번 대조한다 (택배비 합치기도 시트 재고가 필요해 여기서)
+  setTimeout(() => { mergeShippingBooks(); checkSheetStock(); sendHeartbeat(); }, 20000);
 }
 
 /* 여러 기기(·탭)가 같은 큐를 동시에 보내지 않게 잡는 잠금.
@@ -4158,10 +4331,10 @@ function stockGaps(rows) {
     sheetName.set(bookKey(title, cat), String(r.제품명).trim());
   });
   const missing = [], gaps = [], seen = new Set();
+  // 택배비 상품이 아직 여럿이면(합치기 전) 시트 한 줄에 셋이 겹쳐 비교가 안 된다 — 그때만 뺀다
+  const shipMany = books.filter(isShipping).length > 1;
   books.forEach(b => {
-    // 택배비는 재고 개념이 아니다. 원장에서 구분이 '택배비'라 시트 현재재고 수식이 세지 않으므로
-    // (입고도 출고도 아니다) 앱 재고와 영영 벌어진다 — 맞추려 들면 조정 줄만 계속 쌓인다.
-    if (String(b.title).includes('택배비')) return;
+    if (shipMany && isShipping(b)) return;
     const k = bookKey(b.title, catOf(b));
     seen.add(k);
     if (!bySheet.has(k)) { missing.push(b.title); return; }
@@ -4173,7 +4346,7 @@ function stockGaps(rows) {
   // 시트에만 있고 앱에는 없는 책 — 재고가 0이 아니면 시트 합계를 틀리게 만든다
   const sheetOnly = [];
   bySheet.forEach((v, k) => {
-    if (seen.has(k) || !v || String(sheetName.get(k)).includes('택배비')) return;
+    if (seen.has(k) || !v || (shipMany && String(sheetName.get(k)).includes('택배비'))) return;
     sheetOnly.push({ name: sheetName.get(k), stock: v });
   });
   return { gaps, missing, sheetOnly };
@@ -4578,12 +4751,14 @@ function restockModal(b) {
 }
 
 function editBookModal(b) {
+  // 택배비는 금액을 건마다 적는다 — 판매가 칸을 잠근다
+  const ship = isShipping(b), lock = ship ? ' disabled' : '';
   openModal(`
     <h3>책 정보 수정</h3>
     <div class="field"><label>책 제목</label><input id="mTitle" value="${esc(b.title)}"></div>
     <div class="field"><label>카테고리</label>${catSelect(catOf(b))}</div>
     <div class="field-row">
-      <div class="field"><label>판매가 (원)</label><input id="mPrice" inputmode="numeric" value="${b.price}"></div>
+      <div class="field"><label>판매가 (원)</label><input id="mPrice" inputmode="numeric" value="${b.price}"${lock}></div>
       <div class="field"><label>입고단가 (원 · 선택)</label><input id="mCost" inputmode="numeric" value="${b.cost ?? ''}"></div>
     </div>
     <div class="field-row">
@@ -4605,7 +4780,8 @@ function editBookModal(b) {
     const title = $('mTitle').value.trim();
     const price = parseInt(digits($('mPrice').value), 10);
     const stock = parseInt(digits($('mStock').value), 10);
-    if (!title || !price || isNaN(stock)) { toast('올바르게 입력하세요.', 'bad'); return; }
+    // 이름을 바꿔 택배비가 아니게 되면 판매가가 있어야 한다 (0원 책이 생기지 않게)
+    if (!title || (!price && !isShipping({ title })) || isNaN(stock)) { toast('올바르게 입력하세요.', 'bad'); return; }
     const note = $('mNote').value.trim() || null;
     const cost = parseInt(digits($('mCost').value), 10);
     const safety = parseInt(digits($('mSafety').value), 10);
@@ -5144,6 +5320,7 @@ function buildExchange(t, picks, cartLines, paid, method) {
 function processExchange(t) {
   if (!requireOpen('교환')) { closeModal(); return; }
   if (cart.length === 0) { toast('새로 드릴 책이 없습니다.', 'bad'); closeModal(); return; }
+  if (cart.some(shipUnpriced)) { toast('장바구니의 택배비 금액을 먼저 적어 주세요.', 'bad'); closeModal(); return; }
 
   const picks = [];
   modal.querySelectorAll('.ret-row').forEach(row => {

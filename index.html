@@ -1430,6 +1430,7 @@
           <tbody id="rankBody"></tbody>
         </table>
       </div>
+      <div id="reportSumPad" aria-hidden="true"></div>
     </div>
   </section>
 </main>
@@ -3217,14 +3218,24 @@ function renderReport() {
    스크롤 이벤트로 좌표를 재면 매 프레임 레이아웃을 강제로 계산하게 되는데,
    이 표는 책이 수백 줄이라 그때마다 화면이 끊긴다. 대신 요약 바로 위에 둔
    1px 짜리 표식이 화면 밖으로 나갔는지만 관찰자에게 맡긴다 — 브라우저가 알아서 센다. */
+/* 요약이 줄어들면 판 전체 높이도 그만큼 준다. 목록이 짧아 판 끝 가까이 있을 때는 브라우저가
+   스크롤을 끝에 맞춰 끌어올리고, 그러면 표식이 다시 보여 요약이 펴지고, 펴지면 또 붙고 —
+   가만히 있어도 요약이 커졌다 작아졌다 되풀이했다 (2026-11-04, 재현 페이지에서 4초에 98번).
+   붙는 순간 판 맨 아래에 펴진 요약 높이만큼 빈 자리를 대서 판 높이가 줄지 않게 한다.
+   스크롤 고정점(overflow-anchor)도 판에서 끈다 — 위쪽 요소 크기가 바뀔 때 브라우저가
+   스크롤을 저절로 옮겨 같은 되풀이를 부른다. */
 function watchReportSum() {
-  const mark = $('reportSumTop'), sum = $('reportSum');
+  const mark = $('reportSumTop'), sum = $('reportSum'), pad = $('reportSumPad');
   const panel = sum.closest('.panel');
   if (!mark || !sum || !panel || !window.IntersectionObserver) return;
-  new IntersectionObserver(
-    ([e]) => sum.classList.toggle('stuck', !e.isIntersecting),
-    { root: panel, threshold: 0 },
-  ).observe(mark);
+  panel.style.overflowAnchor = 'none';
+  let full = 0;
+  new IntersectionObserver(([e]) => {
+    const stick = !e.isIntersecting;
+    if (stick && !sum.classList.contains('stuck')) full = sum.offsetHeight;
+    sum.classList.toggle('stuck', stick);
+    if (pad) pad.style.height = stick ? full + 'px' : '0px';
+  }, { root: panel, threshold: 0 }).observe(mark);
 }
 
 /* 일별 매출 막대 — 단일 계열이라 범례 없음, 최고값만 직접 라벨 */

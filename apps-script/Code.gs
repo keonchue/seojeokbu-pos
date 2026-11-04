@@ -62,7 +62,7 @@
 /* 이 파일을 고칠 때마다 이 값을 올린다 (그리고 index.html 의 SHEET_MIRROR_VERSION 도 같이).
    앱이 두 값을 비교해서 '새 배포를 안 했다'를 스스로 알려준다.
    주소창에 /exec 를 그대로 열어봐도 지금 배포된 버전이 보인다. */
-var MIRROR_VERSION = '2026-10-27a';
+var MIRROR_VERSION = '2026-11-03a';
 
 // ── 원본 원장. 앱이 거래를 쓰는 곳은 여기 하나뿐이다 (새 책 줄만 재고관리에도) ──
 var LEDGER_TAB = '입출고기록';
@@ -114,6 +114,15 @@ var TOKEN_KEY = 'MIRROR_TOKEN';
    평소에는 보이지 않고, 손으로 적은 줄은 이 칸이 비어 있어 영향을 받지 않는다.
    화면 탭들의 FILTER 가 A:M 만 읽으므로 주소(M) 오른쪽에 두면 화면에 새지 않는다. */
 var KEY_HEADER = '기록ID';
+
+/* 계좌이체 입금확인 (2026-11-03). 확인 표시는 원장 줄에 붙어 있어야 줄이 밀려도 그 거래를 따라간다 —
+   계좌이체모음은 FILTER 화면이라, 거기 칸에 직접 칠한 굵게·색은 칸에 남고 내용만 밀려 섞였다.
+   그래서 원장에 이 이름의 숨김 열을 두고, 계좌이체모음의 '누르기' 체크박스를 누르면 onEdit 가
+   그 순간의 해당 원장 줄에 표시를 적는다. 계좌이체모음의 ✓·굵게는 그 열을 FILTER 로 따라 읽는다. */
+var CONFIRM_HEADER = '입금확인';
+var TRANSFER_TAB = '계좌이체모음';
+var TRANSFER_PATTERN = /계좌이체/;          // 계좌이체모음!A2 의 REGEXMATCH 조건과 같아야 줄이 맞는다
+var CONFIRM_BUTTON_HEADER = '입금확인 누르기';
 
 /* ===================== 웹앱 진입점 ===================== */
 
@@ -351,6 +360,10 @@ function findHeader(sheet) {
     });
     var keyAt = cells.indexOf(KEY_HEADER);
     if (keyAt !== -1) col.기록ID = keyAt + 1;
+    /* 입금확인 열도 폭에 넣는다 — 새 줄을 적을 때 그 칸을 빈칸으로 덮어서, 지워진 줄 자리에
+       남아 있던 옛 확인 표시가 새 거래에 붙지 않게 한다 */
+    var confirmAt = cells.indexOf(CONFIRM_HEADER);
+    if (confirmAt !== -1) col.입금확인 = confirmAt + 1;
     assertNoMerge(sheet, sheet.getRange(r + 1, 1, 1, lastCol), '머리글 줄(' + (r + 1) + '행)');
     return { row: r + 1, col: col, width: lastCol, cells: cells };
   }
@@ -425,7 +438,10 @@ function ensureKeyColumn(sheet, h) {
   if (h.col.기록ID) return h.col.기록ID;
 
   var want = 1;
-  Object.keys(h.col).forEach(function (k) { want = Math.max(want, h.col[k] + 1); });
+  // 입금확인 열은 기록ID 오른쪽에 있어야 한다 — 그 열을 보고 자리를 정하면 순서가 뒤집힌다
+  Object.keys(h.col).forEach(function (k) {
+    if (k !== '입금확인') want = Math.max(want, h.col[k] + 1);
+  });
   var occupied = h.cells && h.cells[want - 1];
   var c = occupied ? sheet.getLastColumn() + 1 : want;
 
@@ -1075,6 +1091,186 @@ function 설치_확인() {
     out.push('  · ' + name + (a1.indexOf('FILTER') !== -1 ? ' — FILTER 수식 ✓' : ' — A1에 수식 없음 ⚠') +
              (stray ? '\n      ⚠ 앱이 직접 쓴 줄 ' + stray + '개가 남아 있습니다 → 앱줄_원장으로_옮기기 실행' : ''));
   });
+  Logger.log(out.join('\n'));
+}
+
+/* ===================== 계좌이체 입금확인 =====================
+   계좌이체모음의 '입금확인 누르기' 체크박스는 버튼이다. 누르면 그 줄의 거래에 확인 표시를 켜거나
+   끄고, 체크박스는 바로 빈칸으로 돌아간다. 상태(✓ · 굵게)는 옆 '입금확인' 열이 원장을 읽어 보여 준다.
+   체크박스가 상태를 들고 있으면 그것도 칸에 붙어서, 줄이 밀릴 때 옛 굵게처럼 섞이기 때문이다.
+
+   계좌이체모음 n번째 줄 = 원장에서 결제방식에 '계좌이체' 가 든 n번째 줄 (FILTER 와 같은 규칙).
+   그대로 믿지 않고 두 줄의 A~M 값이 똑같은지 확인한 뒤에만 적는다. 다르면 아무것도 안 바꾼다.
+   단순 트리거라 따로 설치할 것이 없다 — 스크립트를 저장하면 바로 동작한다(웹 앱 배포와 무관). */
+function onEdit(e) {
+  var r = e && e.range;
+  if (!r) return;
+  var sh = r.getSheet();
+  if (sh.getName() !== TRANSFER_TAB) return;
+  var lay = transferLayout(sh);
+  if (!lay || r.getColumn() > lay.btnCol || r.getLastColumn() < lay.btnCol) return;
+  if (r.getRow() < 2) return;
+  var ss = sh.getParent();
+  var btn = sh.getRange(r.getRow(), lay.btnCol, r.getNumRows(), 1);
+  if (r.getNumRows() !== 1 || r.getNumColumns() !== 1) {
+    btn.setValue(false);
+    ss.toast('입금확인은 한 줄씩 눌러 주세요.', '입금확인', 5);
+    return;
+  }
+  if (String(e.value).toUpperCase() !== 'TRUE') return;
+
+  // 앱 기록(doPost → withLock)과 같은 스크립트 잠금 — 줄을 지우는 중에 n번째 줄을 세면 엇나간다
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) {
+    btn.setValue(false);
+    ss.toast('앱 기록을 적는 중이라 잠시 뒤에 다시 눌러 주세요.', '입금확인', 5);
+    return;
+  }
+  try {
+    var res = toggleConfirm(ss, sh, r.getRow());
+    btn.setValue(false);
+    SpreadsheetApp.flush();
+    ss.toast((res.on ? '✓ 입금확인 — ' : '입금확인 취소 — ') + res.what, '입금확인', 4);
+  } catch (err) {
+    btn.setValue(false);
+    ss.toast(String(err && err.message || err), '입금확인 못 함', 8);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* 계좌이체모음 머리글에서 상태 열 · 누르기 열을 찾는다 */
+function transferLayout(sh) {
+  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0]
+    .map(function (v) { return String(v).trim(); });
+  var st = head.indexOf(CONFIRM_HEADER), bt = head.indexOf(CONFIRM_BUTTON_HEADER);
+  if (st === -1 || bt === -1) return null;
+  return { statusCol: st + 1, btnCol: bt + 1 };
+}
+
+/* 계좌이체모음 row 줄의 거래를 원장에서 찾아 확인 표시를 뒤집는다 */
+function toggleConfirm(ss, sh, row) {
+  var ledger = sheetByName(ss, LEDGER_TAB);
+  var h = findHeader(ledger);
+  if (!h.col.입금확인) throw new Error('원장에 입금확인 열이 없습니다. 입금확인_설치 를 먼저 실행하세요.');
+  if (!h.col.결제) throw new Error('원장에서 결제방식 열을 못 찾았습니다.');
+  var last = ledger.getLastRow();
+  var pay = ledger.getRange(1, h.col.결제, last, 1).getValues();
+  var want = row - 1, seen = 0, at = 0;              // 2행이 첫 번째 계좌이체 줄
+  for (var i = 0; i < pay.length; i++) {
+    if (TRANSFER_PATTERN.test(String(pay[i][0])) && ++seen === want) { at = i + 1; break; }
+  }
+  if (!at) throw new Error('이 줄에 맞는 원장 줄을 못 찾았습니다. 화면이 아직 갱신 중이면 잠시 뒤 다시 눌러 주세요.');
+
+  /* 두 줄의 A~M 값이 같아야 같은 거래다 (FILTER 가 A:M 을 그대로 옮겨 오므로).
+     날짜 칸은 화면 탭의 서식에 따라 Date 가 아니라 날짜 일련번호로 읽힐 수 있어, 한쪽이라도
+     Date 면 그 칸은 비교에서 뺀다 — 제품명·수량·금액·결제방식·고객명이 같으면 충분하다. */
+  var a = ledger.getRange(at, 1, 1, 13).getValues()[0];
+  var b = sh.getRange(row, 1, 1, 13).getValues()[0];
+  var same = a.every(function (v, i) {
+    var w = b[i];
+    if (v instanceof Date || w instanceof Date) return true;
+    return String(v) === String(w);
+  });
+  if (!same)
+    throw new Error('원장 줄과 내용이 달라 표시하지 않았습니다. 화면이 갱신된 뒤 다시 눌러 주세요.');
+  a = a.map(function (v) { return v instanceof Date ? '' : String(v); });
+
+  var cell = ledger.getRange(at, h.col.입금확인);
+  var cur = cell.getValue();
+  var on = !(cur === true || String(cur).toUpperCase() === 'TRUE');
+  cell.setValue(on ? true : '');
+  var what = [h.col.고객 ? a[h.col.고객 - 1] : '', h.col.제품명 ? a[h.col.제품명 - 1] : '']
+    .filter(function (x) { return x; }).join(' · ');
+  return { on: on, what: what };
+}
+
+/* 한 번만 실행한다 (다시 실행해도 같은 결과). 시트에 손대는 것:
+   1) 원장: 기록ID 오른쪽에 '입금확인' 숨김 열 (값은 TRUE / 빈칸)
+   2) 계좌이체모음: FILTER 결과(A~M) 오른쪽의 보이는 빈 열 둘 —
+        '입금확인'      ✓ 를 보여 주는 수식 (원장 입금확인 열을 같은 조건으로 FILTER)
+        '입금확인 누르기' 체크박스 (버튼)
+   3) 계좌이체모음: ✓ 가 있는 줄을 굵게 하는 조건부 서식
+   계좌이체모음에 손으로 칠해 둔 옛 굵게 · 색은 건드리지 않는다 — 섞여 있어 믿을 수 없으니
+   사람이 지우고, 지난 건은 새로 눌러 표시한다. */
+function 입금확인_설치() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var out = [];
+
+  // 1) 원장
+  var ledger = sheetByName(ss, LEDGER_TAB);
+  var h = findHeader(ledger);
+  ensureKeyColumn(ledger, h);
+  var c = h.col.입금확인;
+  if (!c) {
+    c = 1;
+    Object.keys(h.col).forEach(function (k) { c = Math.max(c, h.col[k] + 1); });
+    if (String(ledger.getRange(h.row, c).getValue()).trim())
+      throw new Error('원장 ' + columnLetter(c) + '열 머리글이 비어 있지 않습니다. 자리를 확인해 주세요.');
+    ledger.getRange(h.row, c).setValue(CONFIRM_HEADER);
+    out.push('원장 ' + columnLetter(c) + '열에 "' + CONFIRM_HEADER + '" 열을 만들었습니다.');
+  } else {
+    out.push('원장 ' + columnLetter(c) + '열 "' + CONFIRM_HEADER + '" 열이 이미 있습니다.');
+  }
+  if (c <= 13) throw new Error('입금확인 열이 A~M 안에 있으면 화면 탭에 섞여 나옵니다. 원장 머리글을 확인해 주세요.');
+  var body = ledger.getRange(h.row + 1, c, ledger.getMaxRows() - h.row, 1);
+  body.clearDataValidations();
+  body.setValues(body.getValues().map(function (r) {   // 체크박스였던 칸의 FALSE 는 빈칸으로
+    return [r[0] === true || String(r[0]).toUpperCase() === 'TRUE' ? true : ''];
+  }));
+  try { ledger.hideColumns(c); } catch (e) {}
+  var ledgerCol = columnLetter(c);
+
+  // 2) 계좌이체모음
+  var sh = sheetByName(ss, TRANSFER_TAB);
+  var a2 = String(sh.getRange(2, 1).getFormula() || '');
+  if (a2.indexOf('FILTER') === -1 || a2.indexOf('계좌이체') === -1)
+    throw new Error(TRANSFER_TAB + '!A2 에 계좌이체 FILTER 수식이 없습니다. 탭 구조를 확인해 주세요.');
+  var lay = transferLayout(sh);
+  var stCol, btCol;
+  if (lay) {
+    stCol = lay.statusCol; btCol = lay.btnCol;
+  } else {
+    var maxCol = sh.getMaxColumns();
+    var head = sh.getRange(1, 1, 1, maxCol).getDisplayValues()[0];
+    var free = function (col) {
+      if (col > maxCol || sh.isColumnHiddenByUser(col)) return false;
+      var name = String(head[col - 1] || '').trim();
+      if (name && name !== CONFIRM_HEADER) return false;
+      return sh.getRange(3, col, Math.max(sh.getMaxRows() - 2, 1), 1).getValues()
+        .every(function (r) { return r[0] === '' || r[0] === null; });
+    };
+    stCol = 14;
+    while (stCol < maxCol && !(free(stCol) && free(stCol + 1))) stCol++;
+    if (!(free(stCol) && free(stCol + 1)))
+      throw new Error(TRANSFER_TAB + ' 의 M열 오른쪽에 보이는 빈 열 두 개가 없습니다. 열을 두 개 더해 주세요.');
+    btCol = stCol + 1;
+  }
+  var cond = "REGEXMATCH('" + LEDGER_TAB + "'!J:J, \"계좌이체\")";
+  sh.getRange(1, stCol).setValue(CONFIRM_HEADER);
+  sh.getRange(2, stCol).setFormula("=IFERROR(ARRAYFORMULA(IF(FILTER('" + LEDGER_TAB + "'!" +
+    ledgerCol + ':' + ledgerCol + ', ' + cond + ')=TRUE, "✓", "")), "")');
+  sh.getRange(1, btCol).setValue(CONFIRM_BUTTON_HEADER);
+  var btn = sh.getRange(2, btCol, sh.getMaxRows() - 1, 1);
+  btn.clearContent();
+  btn.insertCheckboxes();
+  out.push(TRANSFER_TAB + ' ' + columnLetter(stCol) + '열 = ✓ 표시, ' + columnLetter(btCol) + '열 = 누르기 체크박스.');
+
+  // 3) 굵게 규칙 — 같은 수식의 규칙이 이미 있으면 바꿔 끼운다
+  var formula = '=$' + columnLetter(stCol) + '2="✓"';
+  var rules = sh.getConditionalFormatRules().filter(function (rule) {
+    var bc = rule.getBooleanCondition();
+    return !(bc && String(bc.getCriteriaValues()[0]) === formula);
+  });
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(formula)
+    .setBold(true)
+    .setRanges([sh.getRange(2, 1, sh.getMaxRows() - 1, btCol)])
+    .build());
+  sh.setConditionalFormatRules(rules);
+  out.push('✓ 가 있는 줄은 굵게 보입니다.');
+  out.push('', '이제 ' + TRANSFER_TAB + ' 의 "' + CONFIRM_BUTTON_HEADER + '" 체크박스를 누르면 입금확인이 켜지고,',
+           '한 번 더 누르면 꺼집니다. 체크박스는 누른 뒤 바로 빈칸으로 돌아갑니다.');
   Logger.log(out.join('\n'));
 }
 

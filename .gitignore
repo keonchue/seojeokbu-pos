@@ -11,3 +11,7 @@ easypos_*.jpg
 PRODUCT.md
 DESIGN.md
 .impeccable/
+
+# 디자인 미리보기로 만든 파일 (node preview/build.mjs)
+preview/before.html
+preview/after.html

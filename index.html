@@ -63,9 +63,9 @@
     --amber-wash: #fbf0d8;
     --amber-line: #e6cf9a;      /* 앰버 바탕 위에 얹히는 테두리 — 결제대기 줄·칩이 쓴다 */
 
-    --r-sm: 9px;
-    --r-md: 13px;
-    --r-lg: 18px;
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 16px;
     --r-pill: 999px;
 
     /* 그림자는 언제나 아래로 떨어진다 — 빛은 위에 있다 */
@@ -74,7 +74,7 @@
     --sh-3: 0 24px 60px rgba(12,18,28,.32), 0 2px 8px rgba(12,18,28,.18);
 
     --tap: 44px;
-    --pill-h: 38px;
+    --pill-h: 40px;
     --safe-b: env(safe-area-inset-bottom, 0px);
     --bar-h: 68px;              /* 항상 보이는 액션 바 */
 
@@ -85,8 +85,8 @@
     --fs-2xs: 13px;   --tr-2xs: .012em;  --lh-2xs: 1.45;
     --fs-xs: 14px;    --tr-xs: .006em;   --lh-xs: 1.5;
     --fs-sm: 15px;    --tr-sm: 0;        --lh-sm: 1.55;
-    --fs-md: 16px;    --tr-md: -.002em;  --lh-md: 1.5;
-    --fs-lg: 18px;    --tr-lg: -.012em;  --lh-lg: 1.35;
+    --fs-md: 16px;    --tr-md: 0;       --lh-md: 1.5;
+    --fs-lg: 18px;    --tr-lg: 0;       --lh-lg: 1.35;
     --fs-xl: 21px;    --tr-xl: -.018em;  --lh-xl: 1.25;
     --fs-2xl: 27px;   --tr-2xl: -.024em; --lh-2xl: 1.15;
     --fs-3xl: 35px;   --tr-3xl: -.03em;  --lh-3xl: 1.05;
@@ -142,7 +142,7 @@
   }
   .panel-head h2 { letter-spacing: var(--tr-xl); line-height: var(--lh-xl); }
   .modal h3, .book-btn .bp { letter-spacing: var(--tr-lg); line-height: var(--lh-lg); }
-  .stat .val { letter-spacing: var(--tr-2xl); line-height: var(--lh-2xl); }
+  .stat .val { letter-spacing: var(--tr-xl); line-height: var(--lh-xl); }
   .stat.hero .val, .mobile-bar .mb-amt { letter-spacing: var(--tr-3xl); line-height: var(--lh-3xl); }
 
   /* 돈은 자리수가 맞아야 눈으로 훑을 수 있다 */
@@ -234,12 +234,30 @@
     .cat-badge, .pill { color: var(--text); }
   }
 
+  /* ═══════════ 선 아이콘 ═══════════
+     emoji 대신 한 벌(lucide)의 선 아이콘. 크기 16 · 선 1.5 하나로, 색은 옆 글자를 따른다. */
+  .ic {
+    width: 16px; height: 16px; flex: none; display: inline-block; vertical-align: -3px;
+    fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+    margin-right: 8px;
+  }
+  .ic.end { margin: 0 0 0 4px; }
+  /* 아이콘만 든 단추 · gap 으로 띄우는 단추는 아이콘 쪽 여백을 뺀다 */
+  .cart-row .del .ic, .hc-drop .ic, .sheet-close .ic, #settingsBtn .ic,
+  .btn .ic, .icon-btn .ic, .act-ico .ic, .biz-icon .ic { margin: 0; }
+  .tabs button .ic { opacity: .8; }
+  .tabs button.active .ic { opacity: 1; }
+  header .brand .ic { width: 18px; height: 18px; vertical-align: -3px; color: var(--on-ink-dim); }
+  .login-brand .ic { width: 24px; height: 24px; vertical-align: -3px; color: var(--muted); }
+  .biz-card .biz-icon { color: var(--muted); }
+  .biz-card .biz-icon .ic { width: 32px; height: 32px; }
+
   /* ═══════════ Header ═══════════ */
   header {
     background: var(--ink);
     color: var(--on-ink);
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 0 18px; flex-shrink: 0;
+    padding: 0 20px; flex-shrink: 0;
     padding-top: env(safe-area-inset-top, 0px);
     height: calc(54px + env(safe-area-inset-top, 0px));
   }
@@ -249,16 +267,18 @@
     min-width: 0; overflow: hidden; text-overflow: ellipsis;
   }
   header .brand span { color: var(--on-ink-dim); font-weight: 500; font-size: var(--fs-2xs); margin-left: 8px; }
-  header .info { font-size: var(--fs-xs); color: var(--on-ink-dim); display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
+  header .info { font-size: var(--fs-xs); color: var(--on-ink-dim); display: flex; gap: 16px; align-items: center; flex-shrink: 0; }
   header .info > div { white-space: nowrap; }
-  header .info b { color: #fff; font-weight: 600; }
+  header .info b { color: #fff; font-weight: 500; }
   header .clock { font-variant-numeric: tabular-nums; }
 
   /* ═══════════ 개업 / 마감 ═══════════ */
   .biz-chip {
-    border: 1px solid transparent; border-radius: var(--r-pill); padding: 5px 12px;
-    font-size: var(--fs-2xs); font-weight: 600; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid transparent; border-radius: var(--r-pill); padding: 4px 12px;
+    font-size: var(--fs-2xs); font-weight: 500; cursor: pointer; white-space: nowrap;
   }
+  .biz-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
   .biz-chip.on  { background: rgba(84,214,150,.16); border-color: rgba(84,214,150,.42); color: #a7ebc7; }
   .biz-chip.off { background: rgba(255,190,110,.16); border-color: rgba(255,190,110,.45); color: #ffd8a8; }
   #bizScreen {
@@ -266,49 +286,48 @@
     display: none; align-items: center; justify-content: center; padding: 20px;
   }
   .biz-card {
-    background: var(--surface); border-radius: var(--r-lg); padding: 34px 30px; width: 390px; max-width: 100%;
+    background: var(--surface); border-radius: var(--r-lg); padding: 32px 32px; width: 390px; max-width: 100%;
     text-align: center; box-shadow: var(--sh-3);
   }
   .biz-card .biz-icon { font-size: 38px; line-height: 1; }
-  .biz-card h2 { margin: 14px 0 6px; font-size: var(--fs-xl); letter-spacing: var(--tr-xl); }
+  .biz-card h2 { margin: 16px 0 6px; font-size: var(--fs-xl); letter-spacing: var(--tr-xl); }
   .biz-card .biz-sub { color: var(--muted); font-size: var(--fs-xs); margin: 0 0 20px; line-height: 1.65; }
   .biz-card .btn { width: 100%; min-height: 50px; font-size: var(--fs-md); }
   .biz-card .btn + .btn { margin-top: 8px; }
   .biz-last {
     background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-md);
-    padding: 14px 16px; margin-bottom: 20px; font-size: var(--fs-xs); text-align: left; line-height: 1.7;
+    padding: 16px 16px; margin-bottom: 20px; font-size: var(--fs-xs); text-align: left; line-height: 1.7;
   }
-  .biz-last .big { font-size: var(--fs-xl); font-weight: 700; }
-  .close-sum { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; }
+  .biz-last .big { font-size: var(--fs-xl); font-weight: 600; }
+  .close-sum { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 16px; }
   .close-sum .row { display: flex; justify-content: space-between; font-size: var(--fs-sm); }
-  .close-sum .row.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 9px; font-size: var(--fs-lg); font-weight: 700; }
+  .close-sum .row.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; font-size: var(--fs-lg); font-weight: 600; }
   .close-sum .row .dim { color: var(--muted); }
   .icon-btn {
     background: rgba(255,255,255,.10); color: #fff; border: 1px solid rgba(255,255,255,.20);
-    border-radius: var(--r-sm); min-width: 38px; height: 34px; padding: 0 11px;
-    font-size: var(--fs-xs); font-weight: 600; cursor: pointer; display: inline-flex;
-    align-items: center; justify-content: center; gap: 5px;
+    border-radius: var(--r-sm); min-width: 36px; height: 36px; padding: 0 12px;
+    font-size: var(--fs-xs); font-weight: 500; cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; gap: 4px;
   }
   @media (hover: hover) { .icon-btn:hover { background: rgba(255,255,255,.2); } }
 
   .sync {
-    display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: 500;
     background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.18);
-    padding: 5px 11px; border-radius: var(--r-pill); white-space: nowrap; color: #cbd6e6;
+    padding: 4px 12px; border-radius: var(--r-pill); white-space: nowrap; color: #cbd6e6;
     cursor: pointer; user-select: none;
   }
   .sync:focus-visible { outline: 2px solid #ffcb45; outline-offset: 2px; }
   .sync .dot { width: 8px; height: 8px; border-radius: 50%; background: #54d696; flex-shrink: 0; }
   .sync.warn { background: rgba(255,206,90,.15); border-color: rgba(255,206,90,.4); color: #ffe3a3; }
-  .sync.warn .dot { background: #ffce5a; animation: pulse 1.4s ease-in-out infinite; }
+  .sync.warn .dot { background: #ffce5a; }
   .sync.off { background: rgba(255,130,130,.16); border-color: rgba(255,130,130,.42); color: #ffd0d0; }
   .sync.off .dot { background: #ff8282; }
-  @keyframes pulse { 50% { opacity: .3; } }
   /* 시트로 오래 못 간 기록 · 시트와 다른 재고 — 어느 기기에서든 위쪽에 뜬다 */
   .sheet-chip {
-    font-size: var(--fs-2xs); font-weight: 600; white-space: nowrap; cursor: pointer;
+    font-size: var(--fs-2xs); font-weight: 500; white-space: nowrap; cursor: pointer;
     background: rgba(255,206,90,.15); border: 1px solid rgba(255,206,90,.4); color: #ffe3a3;
-    padding: 5px 11px; border-radius: var(--r-pill);
+    padding: 4px 12px; border-radius: var(--r-pill);
   }
 
   /* ═══════════ Login ═══════════ */
@@ -320,26 +339,26 @@
     background: var(--surface); border-radius: var(--r-lg); padding: 36px 32px; width: 360px; max-width: 100%;
     box-shadow: var(--sh-3); display: flex; flex-direction: column;
   }
-  .login-brand { font-size: var(--fs-2xl); font-weight: 600; color: var(--text); text-align: center; letter-spacing: var(--tr-2xl); }
+  .login-brand { font-size: var(--fs-2xl); font-weight: 500; color: var(--text); text-align: center; letter-spacing: var(--tr-2xl); }
   .login-sub { font-size: var(--fs-xs); color: var(--muted); text-align: center; margin: 8px 0 24px; }
   .login-card input {
-    padding: 14px; border: 2px solid var(--line); border-radius: var(--r-sm); font-size: 16px;
+    padding: 16px; border: 2px solid var(--line); border-radius: var(--r-sm); font-size: 16px;
     margin-bottom: 10px; background: var(--surface-2); color: inherit;
   }
   .login-card input:focus { outline: none; border-color: var(--blue); background: #fff; }
   .login-card button {
-    padding: 15px 0; border: none; border-radius: var(--r-sm); background: var(--blue); color: #fff;
-    font-size: var(--fs-md); font-weight: 700; cursor: pointer; margin-top: 6px;
+    padding: 16px 0; border: none; border-radius: var(--r-sm); background: var(--blue); color: #fff;
+    font-size: var(--fs-md); font-weight: 500; cursor: pointer; margin-top: 6px;
     --btn-edge: #0e3287;
   }
   .login-card button:disabled { background: #93a4c6; cursor: progress; }
-  .login-err { color: var(--red); font-size: var(--fs-xs); font-weight: 600; text-align: center; min-height: 18px; margin-top: 12px; }
+  .login-err { color: var(--red); font-size: var(--fs-xs); font-weight: 500; text-align: center; min-height: 18px; margin-top: 12px; }
 
   /* ═══════════ Tabs ═══════════ */
   .tabs { display: flex; background: var(--ink-2); flex-shrink: 0; }
   .tabs button {
     flex: 1; border: none; background: transparent; color: var(--on-ink-dim);
-    font-size: var(--fs-sm); font-weight: 500; padding: 13px 4px; cursor: pointer;
+    font-size: var(--fs-sm); font-weight: 500; padding: 12px 4px; cursor: pointer;
     min-height: var(--tap); white-space: nowrap; position: relative; letter-spacing: var(--tr-sm);
   }
   .tabs button::after {
@@ -376,7 +395,7 @@
   .cart-head {
     display: grid; grid-template-columns: 1fr 84px 108px 44px;
     background: var(--ink-2); color: #fff; font-size: var(--fs-xs); font-weight: 500;
-    padding: 13px 16px; gap: 6px; position: relative; align-items: center;
+    padding: 12px 16px; gap: 6px; position: relative; align-items: center;
   }
   .cart-head span:nth-child(2){ text-align:center; }
   .cart-head span:nth-child(3){ text-align:right; }
@@ -384,59 +403,59 @@
     display: block;
     position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
     background: rgba(255,255,255,.14); border: none; color: #fff; width: 30px; height: 30px;
-    border-radius: 50%; font-size: 15px; font-weight: 600; cursor: pointer;
-  }
+    border-radius: 50%; font-size: 15px; font-weight: 500; cursor: pointer;
+   display: inline-flex; align-items: center; justify-content: center; }
   .cart-items { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
   .cart-empty { flex: 1; }
   .cart-row {
     display: grid; grid-template-columns: 1fr 84px 108px 44px; gap: 6px;
-    align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--line-soft);
+    align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line-soft);
     font-size: var(--fs-sm);
   }
   .cart-row .title { font-weight: 500; line-height: 1.35; }
   .cart-row .qty { display: flex; align-items: center; justify-content: center; gap: 4px; }
   .cart-row .qty button {
     width: 28px; height: 28px; border: 1px solid var(--line); background: var(--gray);
-    border-radius: 7px; cursor: pointer; font-size: 15px; font-weight: 600; line-height: 1; color: var(--text);
+    border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 500; line-height: 1; color: var(--text);
   }
-  .cart-row .qty span { min-width: 20px; text-align: center; font-weight: 600; }
-  .cart-row .amt { text-align: right; font-weight: 600; }
+  .cart-row .qty span { min-width: 20px; text-align: center; font-weight: 500; }
+  .cart-row .amt { text-align: right; font-weight: 500; }
   /* 택배비 줄만 금액을 누를 수 있다 — 크기·무게마다 달라서. 밑줄 점선이 '눌러서 고침' 표시 */
   .cart-row .amt-edit {
-    border: none; background: none; padding: 4px 0; font: inherit; font-weight: 600;
+    border: none; background: none; padding: 4px 0; font: inherit; font-weight: 500;
     color: var(--blue); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px;
   }
   .cart-row .title .ship-note { display: block; font-size: 13px; font-weight: 500; color: var(--muted); }
   .cart-row .del { text-align: center; }
   .cart-row .del button {
     width: 30px; height: 30px; border: none; background: var(--red-wash); color: var(--red);
-    border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;
-  }
+    border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;
+   display: inline-flex; align-items: center; justify-content: center; }
   .cart-empty {
     height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
     padding: 28px 20px; text-align: center; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6;
   }
 
-  .summary { border-top: 1px solid var(--line); padding: 13px 16px; background: var(--surface-2); }
-  .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 2px; font-size: var(--fs-md); }
-  .sum-row.total { font-size: 22px; font-weight: 600; color: var(--text); border-top: 1px solid var(--line); margin-top: 7px; padding-top: 12px; letter-spacing: var(--tr-2xl); }
+  .summary { border-top: 1px solid var(--line); padding: 12px 16px; background: var(--surface-2); }
+  .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 2px; font-size: var(--fs-md); }
+  .sum-row.total { font-size: 22px; font-weight: 600; color: var(--text); border-top: 1px solid var(--line); margin-top: 8px; padding-top: 12px; letter-spacing: var(--tr-2xl); }
   .sum-row .k { color: var(--muted); }
   .sum-row .disc-input { display: flex; align-items: center; gap: 6px; }
-  .sum-row .disc-input input { width: 92px; text-align: right; padding: 8px 10px; border: 2px solid var(--line); border-radius: 8px; font-size: var(--fs-md); font-weight: 600; color: var(--red); background:#fff; }
+  .sum-row .disc-input input { width: 92px; text-align: right; padding: 8px 10px; border: 2px solid var(--line); border-radius: 8px; font-size: var(--fs-md); font-weight: 500; color: var(--red); background:#fff; }
   .sum-row .disc-input input:focus { outline: none; border-color: var(--red); }
   .sum-row .disc-input em { font-style: normal; color: var(--muted); font-size: var(--fs-sm); width: 14px; }
   .disc-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  .disc-toggle button { border: none; background: #fff; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; padding: 8px 12px; cursor: pointer; }
+  .disc-toggle button { border: none; background: #fff; color: var(--muted); font-size: var(--fs-xs); font-weight: 500; padding: 8px 12px; cursor: pointer; }
   .disc-toggle button.on { background: var(--ink-2); color: #fff; }
   .sum-row.disc-calc { padding: 0 2px 4px; margin-top: -4px; min-height: 18px; }
-  .sum-row.disc-calc #discCalc { color: var(--red); font-size: var(--fs-xs); font-weight: 600; }
+  .sum-row.disc-calc #discCalc { color: var(--red); font-size: var(--fs-xs); font-weight: 500; }
 
   .pay-methods { display: flex; gap: 6px; padding: 0 16px 10px; }
   .pay-methods button {
     flex: 1; min-height: var(--tap); border: 2px solid var(--line); background: #fff; padding: 0 4px;
-    border-radius: var(--r-sm); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; color: var(--muted);
+    border-radius: var(--r-sm); font-size: var(--fs-sm); font-weight: 500; cursor: pointer; color: var(--muted);
     white-space: nowrap;
-  }
+   display: inline-flex; align-items: center; justify-content: center; }
   .pay-methods button.sel { border-color: var(--blue); background: var(--blue-wash); color: var(--blue-dark); }
   .pay-methods button[data-method="현금"].sel { border-color: var(--green); background: var(--green-wash); color: var(--green-dark); }
   .pay-methods button[data-method="분할"].sel { border-color: var(--amber); background: var(--amber-wash); color: var(--amber); }
@@ -444,58 +463,58 @@
   .split-pay { padding: 0 16px 10px; }
   .split-pay.hide { display: none; }
   .sp-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 2px; font-size: var(--fs-md); }
-  .sp-row .sp-k { color: var(--muted); font-weight: 600; }
+  .sp-row .sp-k { color: var(--muted); font-weight: 500; }
   .sp-row input {
-    width: 118px; text-align: right; padding: 9px 11px; border: 2px solid var(--line);
-    border-radius: 8px; font-size: 16px; font-weight: 700; color: var(--green-dark); background: #fff;
+    width: 118px; text-align: right; padding: 8px 12px; border: 2px solid var(--line);
+    border-radius: 8px; font-size: 16px; font-weight: 500; color: var(--green-dark); background: #fff;
   }
   .sp-row input:focus { outline: none; border-color: var(--green); }
-  .sp-row em { font-style: normal; color: var(--muted); font-size: var(--fs-sm); margin-left: 5px; }
-  .sp-row .sp-v { font-size: 16px; font-weight: 700; color: var(--blue-dark); }
+  .sp-row em { font-style: normal; color: var(--muted); font-size: var(--fs-sm); margin-left: 4px; }
+  .sp-row .sp-v { font-size: 16px; font-weight: 500; color: var(--blue-dark); }
   .sp-row .sp-v.bad { color: var(--red); }
   .sp-hint { font-size: var(--fs-2xs); color: var(--muted); padding: 2px 2px 0; }
-  .sp-hint.bad { color: var(--red); font-weight: 600; }
-  .sp-row.total { border-top: 1px solid var(--line); margin-top: 5px; padding-top: 9px; }
+  .sp-hint.bad { color: var(--red); font-weight: 500; }
+  .sp-row.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; }
   #mRefundCash, #mRefundTr { width: 130px; }
   #mRefundTr { color: var(--blue-dark); }
   #mRefundTr:focus { border-color: var(--blue); }
 
   .customer { padding: 0 16px 10px; }
   .customer.hide { display: none; }
-  .customer label { font-size: var(--fs-2xs); color: var(--muted); display:block; margin-bottom:5px; font-weight: 500; }
+  .customer label { font-size: var(--fs-2xs); color: var(--muted); display:block; margin-bottom:4px; font-weight: 500; }
   .customer input {
-    width: 100%; padding: 11px 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
-    font-size: 16px; font-weight: 600; background: #fff; color: inherit;
+    width: 100%; padding: 12px 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
+    font-size: 16px; font-weight: 500; background: #fff; color: inherit;
   }
   .customer input:focus { outline: none; border-color: var(--blue); }
   .customer label + input + label, .contact-extra label { margin-top: 8px; }
   .more-toggle {
     margin-top: 8px; background: none; border: none; padding: 0; cursor: pointer;
-    font-size: var(--fs-2xs); font-weight: 600; color: var(--blue);
+    font-size: var(--fs-2xs); font-weight: 500; color: var(--blue);
   }
   .contact-extra.hide { display: none; }
 
   /* 버튼 셋이 한 줄에 선다 — 너비는 글자가 정한다. 30% 씩 나눠 주면 폰 세로에서
      '결제 완료' 가 먼저 좁아진다. 주 동작이 남는 자리를 다 갖고, 나머지는 제 글자만큼만. */
-  .pay-actions { display: flex; gap: 7px; padding: 0 16px 16px; }
+  .pay-actions { display: flex; gap: 8px; padding: 0 16px 16px; }
   .pay-actions .clear {
-    flex: 0 0 auto; padding: 0 14px; min-height: 52px; border: none; border-radius: var(--r-sm);
+    flex: 0 0 auto; padding: 0 16px; min-height: 52px; border: none; border-radius: var(--r-sm);
     background: var(--gray);
-    color: var(--ink-3); font-size: var(--fs-md); font-weight: 600; cursor: pointer;
+    color: var(--ink-3); font-size: var(--fs-md); font-weight: 500; cursor: pointer;
     --btn-edge: #d5d0c5;
   }
   /* 대기는 앰버다 — 이 앱에서 앰버는 이미 '아직 안 끝난 것'(분할결제·재고 부족)을 뜻한다.
      초록(결제 완료)도 빨강(비우기·반품)도 건드리지 않는다. */
   .pay-actions .hold {
-    flex: 0 0 auto; padding: 0 14px; min-height: 52px; border: 1px solid var(--amber-line);
+    flex: 0 0 auto; padding: 0 16px; min-height: 52px; border: 1px solid var(--amber-line);
     border-radius: var(--r-sm); background: var(--amber-wash);
-    color: var(--amber); font-size: var(--fs-md); font-weight: 600; cursor: pointer;
+    color: var(--amber); font-size: var(--fs-md); font-weight: 500; cursor: pointer;
     --btn-edge: #e0c68d;
   }
   .pay-actions .hold:disabled { opacity: .42; cursor: not-allowed; box-shadow: none; --btn-edge: transparent; }
   .pay-actions .checkout {
     flex: 1; min-height: 52px; border: none; border-radius: var(--r-sm); background: var(--green);
-    color: #fff; font-size: var(--fs-lg); font-weight: 600; cursor: pointer; letter-spacing: var(--tr-lg);
+    color: #fff; font-size: var(--fs-lg); font-weight: 500; cursor: pointer; letter-spacing: var(--tr-lg);
     --btn-edge: #08472c;
   }
   .pay-actions .checkout:disabled { background: #b9bfc4; cursor: not-allowed; box-shadow: none; --btn-edge: transparent; }
@@ -506,21 +525,21 @@
   .customer.free input { border-color: var(--amber-line); background: var(--amber-wash); }
 
   /* ═══════════ 상품 그리드 ═══════════ */
-  .product-pane { flex: 1; padding: 18px; overflow-y: auto; -webkit-overflow-scrolling: touch;
-                  padding-bottom: calc(var(--bar-h) + var(--safe-b) + 18px); }
+  .product-pane { flex: 1; padding: 20px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+                  padding-bottom: calc(var(--bar-h) + var(--safe-b) + 20px); }
   /* 장바구니가 왼쪽에 서 있는 동안은 화면 전체가 그만큼 비켜 준다 — 책이 가려지지 않게.
      여백은 일부러 애니메이션하지 않는다: 책이 212종이라 padding 을 굴리면 그리드가
      매 프레임 다시 계산돼 판이 미끄러지는 동안 화면이 끊긴다. 판만 움직이고 자리는 즉시 잡는다. */
   @media (min-width: 900px) {
     body.cart-open main { padding-left: 400px; }
-    body.cart-open .mobile-bar { padding-left: calc(400px + 18px); }
+    body.cart-open .mobile-bar { padding-left: calc(400px + 20px); }
   }
-  .product-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
-  .product-head h3 { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
+  .product-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+  .product-head h3 { font-size: var(--fs-sm); color: var(--muted); font-weight: 500; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(208px, 1fr)); gap: 12px; }
   .book-btn {
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
-    padding: 16px 15px; cursor: pointer; text-align: left; position: relative;
+    padding: 16px 16px; cursor: pointer; text-align: left; position: relative;
     box-shadow: var(--sh-1);
     display: flex; flex-direction: column; gap: 8px; min-height: 116px; color: inherit;
   }
@@ -530,17 +549,17 @@
   .book-btn:active:not(.out) { box-shadow: none; border-color: var(--blue); }
   .book-btn.out { opacity: .45; cursor: not-allowed; }
   .book-btn .bt {
-    font-size: var(--fs-md); font-weight: 600; line-height: 1.35;
+    font-size: var(--fs-md); font-weight: 500; line-height: 1.35;
     min-height: calc(2 * 1.35em);
   }
   /* 배지 자리는 첫 줄에서만 비운다. 제목 전체를 밀어내면 좁은 카드에서 글자 폭이 절반으로
      줄어 '42HB 단본 / 성경 (인디고 / 블루)' 처럼 잘게 쪼개진다. 제목은 절대 자르지 않는다. */
   .book-btn .bt::before { content: ''; float: right; width: 62px; height: 1.35em; }
-  .book-btn .bp { font-size: var(--fs-lg); font-weight: 600; color: var(--text); margin-top: auto; padding-top: 10px; }
+  .book-btn .bp { font-size: var(--fs-lg); font-weight: 500; color: var(--text); margin-top: auto; padding-top: 10px; }
   /* 재고도 칩을 씌우지 않는다. 카드마다 회색 알약이 하나씩 떠 있으면 그게 먼저 보인다.
      숫자만 두고 상태는 색으로 말한다 — 평소엔 흐리게, 모자라면 앰버, 품절이면 빨강. */
   .book-btn .bs {
-    position: absolute; top: 14px; right: 15px; font-size: var(--fs-2xs); font-weight: 600;
+    position: absolute; top: 14px; right: 15px; font-size: var(--fs-2xs); font-weight: 500;
     color: var(--muted); white-space: nowrap; background: none; padding: 0; border-radius: 0;
     font-variant-numeric: tabular-nums; text-align: right; line-height: 1.35;
   }
@@ -556,11 +575,11 @@
   .holds-bar {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     background: var(--amber-wash); border: 1px solid var(--amber-line);
-    border-radius: var(--r-md); padding: 9px 11px; margin-bottom: 14px;
+    border-radius: var(--r-md); padding: 8px 12px; margin-bottom: 16px;
   }
   .holds-bar.hide { display: none; }
   .holds-lbl {
-    flex: none; font-size: var(--fs-2xs); font-weight: 600; color: var(--amber); letter-spacing: .04em;
+    flex: none; font-size: var(--fs-2xs); font-weight: 500; color: var(--amber);
   }
   .hold-chip {
     display: inline-flex; align-items: center; background: #fff;
@@ -568,18 +587,18 @@
     box-shadow: var(--sh-1); overflow: hidden;
   }
   .hold-chip .hc-open {
-    display: inline-flex; align-items: center; gap: 9px; border: none; background: none;
-    cursor: pointer; color: inherit; padding: 0 5px 0 14px;
+    display: inline-flex; align-items: center; gap: 8px; border: none; background: none;
+    cursor: pointer; color: inherit; padding: 0 4px 0 16px;
     min-height: var(--pill-h); font-size: var(--fs-2xs);
   }
-  .hold-chip .hc-open b { font-weight: 600; }
+  .hold-chip .hc-open b { font-weight: 500; }
   .hold-chip .hc-qty { color: var(--muted); font-variant-numeric: tabular-nums; }
-  .hold-chip .hc-amt { font-weight: 600; font-variant-numeric: tabular-nums; }
-  .hold-chip.compact .hc-open { padding: 0 3px 0 13px; }
+  .hold-chip .hc-amt { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .hold-chip.compact .hc-open { padding: 0 4px 0 12px; }
   .hold-chip .hc-drop {
     border: none; background: none; cursor: pointer; color: var(--muted);
-    width: 32px; min-height: var(--pill-h); font-size: 13px; font-weight: 600;
-  }
+    width: 32px; min-height: var(--pill-h); font-size: 13px; font-weight: 500;
+   display: inline-flex; align-items: center; justify-content: center; }
   /* 칩은 알약 하나로 읽혀야 한다 — 안쪽 버튼만 2px 내려앉으면 껍질이 남아 어긋나 보인다.
      그래서 누름은 자리 이동이 아니라 바탕색으로 말한다. */
   .hold-chip .hc-open:active { transform: none; background: var(--amber-wash); }
@@ -591,9 +610,9 @@
   /* 마감 창에서 남은 대기를 알리는 상자 — 빨강(되돌릴 수 없음)이 아니라 앰버(안 끝남)다 */
   .hold-warn {
     background: var(--amber-wash); border: 1px solid var(--amber-line); border-radius: var(--r-sm);
-    padding: 13px 15px; font-size: var(--fs-xs); color: #6d4a06; line-height: 1.65; margin-bottom: 15px;
+    padding: 12px 16px; font-size: var(--fs-xs); color: #6d4a06; line-height: 1.65; margin-bottom: 16px;
   }
-  .hold-warn ul { margin: 8px 0 0 17px; }
+  .hold-warn ul { margin: 8px 0 0 16px; }
   .hold-warn li { font-variant-numeric: tabular-nums; }
 
   /* ═══════════ 교환 — 차액 ═══════════
@@ -601,18 +620,18 @@
      그래서 목록보다 크게, 부호가 아니라 말로 적는다. */
   .ex-diff {
     border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2);
-    padding: 14px 16px; margin: 14px 0;
+    padding: 16px 16px; margin: 16px 0;
   }
   .ex-diff .ex-row {
     display: flex; justify-content: space-between; align-items: center;
-    font-size: var(--fs-xs); color: var(--muted); padding: 3px 0;
+    font-size: var(--fs-xs); color: var(--muted); padding: 4px 0;
   }
   .ex-diff .ex-row b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 500; }
   .ex-diff .ex-total {
     display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
-    border-top: 1px solid var(--line); margin-top: 8px; padding-top: 11px;
+    border-top: 1px solid var(--line); margin-top: 8px; padding-top: 12px;
   }
-  .ex-diff .ex-total .k { font-size: var(--fs-sm); font-weight: 600; }
+  .ex-diff .ex-total .k { font-size: var(--fs-sm); font-weight: 500; }
   .ex-diff .ex-total .v {
     font-size: var(--fs-2xl); font-weight: 600; letter-spacing: var(--tr-2xl);
     font-variant-numeric: tabular-nums;
@@ -621,7 +640,7 @@
   .ex-diff.give  .ex-total .k, .ex-diff.give  .ex-total .v { color: var(--red); }
   .ex-diff.even  .ex-total .v { color: var(--muted); }
   .ex-cart { font-size: var(--fs-xs); line-height: 1.6; }
-  .ex-cart b { font-weight: 600; }
+  .ex-cart b { font-weight: 500; }
 
   /* ═══════════ 항상 보이는 액션 바 ═══════════
      어느 화면에서든 바닥에 '지금 할 일'이 고정돼 있다. 폰 세로에서는 이게 엄지 자리다. */
@@ -634,7 +653,7 @@
     -webkit-backdrop-filter: blur(18px) saturate(170%);
     color: var(--on-ink);
     box-shadow: 0 -1px 0 rgba(255,255,255,.10) inset, 0 -12px 28px rgba(12,20,40,.14);
-    padding: 0 18px; gap: 14px; align-items: center;
+    padding: 0 20px; gap: 16px; align-items: center;
     height: calc(var(--bar-h) + var(--safe-b));
     padding-bottom: var(--safe-b);
   }
@@ -643,9 +662,9 @@
   .mobile-bar .mb-amt { font-size: 26px; font-weight: 600; color: #fff; }
   .mobile-bar .mb-open {
     border: none; background: var(--green); color: #fff; border-radius: var(--r-sm);
-    min-height: 48px; padding: 0 24px; font-size: var(--fs-md); font-weight: 700; cursor: pointer;
+    min-height: 48px; padding: 0 24px; font-size: var(--fs-md); font-weight: 500; cursor: pointer;
     --btn-edge: #08472c;
-  }
+   display: inline-flex; align-items: center; }
   .mobile-bar .mb-open:disabled { background: #3a4353; color: #8b95a6; box-shadow: none; --btn-edge: transparent; cursor: not-allowed; }
 
   .sheet-backdrop {
@@ -655,14 +674,14 @@
   .sheet-backdrop.show { opacity: 1; pointer-events: auto; }
 
   /* ═══════════ 패널 공통 ═══════════ */
-  .panel { flex: 1; padding: 22px; overflow-y: auto; width: 100%; -webkit-overflow-scrolling: touch;
-           padding-bottom: calc(var(--bar-h) + var(--safe-b) + 22px); }
-  .panel-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+  .panel { flex: 1; padding: 24px; overflow-y: auto; width: 100%; -webkit-overflow-scrolling: touch;
+           padding-bottom: calc(var(--bar-h) + var(--safe-b) + 24px); }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
   .panel-head h2 { font-size: var(--fs-xl); }
   .panel-head .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .btn {
     padding: 0 16px; min-height: 40px; border: none; border-radius: var(--r-sm); font-size: var(--fs-sm);
-    font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   }
   .btn.primary { background: var(--blue); color: #fff; --btn-edge: #0e3287; }
   .btn.green { background: var(--green); color: #fff; --btn-edge: #08472c; }
@@ -675,42 +694,42 @@
 
   /* ═══════════ 검색 / 필터 ═══════════ */
   .search {
-    height: 40px; padding: 0 13px; border: 1px solid var(--line); border-radius: var(--r-sm);
-    font-size: var(--fs-sm); background: #fff; color: inherit; min-width: 0;
+    height: 40px; padding: 0 12px 0 36px; border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-size: var(--fs-sm); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236a7385' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") no-repeat 12px center / 16px; color: inherit; min-width: 0;
   }
   .search:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-wash); }
   .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
   .filters .search { flex: 1 1 240px; }
   .filters input[type=date], .filters select {
-    height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--r-sm);
+    height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-sm);
     font-size: var(--fs-xs); background: #fff; color: inherit;
   }
   .filters .sep { color: var(--muted); font-size: var(--fs-xs); }
   .filters .chk {
-    display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 13px;
+    display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px;
     border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff;
-    font-size: var(--fs-xs); font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap;
+    font-size: var(--fs-xs); font-weight: 500; color: var(--muted); cursor: pointer; white-space: nowrap;
   }
   .filters .chk input { width: 15px; height: 15px; accent-color: var(--blue); cursor: pointer; }
-  .filters .count { font-size: var(--fs-xs); color: var(--muted); font-weight: 600; margin-left: auto; white-space: nowrap; }
+  .filters .count { font-size: var(--fs-xs); color: var(--muted); font-weight: 500; margin-left: auto; white-space: nowrap; }
   .filters .count b { color: var(--text); }
   .filters.on .search { border-color: var(--blue); }
 
   /* ═══════════ 분류 칩 ═══════════ */
-  .cats { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .cats { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
   .cats button {
-    padding: 0 15px; min-height: var(--pill-h); border: 1px solid var(--line); background: #fff;
-    border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 600; cursor: pointer; color: var(--muted);
+    padding: 0 16px; min-height: var(--pill-h); border: 1px solid var(--line); background: #fff;
+    border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 500; cursor: pointer; color: var(--muted);
   }
   .cats button.on { background: var(--ink-2); border-color: var(--ink-2); color: #fff; }
-  .cats button .n { font-weight: 500; opacity: .65; margin-left: 5px; font-size: var(--fs-2xs); }
+  .cats button .n { font-weight: 500; opacity: .65; margin-left: 4px; font-size: var(--fs-2xs); }
   /* 분류는 알약에 담지 않는다. 색 채운 둥근 칩은 어느 UI 키트에나 있는 얼굴이고,
      제목 옆에 붙으면 제목보다 먼저 눈에 든다. 장부의 방주(傍註)처럼
      앞에 색 눈금 하나 세우고 글자만 남긴다 — 조용하지만 색으로 바로 갈린다. */
   .cat-badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: var(--fs-2xs); font-weight: 600; color: var(--muted);
-    margin-right: 9px; vertical-align: middle; letter-spacing: .01em;
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: var(--fs-2xs); font-weight: 500; color: var(--muted);
+    margin-right: 8px; vertical-align: middle; letter-spacing: .01em;
     background: none; padding: 0; border-radius: 0;
   }
   .cat-badge::before {
@@ -738,26 +757,26 @@
      붙어 있는 기성품 얼굴이라, 이 앱이 무엇인지 하나도 말해 주지 않는다.
      대신 장부의 숫자 단처럼 종이 위에 세로 괘선으로만 갈라 놓는다. */
   .cards {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(158px,1fr));
-    gap: 0; margin-bottom: 22px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(176px,1fr));
+    gap: 0; margin-bottom: 24px;
     border-top: 2px solid var(--ink); border-bottom: 1px solid var(--line);
   }
-  .stat { padding: 14px 18px 15px; border-left: 1px solid var(--line-soft); background: transparent; }
+  .stat { padding: 16px 20px 16px; border-left: 1px solid var(--line-soft); background: transparent; }
   .stat:first-child { border-left: none; padding-left: 0; }
   .stat .lbl {
-    font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 7px; font-weight: 500;
+    font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 8px; font-weight: 500;
     letter-spacing: .02em;
   }
-  .stat .val { font-size: var(--fs-2xl); font-weight: 600; color: var(--text); }
+  .stat .val { font-size: var(--fs-xl); font-weight: 500; color: var(--text); white-space: nowrap; }
   .stat .val.green { color: var(--green-dark); }
   .stat .val.red { color: var(--red); }
   .stat .val.muted { color: var(--muted); }
   .stat .sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 6px; line-height: 1.45; }
-  .stat .sub .warn-text { color: var(--amber); font-weight: 600; }
+  .stat .sub .warn-text { color: var(--amber); font-weight: 500; }
   /* 대표 숫자는 글자가 큰 만큼 자리도 두 칸을 쓴다 — 안 그러면 '1,842,000 / 원' 으로 갈라진다 */
   .stat.hero { grid-column: span 2; }
-  .stat.hero .val { font-size: var(--fs-3xl); font-weight: 600; }
-  .stat.hero .lbl { color: var(--ink-3); font-weight: 600; }
+  .stat.hero .val { font-size: var(--fs-3xl); font-weight: 600; white-space: nowrap; }
+  .stat.hero .lbl { color: var(--ink-3); font-weight: 500; }
 
   /* ═══════════ 리포트 요약 — 내려가도 따라온다 ═══════════
      책별 순수익을 훑으러 아래로 내려가면 '무슨 기간, 얼마'가 화면에서 사라진다.
@@ -766,7 +785,7 @@
      줄어드는 건 '접힌다'가 아니라 '멀어진다' — 글자만 작아지고 자리는 그대로다. */
   .sticky-sum {
     position: sticky; top: 0; z-index: 40;
-    background: var(--bg); margin-bottom: 22px;
+    background: var(--bg); margin-bottom: 24px;
     transition: box-shadow var(--settle), border-bottom-color var(--settle);
   }
   .sticky-sum .stat { transition: padding var(--settle); }
@@ -787,8 +806,8 @@
   }
   /* 줄어드는 폭은 일부러 작게 잡았다. 26 → 17 처럼 크게 줄이면 눈이 '글자가 바뀌었다'로 읽는다.
      한 걸음만 물러나야 '멀어졌다'로 읽힌다 — 아낀 높이는 그래도 28px 남짓이다. */
-  .sticky-sum.stuck .stat { padding-top: 9px; padding-bottom: 10px; }
-  .sticky-sum.stuck .stat .lbl { font-size: 12px; margin-bottom: 3px; }
+  .sticky-sum.stuck .stat { padding-top: 8px; padding-bottom: 10px; }
+  .sticky-sum.stuck .stat .lbl { font-size: 12px; margin-bottom: 4px; }
   .sticky-sum.stuck .stat .val { font-size: 19px; }
   .sticky-sum.stuck .stat.hero .val { font-size: 24px; }
   .sticky-sum.stuck .stat .sub { max-height: 0; margin-top: 0; opacity: 0; }
@@ -796,7 +815,7 @@
   .rank-head { margin-bottom: 12px; }
   .rank-head h3 { font-size: var(--fs-lg); letter-spacing: var(--tr-lg); }
   .rank-sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 4px; line-height: 1.55; }
-  .rank-sub .warn-text { color: var(--amber); font-weight: 600; }
+  .rank-sub .warn-text { color: var(--amber); font-weight: 500; }
   td .pos { color: var(--green-dark); }
   td .neg { color: var(--red); }
 
@@ -804,32 +823,32 @@
   .table-wrap { overflow-x: auto; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); box-shadow: var(--sh-1); }
   table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
   thead th {
-    background: var(--surface-2); color: var(--muted); font-size: var(--fs-2xs); font-weight: 600;
-    text-align: left; padding: 11px 14px; white-space: nowrap; border-bottom: 1px solid var(--line);
+    background: var(--surface-2); color: var(--muted); font-size: var(--fs-2xs); font-weight: 500;
+    text-align: left; padding: 12px 16px; white-space: nowrap; border-bottom: 1px solid var(--line);
     position: sticky; top: 0; z-index: 2;
   }
   th.num, td.num { text-align: right; }
   th.center, td.center { text-align: center; }
-  tbody td { padding: 12px 14px; border-top: 1px solid var(--line-soft); white-space: nowrap; vertical-align: middle; }
+  tbody td { padding: 12px 16px; border-top: 1px solid var(--line-soft); white-space: nowrap; vertical-align: middle; }
   tbody tr:first-child td { border-top: none; }
   tbody td.cell-main { white-space: normal; line-height: 1.45; }
   @media (hover: hover) { tbody tr:hover td { background: var(--surface-2); } }
   .mini-btn {
-    height: 30px; padding: 0 11px; border: 1px solid var(--line); background: #fff; border-radius: 8px;
-    font-size: var(--fs-2xs); font-weight: 600; cursor: pointer; color: var(--text);
+    height: 30px; padding: 0 12px; border: 1px solid var(--line); background: #fff; border-radius: 8px;
+    font-size: var(--fs-2xs); font-weight: 500; cursor: pointer; color: var(--text);
     display: inline-flex; align-items: center; justify-content: center;
   }
-  .mini-btn + .mini-btn { margin-left: 5px; }
+  .mini-btn + .mini-btn { margin-left: 4px; }
   .mini-btn.plus { color: var(--green-dark); border-color:#b6ddc6; }
   .mini-btn.del { color: var(--red); border-color: #eec4c0; }
-  .empty-row td { text-align:center; color: var(--muted); padding: 38px 20px; white-space: normal; line-height: 1.6; }
+  .empty-row td { text-align:center; color: var(--muted); padding: 40px 20px; white-space: normal; line-height: 1.6; }
   .more-wrap { text-align: center; margin-top: 16px; }
   tr.row-return > td { background: #fdf4f3; }
   .dim { color: var(--muted); opacity: .65; }
 
   /* 표식은 밑줄 한 겹으로. 채운 알약을 줄마다 깔면 표가 사탕 상자가 된다. */
   .pill {
-    display:inline-block; padding: 2px 1px 3px; font-size: var(--fs-2xs); font-weight: 600;
+    display:inline-block; padding: 2px 1px 4px; font-size: var(--fs-2xs); font-weight: 500;
     white-space: nowrap; border-bottom: 2px solid currentColor; border-radius: 0;
   }
   .pill.cash { color: var(--green-dark); }
@@ -842,7 +861,7 @@
   .pill.in  { color: var(--amber); }
   /* 매입 필요 — 알약을 밑에 달면 줄이 두 칸이 된다. 숫자 자체를 빨강으로 (2026-11-03) */
   .stock-low { color: var(--red); }
-  .pay-lines { display: flex; flex-direction: column; gap: 3px; }
+  .pay-lines { display: flex; flex-direction: column; gap: 4px; }
   .pay-lines .pill { text-align: center; }
 
   /* 절판 — 시트의 회색 칠한 줄과 같은 뜻이다. 지우는 게 아니라 물러나 있는 것이라
@@ -853,21 +872,21 @@
   .dead-tag { margin-left: 8px; vertical-align: middle; }
 
   /* ═══════════ 리포트 ═══════════ */
-  .period { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+  .period { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
   .period button {
-    padding: 0 15px; min-height: var(--pill-h); border: 1px solid var(--line); background: #fff;
-    border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 600; cursor: pointer; color: var(--muted);
+    padding: 0 16px; min-height: var(--pill-h); border: 1px solid var(--line); background: #fff;
+    border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 500; cursor: pointer; color: var(--muted);
   }
   .period button.on { background: var(--ink-2); border-color: var(--ink-2); color: #fff; }
   .period .custom { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
   .period .custom input {
-    padding: 8px 11px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-xs); background: #fff; color: inherit;
+    padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-xs); background: #fff; color: inherit;
   }
   .period .custom span { color: var(--muted); font-size: var(--fs-xs); }
 
   .chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 20px; box-shadow: var(--sh-1); margin-bottom: 20px; }
-  .chart-title { font-size: var(--fs-sm); font-weight: 600; margin-bottom: 3px; }
-  .chart-sub { font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 18px; }
+  .chart-title { font-size: var(--fs-sm); font-weight: 500; margin-bottom: 4px; }
+  .chart-sub { font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 20px; }
   .chart { position: relative; }
   .chart-plot {
     display: flex; align-items: flex-end; gap: 2px; height: 170px;
@@ -882,14 +901,14 @@
   @media (hover: hover) { .chart-col:hover .bar { background: var(--blue-dark); } }
   .chart-col .peak-label {
     position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 6px;
-    font-size: 12px; font-weight: 600; color: var(--blue-dark); white-space: nowrap;
+    font-size: 12px; font-weight: 500; color: var(--blue-dark); white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
   .chart-x { display: flex; gap: 2px; margin-top: 8px; }
   .chart-x span { flex: 1; min-width: 0; text-align: center; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; }
   .chart-tip {
     position: absolute; pointer-events: none; opacity: 0; transition: opacity .12s;
-    background: var(--ink); color: #fff; font-size: var(--fs-2xs); font-weight: 600;
+    background: var(--ink); color: #fff; font-size: var(--fs-2xs); font-weight: 500;
     padding: 8px 12px; border-radius: 8px; white-space: nowrap; z-index: 5; transform: translate(-50%, -100%);
     box-shadow: var(--sh-2); font-variant-numeric: tabular-nums;
   }
@@ -909,10 +928,10 @@
     max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px; box-shadow: var(--sh-3);
   }
   .modal.wide { width: 640px; }
-  .modal h3 { font-size: var(--fs-lg); margin-bottom: 15px; }
-  .modal p.desc { font-size: var(--fs-xs); color: var(--muted); margin-bottom: 15px; line-height: 1.65; }
-  .field { margin-bottom: 14px; }
-  .field label { display:block; font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+  .modal h3 { font-size: var(--fs-lg); margin-bottom: 16px; }
+  .modal p.desc { font-size: var(--fs-xs); color: var(--muted); margin-bottom: 16px; line-height: 1.65; }
+  .field { margin-bottom: 16px; }
+  .field label { display:block; font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 6px; font-weight: 500; }
   .field input {
     width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm); font-size: 16px;
     background: #fff; color: inherit;
@@ -920,7 +939,7 @@
   .field input:focus, .field select:focus { outline: none; border-color: var(--blue); }
   .field select {
     width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
-    font-size: 16px; background: #fff; color: inherit; font-weight: 600;
+    font-size: 16px; background: #fff; color: inherit; font-weight: 500;
   }
   .field textarea {
     width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: var(--r-sm);
@@ -929,56 +948,57 @@
   }
   .field textarea:focus { outline: none; border-color: var(--blue); }
   .chkline {
-    display: flex; align-items: center; gap: 9px; padding: 8px 0;
-    font-size: var(--fs-xs); font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; padding: 8px 0;
+    font-size: var(--fs-xs); font-weight: 500; cursor: pointer;
   }
   .chkline input { width: 17px; height: 17px; accent-color: var(--blue); cursor: pointer; flex-shrink: 0; }
   .field-row { display: flex; gap: 10px; }
   .field-row .field { flex: 1; min-width: 0; }
   .modal-actions { display:flex; gap: 8px; margin-top: 10px; }
   .modal-actions .btn { flex: 1; min-height: 48px; font-size: var(--fs-md); }
-  .warn-box { background: var(--red-wash); border: 1px solid #eec4c0; border-radius: var(--r-sm); padding: 13px 15px; font-size: var(--fs-xs); color: #8c2921; line-height: 1.65; margin-bottom: 15px; }
-  .info-box { background: var(--blue-wash); border: 1px solid #c9dcf5; border-radius: var(--r-sm); padding: 13px 15px; font-size: var(--fs-xs); color: var(--blue-dark); line-height: 1.65; margin-bottom: 15px; }
+  .warn-box { background: var(--red-wash); border: 1px solid #eec4c0; border-radius: var(--r-sm); padding: 12px 16px; font-size: var(--fs-xs); color: #8c2921; line-height: 1.65; margin-bottom: 16px; }
+  .info-box { background: var(--blue-wash); border: 1px solid #c9dcf5; border-radius: var(--r-sm); padding: 12px 16px; font-size: var(--fs-xs); color: var(--blue-dark); line-height: 1.65; margin-bottom: 16px; }
   /* 기록 수정 레이어 — 좁은 관리 칸에 단추를 늘어놓는 대신 한 겹 안으로 들인다.
      줄 하나가 곧 할 일 하나고, 되돌릴 수 없는 일(삭제)만 맨 아래에서 붉게 선다. */
-  .act-head { padding: 0 2px 13px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .act-head { padding: 0 2px 12px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
   .act-head .ah-when { font-size: var(--fs-2xs); color: var(--muted); }
-  .act-head .ah-what { font-size: var(--fs-sm); font-weight: 600; line-height: 1.5; margin-top: 4px; }
+  .act-head .ah-what { font-size: var(--fs-sm); font-weight: 500; line-height: 1.5; margin-top: 4px; }
   .act-head .ah-meta { font-size: var(--fs-xs); color: var(--muted); margin-top: 4px; }
   .act-list { border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
   .act-row {
     display: flex; align-items: center; gap: 12px; width: 100%;
-    padding: 14px 15px; min-height: var(--tap); border: none; background: #fff;
+    padding: 16px 16px; min-height: var(--tap); border: none; background: #fff;
     border-bottom: 1px solid var(--line-soft); text-align: left; cursor: pointer;
     color: var(--text); font-family: inherit; transition: background var(--press-out);
   }
   .act-row:last-child { border-bottom: none; }
   .act-row:active { background: var(--surface-2); }
-  .act-ico { font-size: 17px; width: 22px; text-align: center; flex-shrink: 0; }
+  .act-ico { width: 16px; display: inline-flex; flex-shrink: 0; color: var(--muted); }
+  .act-row.danger .act-ico { color: var(--red); }
   .act-body { flex: 1; min-width: 0; }
-  .act-name { display: block; font-size: var(--fs-sm); font-weight: 600; }
+  .act-name { display: block; font-size: var(--fs-sm); font-weight: 500; }
   .act-sub { display: block; font-size: var(--fs-2xs); color: var(--muted); margin-top: 2px;
              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .act-arrow { color: var(--muted); opacity: .5; font-size: 15px; flex-shrink: 0; }
   .act-row.danger .act-name { color: var(--red); }
   .act-row.danger:active { background: var(--red-wash); }
   /* 관리 칸: 상태 표식은 단추 위에 한 줄로 얹는다 (표식은 '할 일' 이 아니라 '지금 상태') */
-  td.cell-manage .pill { display: block; margin-bottom: 5px; }
+  td.cell-manage .pill { display: block; margin-bottom: 4px; }
   .ret-list { max-height: 290px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
-  .ret-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; border-bottom: 1px solid var(--line-soft); }
+  .ret-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 12px; border-bottom: 1px solid var(--line-soft); }
   .ret-row:last-child { border-bottom: none; }
-  .ret-title { font-size: var(--fs-sm); font-weight: 600; line-height: 1.4; }
-  .ret-sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 3px; }
+  .ret-title { font-size: var(--fs-sm); font-weight: 500; line-height: 1.4; }
+  .ret-sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 4px; }
   .ret-qty { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .ret-qty button { width: 34px; height: 34px; border: 1px solid var(--line); background: var(--gray); border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; line-height: 1; color: var(--text); }
-  .ret-qty input { width: 52px; text-align: center; padding: 7px 4px; border: 2px solid var(--line); border-radius: 8px; font-size: var(--fs-md); font-weight: 600; }
-  .pick-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 13px; border-bottom: 1px solid var(--line-soft); }
+  .ret-qty button { width: 34px; height: 34px; border: 1px solid var(--line); background: var(--gray); border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 500; line-height: 1; color: var(--text); }
+  .ret-qty input { width: 52px; text-align: center; padding: 8px 4px; border: 2px solid var(--line); border-radius: 8px; font-size: var(--fs-md); font-weight: 500; }
+  .pick-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 12px; border-bottom: 1px solid var(--line-soft); }
   .pick-row:last-child { border-bottom: none; }
   .log-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
-  .log-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 11px 13px; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-xs); }
+  .log-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 12px; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-xs); }
   .log-row:last-child { border-bottom: none; }
-  .log-when { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
-  .log-delta { font-weight: 700; white-space: nowrap; }
+  .log-when { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .log-delta { font-weight: 500; white-space: nowrap; }
   .log-delta.up { color: var(--green-dark); }
   .log-delta.down { color: var(--red); }
   .log-delta.flat { color: var(--muted); }
@@ -987,8 +1007,8 @@
   #toast {
     position: fixed; bottom: calc(var(--bar-h) + var(--safe-b) + 18px); left: 50%;
     transform: translateX(-50%) translateY(16px);
-    background: var(--ink); color: #fff; padding: 14px 24px; border-radius: var(--r-pill); font-size: var(--fs-md);
-    font-weight: 600; opacity: 0; transition: opacity .22s, transform .22s; z-index: 300; pointer-events: none;
+    background: var(--ink); color: #fff; padding: 16px 24px; border-radius: var(--r-pill); font-size: var(--fs-md);
+    font-weight: 500; opacity: 0; transition: opacity .22s, transform .22s; z-index: 300; pointer-events: none;
     box-shadow: var(--sh-3); max-width: calc(100vw - 32px); text-align: center;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -996,11 +1016,11 @@
   #toast.bad { background: var(--red); }
   #updateBar {
     display: none; align-items: center; justify-content: center; gap: 12px;
-    background: #ffcb45; color: #3d2d05; font-size: var(--fs-xs); font-weight: 600;
-    padding: 10px 14px; flex-shrink: 0;
+    background: #ffcb45; color: #3d2d05; font-size: var(--fs-xs); font-weight: 500;
+    padding: 10px 16px; flex-shrink: 0;
   }
   #updateBar.show { display: flex; }
-  #updateBar button { border: none; background: #3d2d05; color: #ffcb45; border-radius: 7px; padding: 7px 14px; font-size: var(--fs-xs); font-weight: 600; cursor: pointer; --btn-edge: #241b03; }
+  #updateBar button { border: none; background: #3d2d05; color: #ffcb45; border-radius: 8px; padding: 8px 16px; font-size: var(--fs-xs); font-weight: 500; cursor: pointer; --btn-edge: #241b03; }
 
   /* ═══════════ 태블릿 / 휴대폰 ═══════════ */
   @media (max-width: 899px) {
@@ -1009,7 +1029,7 @@
     .filters input[type=date], .filters select, .period .custom input { font-size: 16px; }
 
     .cats button, .period button { min-height: var(--tap); padding: 0 16px; }
-    .mini-btn { min-height: var(--tap); padding: 0 14px; }
+    .mini-btn { min-height: var(--tap); padding: 0 16px; }
 
     body { height: 100dvh; }
     /* padding 을 통째로 덮어쓰면 상태바 자리(safe-area)까지 지워져,
@@ -1029,15 +1049,15 @@
     .sync .dot { width: 10px; height: 10px; box-shadow: 0 0 0 3px rgba(84,214,150,.18); }
     .sync.warn .dot { box-shadow: 0 0 0 3px rgba(255,206,90,.20); }
     .sync.off  .dot { box-shadow: 0 0 0 3px rgba(255,130,130,.20); }
-    .icon-btn { min-width: 36px; height: 32px; padding: 0 9px; }
+    .icon-btn { min-width: 36px; height: 32px; padding: 0 8px; }
     #installBtn .lbl { display: none; }
-    .biz-chip { padding: 5px 10px; }
+    .biz-chip { padding: 4px 10px; }
     .tabs { overflow-x: auto; scrollbar-width: none; }
     .tabs::-webkit-scrollbar { display: none; }
-    .tabs button { flex: 1 0 auto; padding: 12px 14px; font-size: var(--fs-xs); }
+    .tabs button { flex: 1 0 auto; padding: 12px 16px; font-size: var(--fs-xs); }
 
     #pos.view.active { flex-direction: column; }
-    .product-pane { padding: 14px; padding-bottom: calc(var(--bar-h) + var(--safe-b) + 14px); }
+    .product-pane { padding: 16px; padding-bottom: calc(var(--bar-h) + var(--safe-b) + 16px); }
     .grid { grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 10px; }
 
     /* 폰에서는 왼쪽 기둥을 세울 자리가 없다 — 아래에서 올라와 화면을 덮는 판이 된다 */
@@ -1052,16 +1072,16 @@
     .cart-head { border-radius: var(--r-lg) var(--r-lg) 0 0; }
     .cart-items { max-height: 34dvh; }
 
-    .panel { padding: 14px; padding-bottom: calc(var(--bar-h) + var(--safe-b) + 14px); }
+    .panel { padding: 16px; padding-bottom: calc(var(--bar-h) + var(--safe-b) + 16px); }
     .panel-head h2 { font-size: var(--fs-lg); }
     .cards { grid-template-columns: repeat(auto-fit, minmax(148px,1fr)); gap: 10px; }
-    .stat { padding: 13px 14px; }
+    .stat { padding: 12px 16px; }
     .stat .val { font-size: 22px; }
     .stat.hero .val { font-size: 27px; }
 
-    .mobile-bar { padding: 0 14px; }
+    .mobile-bar { padding: 0 16px; }
     .mobile-bar .mb-amt { font-size: 21px; }
-    .mobile-bar .mb-open { padding: 0 18px; }
+    .mobile-bar .mb-open { padding: 0 20px; }
   }
 
   @media (max-width: 620px) {
@@ -1069,7 +1089,7 @@
        탭처럼 한 줄로 눕히고 옆으로 밀어 본다 — 스크롤 막대는 감춘다. */
     .cats {
       flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
-      margin-left: -14px; margin-right: -14px; padding: 2px 14px;
+      margin-left: -16px; margin-right: -16px; padding: 2px 16px;
       -webkit-overflow-scrolling: touch;
     }
     .cats::-webkit-scrollbar { display: none; }
@@ -1082,7 +1102,7 @@
     .period .custom { flex-wrap: wrap; width: 100%; margin-left: 0; }
     .period .custom input { flex: 1 1 40%; min-width: 0; }
     .period .custom button { flex: 1 1 100%; min-height: var(--tap); }
-    .modal { padding: 18px; border-radius: var(--r-md); }
+    .modal { padding: 20px; border-radius: var(--r-md); }
     .modal-actions { position: sticky; bottom: 0; background: var(--surface);
                      padding-top: 12px; margin-top: 12px; box-shadow: 0 -8px 12px -8px rgba(23,29,39,.18); }
     .field-row { flex-wrap: wrap; }
@@ -1104,11 +1124,11 @@
     tbody tr:first-child td { border-top: none; }
     tbody td {
       border-top: none; display: flex; align-items: center; justify-content: space-between;
-      gap: 14px; padding: 9px 14px; text-align: right; white-space: normal;
+      gap: 16px; padding: 8px 16px; text-align: right; white-space: normal;
     }
     tbody td + td { border-top: 1px solid var(--line-soft); }
     tbody td::before {
-      content: attr(data-label); color: var(--muted); font-weight: 600; font-size: var(--fs-2xs);
+      content: attr(data-label); color: var(--muted); font-weight: 500; font-size: var(--fs-2xs);
       text-align: left; flex: 0 0 auto; white-space: nowrap;
     }
     tbody td.cell-main { font-size: var(--fs-md); font-weight: 500; }
@@ -1124,10 +1144,10 @@
 
   /* 손바닥만 한 폰 — '매출' 이라는 말은 떼도 숫자가 스스로 말한다. 톱니 자리를 먼저 지킨다. */
   @media (max-width: 420px) {
-    header { padding-left: 10px; padding-right: 8px; gap: 7px; }
+    header { padding-left: 10px; padding-right: 8px; gap: 8px; }
     header .brand { font-size: var(--fs-sm); }
     .hdr-rev .k { display: none; }
-    header .info { gap: 7px; }
+    header .info { gap: 8px; }
   }
 
   /* 아주 좁은 화면 — 카드가 150px 남짓이라 배지 자리(62px)를 떼면 첫 줄에 글자가 안 남는다.
@@ -1135,8 +1155,8 @@
   @media (max-width: 400px) {
     .book-btn .bs { position: static; align-self: flex-end; }
     .book-btn .bt::before { content: none; }
-    .book-btn { min-height: 104px; padding: 13px; }
-    .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 9px; }
+    .book-btn { min-height: 104px; padding: 12px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
     .cards { grid-template-columns: 1fr 1fr; }
     .stat.hero { grid-column: span 2; }
     .cart-head, .cart-row { grid-template-columns: 1fr 72px 88px 38px; }
@@ -1147,24 +1167,58 @@
     .pay-actions .clear, .pay-actions .hold { padding: 0 10px; font-size: var(--fs-sm); }
     .mobile-bar { gap: 10px; padding: 0 12px; }
     .mobile-bar .mb-amt { font-size: 19px; }
-    .mobile-bar .mb-open { padding: 0 15px; font-size: var(--fs-sm); }
+    .mobile-bar .mb-open { padding: 0 16px; font-size: var(--fs-sm); }
     .panel-head .actions { width: 100%; }
     .panel-head .actions .btn { flex: 1; }
   }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-book-open" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-lock-open" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></symbol>
+  <symbol id="i-package" viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+  <symbol id="i-ledger" viewBox="0 0 24 24"><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M9.5 8h5"/><path d="M9.5 12H16"/><path d="M9.5 16H14"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-bank" viewBox="0 0 24 24"><path d="M3 22h18"/><path d="M6 18v-7"/><path d="M10 18v-7"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="M12 2 20 7H4z"/></symbol>
+  <symbol id="i-cash" viewBox="0 0 24 24"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></symbol>
+  <symbol id="i-split" viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></symbol>
+  <symbol id="i-pull" viewBox="0 0 24 24"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+</svg>
 
 <header>
-  <div class="brand">📚 서적부 POS <span>Book Store</span></div>
+  <div class="brand"><svg class="ic" aria-hidden="true"><use href="#i-book-open"/></svg>서적부 POS <span>Book Store</span></div>
   <div class="info">
     <div class="hide-sm">영업일자 <b id="today"></b> <b id="clock" class="clock"></b></div>
     <div class="hdr-rev"><span class="k">매출</span> <b id="hdrRevenue">0원</b></div>
     <button id="bizChip" class="biz-chip off" title="개업 · 마감">–</button>
     <button id="sheetChip" class="sheet-chip" style="display:none"></button>
     <div id="syncBadge" class="sync" role="status" tabindex="0"><span class="dot"></span><span id="syncText" class="sync-text">연결 중…</span></div>
-    <button id="installBtn" class="icon-btn" style="display:none" title="홈 화면에 설치">⬇<span class="lbl">설치</span></button>
-    <button id="settingsBtn" class="icon-btn" title="설정 · 백업">⚙</button>
+    <button id="installBtn" class="icon-btn" style="display:none" title="홈 화면에 설치"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg><span class="lbl">설치</span></button>
+    <button id="settingsBtn" class="icon-btn" title="설정 · 백업" aria-label="설정 · 백업"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg></button>
   </div>
 </header>
 
@@ -1175,7 +1229,7 @@
 
 <div id="loginScreen">
   <form id="loginForm" class="login-card">
-    <div class="login-brand">📚 서적부 POS</div>
+    <div class="login-brand"><svg class="ic" aria-hidden="true"><use href="#i-book-open"/></svg>서적부 POS</div>
     <p class="login-sub">가게 계정으로 로그인하세요</p>
     <input id="loginEmail" type="email" placeholder="이메일" autocomplete="username" required>
     <input id="loginPw" type="password" placeholder="비밀번호" autocomplete="current-password" required>
@@ -1186,20 +1240,20 @@
 
 <div id="bizScreen">
   <div class="biz-card">
-    <div class="biz-icon">🔒</div>
+    <div class="biz-icon"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></div>
     <h2>아직 개업 전입니다</h2>
     <p class="biz-sub">개업해야 판매·반품을 할 수 있습니다.<br>매출 조회와 재고 관리는 그냥 하셔도 됩니다.</p>
     <div id="bizLast" class="biz-last"></div>
-    <button class="btn primary" id="bizOpenBtn">🔓 개업하기</button>
+    <button class="btn primary" id="bizOpenBtn"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg>개업하기</button>
     <button class="btn ghost" id="bizPeekBtn">닫고 둘러보기</button>
   </div>
 </div>
 
 <div class="tabs">
-  <button class="active" data-view="pos">🛒 판매</button>
-  <button data-view="inventory">📦 재고</button>
-  <button data-view="sales">📊 입출고 내역</button>
-  <button data-view="report">📈 리포트</button>
+  <button class="active" data-view="pos"><svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg>판매</button>
+  <button data-view="inventory"><svg class="ic" aria-hidden="true"><use href="#i-package"/></svg>재고</button>
+  <button data-view="sales"><svg class="ic" aria-hidden="true"><use href="#i-ledger"/></svg>입출고 내역</button>
+  <button data-view="report"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg>리포트</button>
 </div>
 
 <main>
@@ -1208,7 +1262,7 @@
     <div class="cart-pane" id="cartPane">
       <div class="cart-head">
         <span>상품명</span><span>수량</span><span>금액</span><span></span>
-        <button class="sheet-close" id="sheetClose" aria-label="장바구니 닫기">✕</button>
+        <button class="sheet-close" id="sheetClose" aria-label="장바구니 닫기"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
       </div>
       <div class="cart-items" id="cartItems"></div>
 
@@ -1230,18 +1284,18 @@
       </div>
 
       <div class="pay-methods">
-        <button data-method="계좌이체" class="sel">💳 계좌이체</button>
-        <button data-method="현금">💵 현금</button>
-        <button data-method="분할">🧾 분할결제</button>
+        <button data-method="계좌이체" class="sel"><svg class="ic" aria-hidden="true"><use href="#i-bank"/></svg>계좌이체</button>
+        <button data-method="현금"><svg class="ic" aria-hidden="true"><use href="#i-cash"/></svg>현금</button>
+        <button data-method="분할"><svg class="ic" aria-hidden="true"><use href="#i-split"/></svg>분할결제</button>
       </div>
 
       <div class="split-pay hide" id="splitWrap">
         <div class="sp-row">
-          <span class="sp-k">💵 현금</span>
+          <span class="sp-k">현금</span>
           <span><input id="splitCash" type="text" inputmode="numeric" placeholder="0"><em>원</em></span>
         </div>
         <div class="sp-row">
-          <span class="sp-k">💳 계좌이체 <span class="dim">(자동)</span></span>
+          <span class="sp-k">계좌이체 <span class="dim">(자동)</span></span>
           <span class="sp-v" id="splitTransfer">0원</span>
         </div>
         <div class="sp-hint" id="splitHint">현금으로 받은 금액을 적으면 나머지가 계좌이체로 잡힙니다.</div>
@@ -1274,8 +1328,8 @@
     <div class="product-pane">
       <div class="holds-bar hide" id="holdsBar"></div>
       <div class="product-head">
-        <input id="qBooks" class="search" type="search" placeholder="🔍 책 제목으로 찾기" style="flex:1;max-width:340px">
-        <button class="btn ghost" id="posExchangeBtn">⇄ 교환</button><button class="btn danger" id="posReturnBtn">↩ 반품하기</button>
+        <input id="qBooks" class="search" type="search" placeholder="책 제목으로 찾기" style="flex:1;max-width:340px">
+        <button class="btn ghost" id="posExchangeBtn"><svg class="ic" aria-hidden="true"><use href="#i-swap"/></svg>교환</button><button class="btn danger" id="posReturnBtn"><svg class="ic" aria-hidden="true"><use href="#i-undo"/></svg>반품하기</button>
       </div>
       <div class="cats" id="posCats"></div>
       <div class="grid" id="bookGrid"></div>
@@ -1286,9 +1340,9 @@
   <section class="view" id="inventory">
     <div class="panel">
       <div class="panel-head">
-        <h2>📦 재고 관리</h2>
+        <h2>재고 관리</h2>
         <div class="actions">
-          <button class="btn ghost" id="allLogsBtn">🧾 변동 이력</button>
+          <button class="btn ghost" id="allLogsBtn"><svg class="ic" aria-hidden="true"><use href="#i-history"/></svg>변동 이력</button>
           <button class="btn green" id="addBookBtn">＋ 새 책 등록</button>
         </div>
       </div>
@@ -1299,7 +1353,7 @@
         <div class="stat"><div class="lbl">매입 필요 (안전재고 미만)</div><div class="val red" id="statLow">0종</div></div>
       </div>
       <div class="filters" id="invFilters">
-        <input id="qInv" class="search" type="search" placeholder="🔍 책 제목으로 찾기">
+        <input id="qInv" class="search" type="search" placeholder="책 제목으로 찾기">
         <select id="invSort" aria-label="정렬">
           <option value="stock-desc">재고 많은 순</option>
           <option value="stock-asc">재고 적은 순</option>
@@ -1331,16 +1385,16 @@
   <section class="view" id="sales">
     <div class="panel">
       <div class="panel-head">
-        <h2>📊 입출고 내역</h2>
+        <h2>입출고 내역</h2>
         <div class="actions">
-          <button class="btn ghost" id="exportCsv">⬇ 지금 보이는 목록 CSV</button>
+          <button class="btn ghost" id="exportCsv"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>지금 보이는 목록 CSV</button>
         </div>
       </div>
 
       <div class="cats" id="flowChips"></div>
 
       <div class="filters" id="salesFilters">
-        <input id="qSales" class="search" type="search" placeholder="🔍 책 제목 · 고객 · 거래처로 찾기">
+        <input id="qSales" class="search" type="search" placeholder="책 제목 · 고객 · 거래처로 찾기">
         <input type="date" id="fFrom" title="시작일"><span class="sep">~</span><input type="date" id="fTo" title="종료일">
         <select id="fMethod" data-only="out">
           <option value="">결제수단 전체</option>
@@ -1373,9 +1427,9 @@
   <section class="view" id="report">
     <div class="panel">
       <div class="panel-head">
-        <h2>📈 리포트</h2>
+        <h2>리포트</h2>
         <div class="actions">
-          <button class="btn ghost" id="exportPeriodCsv">⬇ 이 기간 CSV</button>
+          <button class="btn ghost" id="exportPeriodCsv"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>이 기간 CSV</button>
         </div>
       </div>
 
@@ -1395,14 +1449,14 @@
         <div class="stat hero"><div class="lbl" id="rLabel">이번 달 매출 (실수령)</div><div class="val green" id="rRevenue">0원</div></div>
         <div class="stat"><div class="lbl">판매 권수 (반품 차감)</div><div class="val" id="rQty">0권</div></div>
         <div class="stat"><div class="lbl">거래 건수</div><div class="val" id="rCount">0건</div></div>
-        <div class="stat"><div class="lbl">💵 현금</div><div class="val" id="rCash">0원</div></div>
-        <div class="stat"><div class="lbl">💳 계좌이체</div><div class="val" id="rTransfer">0원</div></div>
+        <div class="stat"><div class="lbl">현금</div><div class="val" id="rCash">0원</div></div>
+        <div class="stat"><div class="lbl">계좌이체</div><div class="val" id="rTransfer">0원</div></div>
         <div class="stat"><div class="lbl">할인 합계</div><div class="val red" id="rDisc">0원</div></div>
         <div class="stat"><div class="lbl">환불 금액 합계</div><div class="val red" id="rRefund">0원</div></div>
         <div class="stat hero"><div class="lbl">순수익 (매출 − 원가)</div>
           <div class="val green" id="rProfit">0원</div>
           <div class="sub" id="rProfitSub"></div></div>
-        <div class="stat"><div class="lbl">판매된 책 원가</div><div class="val red" id="rCogs">0원</div></div>
+        <div class="stat"><div class="lbl">판매된 책 원가</div><div class="val" id="rCogs">0원</div></div>
       </div>
 
       <div class="chart-card">
@@ -1486,6 +1540,8 @@ const bookById = id => books.find(b => b.id === id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const digits = v => String(v ?? '').replace(/[^\d]/g, '');
+/* 선 아이콘 — 맨 위 <svg> 묶음(lucide)에서 꺼내 쓴다. 글자 색을 따라간다 */
+const ic = (n, cls = '') => `<svg class="ic${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
 
 /* ---------- 카테고리 · 안전재고 ----------
    기존 스프레드시트가 제품명을 `[성경] 호크마 성경` 처럼 적어 왔다.
@@ -1865,7 +1921,7 @@ function renderBookGrid() {
   if (list.length === 0) {
     grid.innerHTML = `<div class="cart-empty" style="grid-column:1/-1">${
       books.length === 0
-        ? '등록된 책이 없습니다.<br>‘📦 재고’ 탭에서 책을 먼저 등록하세요.'
+        ? '등록된 책이 없습니다.<br>‘재고’ 탭에서 책을 먼저 등록하세요.'
         : q
           ? `‘${esc($('qBooks').value.trim())}’ 와(과) 일치하는 책이 없습니다.`
           : `‘${posCat}’ 카테고리에 등록된 책이 없습니다.`
@@ -2029,9 +2085,9 @@ function renderCart() {
         <button data-a="dec" aria-label="수량 줄이기">−</button><span>${c.qty}</span><button data-a="inc" aria-label="수량 늘리기">＋</button>
       </div>
       <div class="amt">${ship
-        ? `<button type="button" class="amt-edit" data-a="price" title="눌러서 택배비 금액 바꾸기">${won(amt)} ✎</button>`
+        ? `<button type="button" class="amt-edit" data-a="price" title="눌러서 택배비 금액 바꾸기">${won(amt)}${ic('pencil', 'end')}</button>`
         : won(amt)}</div>
-      <div class="del"><button data-a="del" aria-label="삭제">✕</button></div>`;
+      <div class="del"><button data-a="del" aria-label="삭제">${ic('x')}</button></div>`;
     row.querySelector('[data-a=dec]').onclick = () => changeQty(c.id, -1);
     row.querySelector('[data-a=inc]').onclick = () => changeQty(c.id, 1);
     row.querySelector('[data-a=del]').onclick = () => removeFromCart(c.id);
@@ -2099,7 +2155,7 @@ function syncSplitField() {
 
   let msg = '현금으로 받은 금액을 적으면 나머지가 계좌이체로 잡힙니다.', bad = false;
   if (cash > payable) { msg = `받을 금액(${won(payable)})보다 많습니다.`; bad = true; }
-  else if (cash > 0 && rest === 0) { msg = '전액 현금입니다 — 💵 현금을 고르세요.'; bad = true; }
+  else if (cash > 0 && rest === 0) { msg = '전액 현금입니다 — 현금을 고르세요.'; bad = true; }
   hint.textContent = msg;
   hint.classList.toggle('bad', bad);
 }
@@ -2377,7 +2433,7 @@ function renderHolds() {
         `<span class="hc-amt">${won(holdPayable(h))}</span>`;
     return `<span class="hold-chip${compact ? ' compact' : ''}">
       <button type="button" class="hc-open" data-no="${h.no}" title="${esc(full)} — 눌러서 불러오기">${body}</button>
-      <button type="button" class="hc-drop" data-drop="${h.no}" aria-label="${esc(full)} 버리기" title="버리기">✕</button>
+      <button type="button" class="hc-drop" data-drop="${h.no}" aria-label="${esc(full)} 버리기" title="버리기">${ic('x')}</button>
     </span>`;
   }).join('');
 
@@ -2910,7 +2966,7 @@ function renderSales() {
     const cols = HEADS[flowTab].match(/<th/g).length;
     const empty = flowTab === 'in'
       ? (purchaseList().length === 0
-          ? '아직 입고 기록이 없습니다. 재고 화면의 “+ 입고” 로 등록하거나, ⚙ 설정에서 시트의 옛 입고를 가져오세요.'
+          ? '아직 입고 기록이 없습니다. 재고 화면의 “+ 입고” 로 등록하거나, 설정에서 시트의 옛 입고를 가져오세요.'
           : '검색 조건에 맞는 입고가 없습니다.')
       : (transactions.length === 0 ? '아직 판매 내역이 없습니다.'
           : '검색 조건에 맞는 내역이 없습니다. 조건을 바꾸거나 “초기화”를 눌러보세요.');
@@ -3008,7 +3064,7 @@ function renderBiz() {
   const open = bizOpen();
   const chip = $('bizChip');
   chip.className = 'biz-chip ' + (open ? 'on' : 'off');
-  chip.textContent = open ? '🟢 영업 중' : '🔴 마감됨';
+  chip.innerHTML = `<span class="dot"></span>${open ? '영업 중' : '마감됨'}`;
   chip.title = open ? `${fmtDateTime(session.openedAt)} 개업 · 눌러서 마감` : '눌러서 개업';
 
   $('bizLast').innerHTML = lastClosingHtml();
@@ -3030,12 +3086,12 @@ async function openBiz() {
       seq: ((session && session.seq) || 0) + 1,
     });
     bizPeekedFor = null;
-    toast('개업했습니다. 좋은 하루 되세요!', 'good');
+    toast('개업했습니다 · 좋은 하루 되세요', 'good');
   } catch (e) {
     console.error('개업 실패', e);
     toast('개업 실패 · 연결 확인', 'bad');
   } finally {
-    btn.disabled = false; btn.textContent = '🔓 개업하기';
+    btn.disabled = false; btn.innerHTML = ic('lock-open') + '개업하기';
   }
 }
 
@@ -3044,7 +3100,7 @@ function closeBizModal() {
   const s = sessionStats();
   const methods = Object.keys(s.byMethod);
   openModal(`
-    <h3>🔒 마감하기</h3>
+    <h3>마감하기</h3>
     <div class="info-box">
       <b>${esc(session.bizDate || '')}</b> 영업 · ${fmtDateTime(session.openedAt)} 개업 → 지금 마감
     </div>
@@ -3109,7 +3165,7 @@ function closeBizModal() {
 function closingsModal() {
   const rows = [...closings].reverse();
   openModal(`
-    <h3>📒 지난 마감 내역</h3>
+    <h3>지난 마감 내역</h3>
     ${rows.length === 0 ? '<div class="info-box">아직 마감 기록이 없습니다.</div>' : `
       <div style="max-height:56vh;overflow:auto">
         ${rows.map(c => `
@@ -3211,7 +3267,9 @@ function renderReport() {
   $('rCash').textContent = won(cash);
   $('rTransfer').textContent = won(transfer);
   $('rDisc').textContent = disc ? `−${won(disc)}` : '0원';
+  $('rDisc').className = 'val ' + (disc ? 'red' : 'muted');
   $('rRefund').textContent = refund ? `−${won(refund)}` : '0원';
+  $('rRefund').className = 'val ' + (refund ? 'red' : 'muted');
   $('rCogs').textContent = cogs ? `−${won(cogs)}` : '0원';
   const pf = $('rProfit');
   pf.textContent = won(profit);
@@ -3522,12 +3580,12 @@ function manageTxModal(t) {
     `${isExchange && i.qty < 0 ? '↩' : ''}${esc(i.title)} ×${Math.abs(i.qty)}`).join(', ');
   const remain = (!isReturn && !isExchange) ? remainingReturnable(t) : 0;
   const rows = [
-    actRow('🕐', '일시 수정', fmtDateTime(t.time), 'time'),
+    actRow(ic('clock'), '일시 수정', fmtDateTime(t.time), 'time'),
     /* 무상 출고는 고객 칸에 '왜 나갔는지' 가 들어가는 자리라(시트 관습) 고칠 이름이 없다 */
-    isFreeTx(t) ? '' : actRow('👤', '고객 정보 수정',
+    isFreeTx(t) ? '' : actRow(ic('user'), '고객 정보 수정',
       t.customer ? esc(t.customer) : '적혀 있지 않음', 'cust'),
-    remain > 0 ? actRow('↩', '반품', `반품 가능 ${remain}권`, 'return') : '',
-    actRow('🗑', '기록 삭제', '없던 일로 만듭니다', 'drop', 'danger'),
+    remain > 0 ? actRow(ic('undo'), '반품', `반품 가능 ${remain}권`, 'return') : '',
+    actRow(ic('trash'), '기록 삭제', '없던 일로 만듭니다', 'drop', 'danger'),
   ].filter(Boolean).join('');
 
   openModal(`
@@ -3565,8 +3623,8 @@ function managePurchaseModal(p) {
         p.amount != null ? won(p.amount) : '금액 모름')}</div>
     </div>
     <div class="act-list">${[
-      qtyOk ? actRow('✏️', '수량 고치기', '잘못 친 권수를 바로잡습니다 · 재고도 같이 맞춥니다', 'qty') : '',
-      p.reg ? '' : actRow('🗑', '기록 삭제', '없던 일로 만듭니다', 'drop', 'danger'),
+      qtyOk ? actRow(ic('pencil'), '수량 고치기', '잘못 친 권수를 바로잡습니다 · 재고도 같이 맞춥니다', 'qty') : '',
+      p.reg ? '' : actRow(ic('trash'), '기록 삭제', '없던 일로 만듭니다', 'drop', 'danger'),
     ].join('')}</div>
     <div class="modal-actions"><button class="btn ghost" id="mCancel">닫기</button></div>`);
   $('mCancel').onclick = closeModal;
@@ -4426,10 +4484,10 @@ function renderSheetBadge() {
   const chip = $('sheetChip');
   if (chip) {
     let txt = '';
-    if (!qRemoteOk) txt = '⚠ 시트 큐 규칙 미게시';
-    else if (sheetRejected.size) txt = `⚠ 시트가 거절 ${sheetRejected.size}건`;
-    else if (stuck) txt = `⚠ 시트 대기 ${n}건`;
-    else if (gaps) txt = `⚠ 시트 재고 ${gaps}종 다름`;
+    if (!qRemoteOk) txt = '시트 큐 규칙 미게시';
+    else if (sheetRejected.size) txt = `시트가 거절 ${sheetRejected.size}건`;
+    else if (stuck) txt = `시트 대기 ${n}건`;
+    else if (gaps) txt = `시트 재고 ${gaps}종 다름`;
     chip.style.display = txt ? '' : 'none';
     chip.textContent = txt;
     chip.title = txt ? txt + ' — 눌러서 설정 열기' : '';
@@ -4441,15 +4499,15 @@ function renderSheetBadge() {
   const warn = $('sheetStale');
   if (warn) {
     const msgs = [];
-    if (sheetMirrorStale()) msgs.push(`⚠ <b>시트 스크립트가 옛 버전입니다.</b> 배포된 것 <b>${esc(sheetMirrorVersion)}</b> ·
+    if (sheetMirrorStale()) msgs.push(`${ic('alert')}<b>시트 스크립트가 옛 버전입니다.</b> 배포된 것 <b>${esc(sheetMirrorVersion)}</b> ·
          필요한 것 <b>${esc(SHEET_MIRROR_VERSION)}</b><br>
          Apps Script 에 <code>apps-script/Code.gs</code> 를 다시 붙여넣고
          <b>배포 → 배포 관리 → 수정 → 새 버전</b> 을 해주세요.`);
-    if (!qRemoteOk) msgs.push(`⚠ <b>못 보낸 기록을 Firestore 에 못 쓰고 있습니다.</b>
+    if (!qRemoteOk) msgs.push(`${ic('alert')}<b>못 보낸 기록을 Firestore 에 못 쓰고 있습니다.</b>
          지금은 이 기기에만 쌓입니다. Firebase 콘솔 → Firestore → 규칙에
          <code>firestore.rules</code> 를 붙여넣고 게시해 주세요.`);
-    if (stuck && sheetLastError) msgs.push(`⚠ 시트 전송이 실패하고 있습니다 · ${esc(sheetLastError)}`);
-    if (sheetRejected.size) msgs.push(`⚠ <b>시트가 거절한 기록 ${sheetRejected.size}건</b> — 나머지는 정상으로 갔습니다.<br>` +
+    if (stuck && sheetLastError) msgs.push(`${ic('alert')}시트 전송이 실패하고 있습니다 · ${esc(sheetLastError)}`);
+    if (sheetRejected.size) msgs.push(`${ic('alert')}<b>시트가 거절한 기록 ${sheetRejected.size}건</b> — 나머지는 정상으로 갔습니다.<br>` +
       [...sheetRejected.values()].slice(0, 3).map(esc).join('<br>'));
     warn.style.display = msgs.length ? '' : 'none';
     warn.innerHTML = msgs.join('<br><br>');
@@ -4468,7 +4526,7 @@ function renderSheetBadge() {
     diffEl.innerHTML = gaps
       ? `<div class="warn-box" style="margin:0">시트와 앱 재고가 다른 책 <b>${gaps}종</b> <span class="dim">(${when} 기준)</span>
            <div class="sub" style="max-height:120px;overflow:auto;color:inherit;margin-top:4px">${list}${gaps > 40 ? '<br>…' : ''}</div></div>`
-      : `<span class="dim">✓ 시트와 앱 재고가 모두 같습니다 (${when} 기준)</span>`;
+      : `<span class="dim">${ic('check')}시트와 앱 재고가 모두 같습니다 (${when} 기준)</span>`;
   }
 }
 setInterval(() => renderSheetBadge(), 30000);   // '오래 머문 기록' 판정이 시간이 지나며 바뀐다
@@ -4645,7 +4703,7 @@ function addBookModal() {
     const price = wonOf(priceEl), cost = wonOf(costEl), el = $('mMargin');
     if (isNaN(price) || isNaN(cost) || price <= 0) { el.textContent = ''; return; }
     el.textContent = (cost > price)
-      ? `⚠ 입고단가가 판매가보다 ${won(cost - price)} 높습니다`
+      ? `입고단가가 판매가보다 ${won(cost - price)} 높습니다`
       : `권당 이익 ${won(price - cost)}`;
   };
   const fromDisc = () => {
@@ -4918,7 +4976,7 @@ function showLogs(list, b) {
   }).join('');
 
   openModal(`
-    <h3>🧾 변동 이력${b ? ' · ' + esc(b.title) : ''}</h3>
+    <h3>변동 이력${b ? ' · ' + esc(b.title) : ''}</h3>
     <p class="desc">입고·판매·반품·조정·가격변경이 모두 기록됩니다. (최근 500건 중 200건 표시)</p>
     <div class="log-list">${rows || '<div class="cart-empty">아직 기록이 없습니다.<br>이 기능을 켠 뒤의 변동부터 쌓입니다.</div>'}</div>
     <div class="modal-actions"><button class="btn ghost" id="mCancel">닫기</button></div>`, true);
@@ -5006,11 +5064,11 @@ function returnModal(t, onBack) {
     <div class="field" style="margin-top:14px">
       <label>환불 금액 (수단별로 실제 돌려줄 금액을 적으세요)</label>
       <div class="sp-row">
-        <span class="sp-k">💵 현금</span>
+        <span class="sp-k">현금</span>
         <span><input id="mRefundCash" inputmode="numeric"><em>원</em></span>
       </div>
       <div class="sp-row">
-        <span class="sp-k">💳 계좌이체</span>
+        <span class="sp-k">계좌이체</span>
         <span><input id="mRefundTr" inputmode="numeric"><em>원</em></span>
       </div>
       <div class="sp-row total">
@@ -5196,7 +5254,7 @@ function exchangeStart() {
   }).join('');
 
   openModal(`
-    <h3>⇄ 교환할 결제 건 선택</h3>
+    <h3>교환할 결제 건 선택</h3>
     <div class="info-box ex-cart">새로 드릴 책 (장바구니)<br>${cartSummaryHtml()}</div>
     <p class="desc">손님이 원래 사 가신 결제 내역을 고르세요. (최근 순)</p>
     <div class="ret-list">${rows}</div>
@@ -5230,7 +5288,7 @@ function exchangeModal(t) {
   }).join('');
 
   openModal(`
-    <h3>⇄ 교환</h3>
+    <h3>교환</h3>
     <div class="info-box ex-cart">새로 드릴 책<br>${cartSummaryHtml()}</div>
     <p class="desc">손님에게서 <b>돌려받을 책</b>과 수량을 고르세요.</p>
     <div class="ret-list">${rows}</div>
@@ -5244,8 +5302,8 @@ function exchangeModal(t) {
     <div class="field hide" id="exMethodWrap">
       <label id="exMethodLabel">받을 방법</label>
       <select id="exMethod">
-        <option value="현금">💵 현금</option>
-        <option value="계좌이체" selected>💳 계좌이체</option>
+        <option value="현금">현금</option>
+        <option value="계좌이체" selected>계좌이체</option>
       </select>
     </div>
     <div class="field hide" id="exAdjustWrap">
@@ -5400,7 +5458,7 @@ function settingsModal() {
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 
   openModal(`
-    <h3>⚙ 설정 · 데이터 관리</h3>
+    <h3>설정 · 데이터 관리</h3>
 
     <div class="info-box">
       <b>${esc(backupLine)}</b><br>
@@ -5411,37 +5469,37 @@ function settingsModal() {
     <div class="field">
       <label>데이터 백업</label>
       <div style="display:flex;gap:8px">
-        <button class="btn primary" id="sBackup" style="flex:1">⬇ 백업 파일 저장</button>
-        <button class="btn ghost" id="sRestore" style="flex:1">⬆ 백업에서 복원</button>
+        <button class="btn primary" id="sBackup" style="flex:1">${ic('download')}백업 파일 저장</button>
+        <button class="btn ghost" id="sRestore" style="flex:1">${ic('upload')}백업에서 복원</button>
       </div>
     </div>
 
     <div class="field">
       <label>영업</label>
       <div style="display:flex;gap:8px">
-        <button class="btn ghost" id="sBiz" style="flex:1">${bizOpen() ? '🔒 마감하기' : '🔓 개업하기'}</button>
-        <button class="btn ghost" id="sClosings" style="flex:1">📒 지난 마감 내역</button>
+        <button class="btn ghost" id="sBiz" style="flex:1">${bizOpen() ? ic('lock') + '마감하기' : ic('lock-open') + '개업하기'}</button>
+        <button class="btn ghost" id="sClosings" style="flex:1">${ic('calendar')}지난 마감 내역</button>
       </div>
     </div>
 
     <div class="field">
       <label>스프레드시트에서 상품 가져오기</label>
-      <button class="btn ghost" id="sImport" style="width:100%">📋 카테고리 · 단가 · 안전재고 일괄 반영</button>
+      <button class="btn ghost" id="sImport" style="width:100%">${ic('clipboard')}카테고리 · 단가 · 안전재고 일괄 반영</button>
     </div>
 
     <div class="field">
       <label>구글 시트 자동 기록 · <span id="sheetPending" class="dim"></span></label>
       <div class="warn-box" id="sheetStale" style="display:none;margin:0 0 8px"></div>
       <div style="display:flex;gap:8px">
-        <button class="btn ghost" id="sSheetCfg" style="flex:1">🔗 연동 설정</button>
-        <button class="btn ghost" id="sSheetSend" style="flex:1">📤 지금 보내기</button>
+        <button class="btn ghost" id="sSheetCfg" style="flex:1">${ic('link')}연동 설정</button>
+        <button class="btn ghost" id="sSheetSend" style="flex:1">${ic('send')}지금 보내기</button>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="btn ghost" id="sSheetPull" style="flex:1">📥 판매 가져오기</button>
-        <button class="btn ghost" id="sSheetBuy" style="flex:1">📦 입고 가져오기</button>
+        <button class="btn ghost" id="sSheetPull" style="flex:1">${ic('pull')}판매 가져오기</button>
+        <button class="btn ghost" id="sSheetBuy" style="flex:1">${ic('pull')}입고 가져오기</button>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="btn ghost" id="sSheetStock" style="width:100%">🧮 재고 맞추기</button>
+        <button class="btn ghost" id="sSheetStock" style="width:100%">${ic('scale')}재고 맞추기</button>
       </div>
       <div id="sheetDiff" style="margin-top:8px;font-size:var(--fs-xs)"></div>
     </div>
@@ -5449,9 +5507,9 @@ function settingsModal() {
     <div class="field">
       <label>앱으로 설치</label>
       ${isStandalone
-        ? '<div class="info-box" style="margin:0">이미 앱으로 실행 중입니다. 👍</div>'
+        ? '<div class="info-box" style="margin:0">이미 앱으로 실행 중입니다</div>'
         : (deferredInstall
-          ? '<button class="btn green" id="sInstall" style="width:100%">📲 홈 화면에 설치하기</button>'
+          ? '<button class="btn green" id="sInstall" style="width:100%">' + ic('phone') + '홈 화면에 설치하기</button>'
           : `<div class="info-box" style="margin:0">
                <b>아이폰·아이패드</b>: Safari 하단 <b>공유(⬆)</b> → <b>홈 화면에 추가</b><br>
                <b>안드로이드</b>: Chrome 메뉴(⋮) → <b>앱 설치</b><br>
@@ -5562,7 +5620,7 @@ async function fetchSheetBooks() {
 
 function importSheetModal() {
   openModal(`
-    <h3>📋 스프레드시트에서 상품 가져오기</h3>
+    <h3>스프레드시트에서 상품 가져오기</h3>
     <div class="info-box">
       시트의 <b>재고관리 탭</b>에서 <b>단가 · 안전재고</b>를 가져옵니다.
       아래 버튼을 누르면 바로 읽어 오고, 연동 전이라면 네 열
@@ -5570,10 +5628,10 @@ function importSheetModal() {
       제목이 같은 책은 <b>덮어쓰고</b>, 시트에만 있는 책은 <b>새로 등록</b>합니다.<br>
       앱에만 있고 시트에 없는 책은 <b>건드리지 않습니다.</b><br>
       여기서 바꾼 재고는 <b>시트로 되돌려 보내지 않습니다</b> — 시트에서 읽어 온 값이라
-      다시 보내면 같은 숫자가 두 번 도는 셈이 됩니다. 반대 방향은 <b>🧮 재고 맞추기</b>가 합니다.
+      다시 보내면 같은 숫자가 두 번 도는 셈이 됩니다. 반대 방향은 <b>재고 맞추기</b>가 합니다.
     </div>
     <div class="field">
-      <button class="btn ghost" id="iPull" style="width:100%">🔻 시트에서 바로 가져오기</button>
+      <button class="btn ghost" id="iPull" style="width:100%">${ic('pull')}시트에서 바로 가져오기</button>
     </div>
     <div class="field">
       <textarea id="iPaste" rows="7" placeholder="[성경] 대조 성경	₩50,000	-50	-27	정상&#10;[기타] 찬송가	₩25,000	5	12	정상"></textarea>
@@ -5610,7 +5668,7 @@ function importSheetModal() {
     $('iStockNote').innerHTML = `<div class="warn-box" style="margin:6px 0 0">
       시트로 <b>못 보낸 기록이 ${pending}건</b> 있어서 <b>현재 재고</b>를 잠갔습니다.
       지금 시트의 재고는 그만큼 옛날 값이라, 그대로 가져오면 이미 팔린 책이 되살아납니다.<br>
-      ⚙ 설정에서 <b>📤 지금 보내기</b> 를 먼저 누르고 다시 오세요.</div>`;
+      설정에서 <b>지금 보내기</b> 를 먼저 누르고 다시 오세요.</div>`;
   }
 
   const preview = () => {
@@ -5690,11 +5748,11 @@ function importSheetModal() {
     try {
       paste.value = await fetchSheetBooks();
       preview();
-      btn.textContent = '🔻 시트에서 다시 가져오기';
+      btn.innerHTML = ic('pull') + '시트에서 다시 가져오기';
     } catch (e) {
       console.error('시트에서 상품 읽기 실패', e);
       toast('가져오기 실패 · ' + (e.message || '연결 확인'), 'bad');
-      btn.textContent = '🔻 시트에서 바로 가져오기';
+      btn.innerHTML = ic('pull') + '시트에서 바로 가져오기';
     } finally { btn.disabled = false; }
   };
 
@@ -5752,7 +5810,7 @@ function importSheetModal() {
    그 누적 차이를 '재고조정' 줄 한 줄씩으로 메워 두 숫자를 같은 자리에서 다시 출발시킨다. */
 function syncStockModal() {
   openModal(`
-    <h3>🧮 시트 재고 맞추기</h3>
+    <h3>시트 재고 맞추기</h3>
     <div class="info-box">
       시트 <b>재고관리</b> 탭의 현재재고와 앱 재고를 비교해, 차이만큼
       원장에 <b>재고조정</b> 줄을 남깁니다. <b>앱 재고가 정답</b>이라고 보고 시트를 맞추는 것입니다.<br>
@@ -5773,7 +5831,7 @@ function syncStockModal() {
   if (pending) {
     $('yState').innerHTML = `<div class="warn-box" style="margin:0">
       시트로 <b>못 보낸 기록이 ${pending}건</b> 있습니다. 지금 시트 재고는 그만큼 옛날 값이라
-      맞추면 오히려 어긋납니다.<br>⚙ 설정에서 <b>📤 지금 보내기</b> 를 먼저 누르고 다시 오세요.</div>`;
+      맞추면 오히려 어긋납니다.<br>설정에서 <b>지금 보내기</b> 를 먼저 누르고 다시 오세요.</div>`;
     save.textContent = '먼저 보내기';
     return;
   }
@@ -5889,7 +5947,7 @@ function importBuysModal() {
   const from = new Date(first.getFullYear(), first.getMonth(), 1);
 
   openModal(`
-    <h3>📦 시트에서 입고 가져오기</h3>
+    <h3>시트에서 입고 가져오기</h3>
     <div class="info-box">
       원장 <b>입출고기록</b>의 <b>구분이 '입고'</b>인 줄 중 <b>앱이 모르는 줄</b>만 찾아
       입고 기록으로 만듭니다. 가져온 줄에는 표시를 남겨 <b>두 번 가져오지 않습니다.</b><br>
@@ -5902,7 +5960,7 @@ function importBuysModal() {
       <div class="field"><label>끝 날짜</label><input type="date" id="bTo" value="${ymd(new Date())}"></div>
     </div>
     <div class="field">
-      <button class="btn ghost" id="bFetch" style="width:100%">🔻 이 기간에서 찾아보기</button>
+      <button class="btn ghost" id="bFetch" style="width:100%">${ic('search')}이 기간에서 찾아보기</button>
     </div>
     <div class="field">
       <label class="chkline"><input type="checkbox" id="bCost" checked> 입고단가가 비어 있는 책에 채워 넣기
@@ -5950,7 +6008,7 @@ function importBuysModal() {
       console.error('시트 입고 읽기 실패', e);
       $('bPreview').innerHTML = `<div class="warn-box">읽지 못했습니다 · ${esc(e.message || '연결 확인')}</div>`;
     } finally {
-      btn.disabled = false; btn.textContent = '🔻 이 기간에서 다시 찾아보기';
+      btn.disabled = false; btn.innerHTML = ic('search') + '이 기간에서 다시 찾아보기';
     }
   };
 
@@ -6006,7 +6064,7 @@ function importSalesModal() {
   const from = new Date(first.getFullYear(), first.getMonth(), 1);
 
   openModal(`
-    <h3>📥 시트에서 판매 가져오기</h3>
+    <h3>시트에서 판매 가져오기</h3>
     <div class="info-box">
       원장 <b>입출고기록</b>에서 <b>앱이 모르는 줄</b>(기록ID 가 빈 줄 = 손으로 적은 줄)만
       찾아 앱의 매출 기록으로 만듭니다. 가져온 줄에는 표시를 남겨 <b>두 번 가져오지 않습니다.</b><br>
@@ -6017,7 +6075,7 @@ function importSalesModal() {
       <div class="field"><label>끝 날짜</label><input type="date" id="pTo" value="${ymd(new Date())}"></div>
     </div>
     <div class="field">
-      <button class="btn ghost" id="pFetch" style="width:100%">🔻 이 기간에서 찾아보기</button>
+      <button class="btn ghost" id="pFetch" style="width:100%">${ic('search')}이 기간에서 찾아보기</button>
     </div>
     <div class="field">
       <label class="chkline"><input type="checkbox" id="pStock"> 재고도 함께 차감
@@ -6049,7 +6107,7 @@ function importSalesModal() {
       console.error('시트 줄 읽기 실패', e);
       $('pPreview').innerHTML = `<div class="warn-box">읽지 못했습니다 · ${esc(e.message || '연결 확인')}</div>`;
     } finally {
-      btn.disabled = false; btn.textContent = '🔻 이 기간에서 다시 찾아보기';
+      btn.disabled = false; btn.innerHTML = ic('search') + '이 기간에서 다시 찾아보기';
     }
   };
 
@@ -6074,7 +6132,7 @@ function importSalesModal() {
         시작 날짜를 <b>${esc(appFirst.slice(0, 8) + '01')}</b> 로 좁히세요.</div>` : ''}
       ${p.unknown.length ? `<div class="warn-box" style="margin:10px 0 0">
         <b>앱에 없는 책 ${p.unknown.length}종</b> — 매출 금액은 그대로 들어가지만
-        재고·순위에는 잡히지 않습니다. 필요하면 먼저 📋 가져오기로 상품을 맞추세요.
+        재고·순위에는 잡히지 않습니다. 필요하면 먼저 상품 가져오기로 상품을 맞추세요.
         <div class="sub" style="max-height:60px;overflow:auto;color:inherit">${esc(p.unknown.join(', '))}</div></div>` : ''}
       ${p.txs.length ? `<div class="info-box" style="margin:10px 0 0;max-height:150px;overflow:auto">
         ${p.txs.slice(0, 40).map(t => `${esc(t.data.time.slice(0, 10))} ·
@@ -6194,7 +6252,7 @@ function planSheetImport(rows) {
 function sheetConfigModal() {
   const cur = sheetCfg || {};
   openModal(`
-    <h3>🔗 구글 시트 연동</h3>
+    <h3>구글 시트 연동</h3>
     <div class="info-box">
       스프레드시트 → 확장 프로그램 → Apps Script 에 저장소의
       <b>apps-script/Code.gs</b> 를 붙여넣고 배포하면 나오는 값입니다.<br>
@@ -6227,7 +6285,7 @@ function sheetConfigModal() {
         body: JSON.stringify({ token: $('cToken').value.trim(), items: [] }),
       });
       const out = await res.json();
-      toast(out.ok ? '연결됐습니다. 👍' : '거절됨 · ' + (out.error || ''), out.ok ? 'good' : 'bad');
+      toast(out.ok ? '연결됐습니다' : '거절됨 · ' + (out.error || ''), out.ok ? 'good' : 'bad');
     } catch (e) {
       console.error(e);
       toast('연결 실패 · 주소와 배포 권한(링크가 있는 모든 사용자)을 확인하세요', 'bad');
@@ -6386,7 +6444,7 @@ function setBar(sub, main, label, onClick, disabled = false) {
   $('mbQty').textContent = sub;
   $('mbAmt').textContent = main;
   const btn = $('mbOpen');
-  btn.textContent = label;
+  btn.innerHTML = label;      // 라벨은 이 파일 안의 고정 문구뿐이다 (아이콘을 같이 넣는다)
   btn.disabled = disabled;
   barAction = onClick;
 }
@@ -6411,7 +6469,7 @@ function renderActionBar() {
     const stock = books.reduce((s, b) => s + b.stock, 0);
     const low = books.filter(isLow).length;
     setBar(low ? `매입 필요 ${low}종` : '재고 이상 없음', `${stock.toLocaleString('ko-KR')}권`,
-           '＋ 새 책', addBookModal);
+           ic('plus') + '새 책', addBookModal);
     return;
   }
   if (view === 'sales') {
@@ -6422,7 +6480,7 @@ function renderActionBar() {
     const label = flowTab === 'in' ? '매입 합계' : (flowTab === 'out' ? '매출 합계' : '매출 − 매입');
     const value = flowTab === 'in' ? paid : (flowTab === 'out' ? got : got - paid);
     setBar(`${label} · ${tx.length + buy.length}건`, won(value),
-           '⬇ CSV', () => $('exportCsv').click(), tx.length + buy.length === 0);
+           ic('download') + 'CSV', () => $('exportCsv').click(), tx.length + buy.length === 0);
     return;
   }
   // report
@@ -6430,7 +6488,7 @@ function renderActionBar() {
   const revenue = list.reduce((s, t) => s + t.received, 0);
   const { label } = periodRange();
   setBar(`${label} 매출 · ${list.length}건`, won(revenue),
-         '⬇ CSV', () => $('exportPeriodCsv').click(), list.length === 0);
+         ic('download') + 'CSV', () => $('exportPeriodCsv').click(), list.length === 0);
 }
 document.querySelectorAll('.tabs button').forEach(btn => {
   btn.onclick = () => switchView(btn.dataset.view);

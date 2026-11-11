@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>서적부 POS 디자인 미리보기</title>
+<style>
+  :root { --bg: #f4f2ee; --text: #1a2233; --muted: #6a7385; --line: rgba(26,34,51,.1); --surface: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17191d; --text: #eceae6; --muted: #9a9ea8; --line: rgba(236,234,230,.1); --surface: #1f2126; } }
+  * { box-sizing: border-box; margin: 0; }
+  body { font: 15px/1.55 system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 32px 16px; }
+  main { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; }
+  h1 { font-size: 21px; font-weight: 500; }
+  p { color: var(--muted); }
+  a { display: block; padding: 16px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+      color: inherit; text-decoration: none; transition: border-color 150ms ease-out; }
+  a:hover { border-color: var(--muted); }
+  a span { display: block; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>서적부 POS 디자인 미리보기</h1>
+  <p>로그인 없이 가짜 데이터로 뜹니다. 누르고 팔아 봐도 이 탭 안에서만 바뀌고, 새로고침하면 처음으로 돌아갑니다.</p>
+  <a href="./before.html">고치기 전<span>main 브랜치의 index.html</span></a>
+  <a href="./after.html">고친 뒤<span>지금 작업 트리의 index.html</span></a>
+  <p>로컬 전용입니다. node preview/build.mjs main · node preview/build.mjs 로 두 파일을 만든 뒤 node preview/serve.mjs 로 띄웁니다.</p>
+</main>
+</body>
+</html>

@@ -118,11 +118,12 @@ var KEY_HEADER = '기록ID';
 /* 계좌이체 입금확인 (2026-11-03). 확인 표시는 원장 줄에 붙어 있어야 줄이 밀려도 그 거래를 따라간다 —
    계좌이체모음은 FILTER 화면이라, 거기 칸에 직접 칠한 굵게·색은 칸에 남고 내용만 밀려 섞였다.
    그래서 원장에 이 이름의 숨김 열을 두고, 계좌이체모음의 '누르기' 체크박스를 누르면 onEdit 가
-   그 순간의 해당 원장 줄에 표시를 적는다. 계좌이체모음의 ✓·굵게는 그 열을 FILTER 로 따라 읽는다. */
+   그 순간의 해당 원장 줄에 표시를 적는다. 계좌이체모음의 ✓·하늘색 줄은 그 열을 FILTER 로 따라 읽는다. */
 var CONFIRM_HEADER = '입금확인';
 var TRANSFER_TAB = '계좌이체모음';
 var TRANSFER_PATTERN = /계좌이체/;          // 계좌이체모음!A2 의 REGEXMATCH 조건과 같아야 줄이 맞는다
 var CONFIRM_BUTTON_HEADER = '입금확인 누르기';
+var CONFIRM_FILL = '#cfe2f3';               // 입금확인 된 줄 배경 — 시트 팔레트의 '연한 수레국화색 3'(하늘색)
 
 /* ===================== 웹앱 진입점 ===================== */
 
@@ -1096,7 +1097,7 @@ function 설치_확인() {
 
 /* ===================== 계좌이체 입금확인 =====================
    계좌이체모음의 '입금확인 누르기' 체크박스는 버튼이다. 누르면 그 줄의 거래에 확인 표시를 켜거나
-   끄고, 체크박스는 바로 빈칸으로 돌아간다. 상태(✓ · 굵게)는 옆 '입금확인' 열이 원장을 읽어 보여 준다.
+   끄고, 체크박스는 바로 빈칸으로 돌아간다. 상태(✓ · 하늘색 줄)는 옆 '입금확인' 열이 원장을 읽어 보여 준다.
    체크박스가 상태를 들고 있으면 그것도 칸에 붙어서, 줄이 밀릴 때 옛 굵게처럼 섞이기 때문이다.
 
    계좌이체모음 n번째 줄 = 원장에서 결제방식에 '계좌이체' 가 든 n번째 줄 (FILTER 와 같은 규칙).
@@ -1190,7 +1191,7 @@ function toggleConfirm(ss, sh, row) {
    2) 계좌이체모음: FILTER 결과(A~M) 오른쪽의 보이는 빈 열 둘 —
         '입금확인'      ✓ 를 보여 주는 수식 (원장 입금확인 열을 같은 조건으로 FILTER)
         '입금확인 누르기' 체크박스 (버튼)
-   3) 계좌이체모음: ✓ 가 있는 줄을 굵게 하는 조건부 서식
+   3) 계좌이체모음: ✓ 가 있는 줄을 하늘색으로 채우는 조건부 서식 (2026-11-11 전에는 굵게)
    계좌이체모음에 손으로 칠해 둔 옛 굵게 · 색은 건드리지 않는다 — 섞여 있어 믿을 수 없으니
    사람이 지우고, 지난 건은 새로 눌러 표시한다. */
 function 입금확인_설치() {
@@ -1256,7 +1257,7 @@ function 입금확인_설치() {
   btn.insertCheckboxes();
   out.push(TRANSFER_TAB + ' ' + columnLetter(stCol) + '열 = ✓ 표시, ' + columnLetter(btCol) + '열 = 누르기 체크박스.');
 
-  // 3) 굵게 규칙 — 같은 수식의 규칙이 이미 있으면 바꿔 끼운다
+  // 3) 하늘색 규칙 — 같은 수식의 규칙(예전 굵게 규칙 포함)이 이미 있으면 바꿔 끼운다
   var formula = '=$' + columnLetter(stCol) + '2="✓"';
   var rules = sh.getConditionalFormatRules().filter(function (rule) {
     var bc = rule.getBooleanCondition();
@@ -1264,11 +1265,11 @@ function 입금확인_설치() {
   });
   rules.push(SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied(formula)
-    .setBold(true)
+    .setBackground(CONFIRM_FILL)
     .setRanges([sh.getRange(2, 1, sh.getMaxRows() - 1, btCol)])
     .build());
   sh.setConditionalFormatRules(rules);
-  out.push('✓ 가 있는 줄은 굵게 보입니다.');
+  out.push('✓ 가 있는 줄은 하늘색으로 채워집니다.');
   out.push('', '이제 ' + TRANSFER_TAB + ' 의 "' + CONFIRM_BUTTON_HEADER + '" 체크박스를 누르면 입금확인이 켜지고,',
            '한 번 더 누르면 꺼집니다. 체크박스는 누른 뒤 바로 빈칸으로 돌아갑니다.');
   Logger.log(out.join('\n'));

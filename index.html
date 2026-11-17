@@ -425,6 +425,8 @@
     border: none; background: none; padding: 4px 0; font: inherit; font-weight: 500;
     color: var(--blue); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px;
   }
+  .book-btn .bp .was { color: var(--muted); font-weight: 500; font-size: 0.8em; }
+  .book-btn .bp .promo { font-style: normal; color: var(--red); font-size: 0.8em; }
   .cart-row .title .ship-note { display: block; font-size: 13px; font-weight: 500; color: var(--muted); }
   .cart-row .del { text-align: center; }
   .cart-row .del button {
@@ -1207,6 +1209,7 @@
   <symbol id="i-phone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5"/></symbol>
 </svg>
 
 <header>
@@ -1223,7 +1226,7 @@
 </header>
 
 <div id="updateBar">
-  <span>새 버전이 준비됐어요.</span>
+  <span id="updateMsg">새 버전이 준비됐어요.</span>
   <button id="updateNow">지금 적용</button>
 </div>
 
@@ -1644,6 +1647,27 @@ function findBook(title, cat) {
   return books.find(b => b.title === title);
 }
 
+/* 거래 품목이 가리키는 앱 책. 제목으로만 찾으면 판 뒤에 이름을 바꾼 책을 못 찾는다
+   (2026-11-14 '훼밀리' → '훼미리' 반품 — 앱 재고가 안 돌아왔다).
+   ① 품목에 박힌 bookId (2026-11-17 부터 판매·교환이 적는다)
+   ② 그 거래 때 남긴 변동 이력(txId · 그때 제목) 의 bookId
+   ③ 그래도 없으면 예전처럼 제목 + 분류 */
+function bookForItem(t, i) {
+  if (i.bookId) { const b = bookById(i.bookId); if (b) return b; }
+  if (t && t.id) {
+    const l = stockLogs.find(l => l.txId === t.id && l.title === i.title && l.bookId);
+    const b = l && bookById(l.bookId);
+    if (b) return b;
+  }
+  return findBook(i.title, i.category);
+}
+/* 돌려받는 품목에 붙일 표시 — 어느 책인지(bookId)와, 이름이 바뀌었으면 시트에 적을 지금 이름 */
+function backItemRef(b, orig) {
+  if (!b) return {};
+  const now = sheetTitle(b);
+  return now === itemSheetName(orig) ? { bookId: b.id } : { bookId: b.id, sheetName: now };
+}
+
 /* 제목만으로는 구별이 안 되는 책들. 이때만 화면에 분류를 같이 보여 준다. */
 function sharedTitles() {
   const seen = new Map();
@@ -1914,7 +1938,7 @@ function renderBookGrid() {
     // '개역개정' 같은 갈래 이름은 배지가 대신하므로 shownTitle 이 뗀다
     el.innerHTML = `<span class="${cls}">${label}</span>
       <div class="bt">${catBadge(b)}${esc(shownTitle(b))}</div>
-      <div class="bp">${ship ? '눌러서 입력' : won(b.price)}</div>`;
+      <div class="bp">${ship ? '눌러서 입력' : priceHtml(b)}</div>`;
     el.onclick = () => addToCart(b.id);
     grid.appendChild(el);
   });
@@ -1946,7 +1970,32 @@ const isShipping = b => !!b && String(b.title || '').includes('택배비');
 function linePrice(c) {
   if (Number.isFinite(c.price)) return c.price;
   const b = bookById(c.id);
-  return b ? b.price : 0;
+  return b ? salePrice(b) : 0;
+}
+
+/* ================= 책별 할인 =================
+   운영자가 고른 책에만 할인율(salePct, %)을 붙여 두면 장바구니에 담는 순간부터 할인된 값으로 잡는다.
+   계산대에서 한 권씩 할인 칸에 50% 를 적지 않아도 되게 (2026-11-17 운영자 요청 — 처음엔 '제목에
+   개역한글' 로 정했다가, 원하는 때에 원하는 책을 넣고 빼고 싶다고 해서 책마다 고르는 방식으로 바꿨다).
+   책 문서의 salePct 하나라 모든 기기가 같이 보고, 설정 → '할인 책 관리' 에서 넣고 뺀다.
+
+   할인 칸이 아니라 **한 권 값**을 낮춘다. 시트로는 출고단가가 할인값으로 갈 뿐이라
+   결제방식 칸에 새 값('계좌이체(…)')이 생기지 않는다 — 결제방식 드롭다운 밖 값이
+   반쪽 줄 970개를 만든 일(2026-10)을 되풀이하지 않으려는 것. 할인 칸은 그 위에 따로 더 쓸 수 있다.
+   판 값은 거래 품목의 price 로 박히므로, 나중에 할인을 빼도 반품은 그때 받은 값으로 돌려준다. */
+function promoPct(b) {
+  if (!b || isShipping(b)) return 0;
+  const p = Number(b.salePct);
+  return Number.isFinite(p) ? Math.min(Math.max(Math.round(p), 0), 100) : 0;
+}
+function salePrice(b) {
+  const p = promoPct(b);
+  return p ? Math.round(b.price * (100 - p) / 100) : b.price;
+}
+/* 판매 화면 카드의 값 — 할인이 걸린 책은 정가를 긋고 할인값을 보인다 */
+function priceHtml(b) {
+  const p = promoPct(b);
+  return p ? `<s class="was">${won(b.price)}</s> ${won(salePrice(b))} <em class="promo">${p}%</em>` : won(b.price);
 }
 /* 금액을 아직 안 적은 택배비 줄 (예전 결제대기에서 돌아온 줄 등) */
 const shipUnpriced = c => isShipping(bookById(c.id)) && !(Number.isFinite(c.price) && c.price > 0);
@@ -2080,7 +2129,9 @@ function renderCart() {
     row.className = 'cart-row';
     row.innerHTML = `
       <div class="title">${esc(b.title)}${ship && shipUnpriced(c)
-        ? '<span class="ship-note">금액을 눌러 적어 주세요</span>' : ''}</div>
+        ? '<span class="ship-note">금액을 눌러 적어 주세요</span>' : ''}${
+        !ship && unit < b.price && (promoPct(b) || Number.isFinite(c.price))
+        ? `<span class="ship-note">할인 ${Math.round((1 - unit / b.price) * 100)}% · 정가 ${won(b.price)}</span>` : ''}</div>
       <div class="qty">
         <button data-a="dec" aria-label="수량 줄이기">−</button><span>${c.qty}</span><button data-a="inc" aria-label="수량 늘리기">＋</button>
       </div>
@@ -2317,7 +2368,12 @@ function snapshotCart() {
   return {
     no: nextHoldNo(),
     at: new Date().toISOString(),
-    items: cart.map(c => ({ id: c.id, qty: c.qty, ...(Number.isFinite(c.price) ? { price: c.price } : {}) })),
+    /* 개역한글 할인이 걸린 줄은 세울 때의 값을 박아 둔다 — 대기 중에 할인을 끄거나 바꿔도
+       손님에게 말한 값 그대로 결제되게 */
+    items: cart.map(c => {
+      const keep = Number.isFinite(c.price) ? c.price : (promoPct(bookById(c.id)) ? linePrice(c) : null);
+      return { id: c.id, qty: c.qty, ...(keep !== null ? { price: keep } : {}) };
+    }),
     discountMode,
     discount: $('discount').value,
     discLabel: $('discLabel').value,
@@ -2484,7 +2540,7 @@ function checkout() {
      이미 판 건의 순수익이 흔들리면 안 되기 때문. 원가를 모르는 책은 null 로 둔다
      (0 으로 채우면 순수익이 부풀려져 거짓말이 된다). */
   const items = lines.map(l => ({
-    title: l.book.title, category: catOf(l.book),
+    bookId: l.book.id, title: l.book.title, category: catOf(l.book),
     qty: l.qty, price: l.price, amount: l.price * l.qty,
     cost: Number.isFinite(l.book.cost) ? l.book.cost : null,
   }));
@@ -3526,7 +3582,7 @@ function deleteTxModal(t, onBack) {
     try {
       const batch = writeBatch(db);
       (t.items || []).forEach(i => {
-        const b = findBook(i.title, i.category);
+        const b = bookForItem(t, i);
         if (!b) return;
         // 판매(qty 양수)를 지우면 재고는 늘고, 반품(qty 음수)을 지우면 재고는 준다 — 한 식으로 처리된다
         const patch = { sold: increment(-i.qty) };
@@ -3931,6 +3987,15 @@ function netAmounts(t) {
      SUMIFS(수량, 구분="입고") - SUMIFS(수량, 구분="출고*")
    라서, 반품을 '반품'으로 적으면 어느 쪽에도 안 걸려 재고가 되돌아가지 않는다.
    시트에 손으로 적어 온 방식대로 **반품은 구분 '입고' · 수량 양수 · 금액 음수**로 적는다. */
+/* 거래 품목 하나가 시트 원장에 적힐 제품명.
+   반품·교환으로 돌려받는 책은 sheetName 이 박혀 있을 수 있다 — 판 뒤에 책 이름을 바꿨으면
+   재고는 지금 이름 줄에 있으니 돌려받은 권수도 지금 이름으로 들어가야 한다.
+   (2026-11-14 에 실제로 그랬다 — 11-09 에 '훼밀리' → '훼미리' 로 바꾼 성경 두 권을 반품하자
+   시트에서는 옛 이름 줄이 1권씩 되살아나고, 앱은 그 책을 못 찾아 재고를 안 늘렸다) */
+function itemSheetName(i) {
+  if (i.sheetName) return i.sheetName;
+  return `[${sheetCat(knownCat(i.category) ? catOf(i) : catForTitle(i.title))}] ${i.title}`;
+}
 function sheetRecords(t) {
   // 분할결제는 현금 몫 · 계좌이체 몫으로 갈라 각각 줄을 만든다 (결제방식 열이 섞이지 않게)
   if (isSplitTx(t)) return payParts(t).flatMap(p => sheetRecords(p));
@@ -3946,10 +4011,9 @@ function sheetRecords(t) {
     const amount = nets[idx];                      // 반품이면 음수
     const qty = Math.abs(i.qty);                   // 수량은 언제나 양수
     const unit = qty ? Math.round((amount / qty) * 100) / 100 : 0;
-    const cat = sheetCat(knownCat(i.category) ? catOf(i) : catForTitle(i.title));
     return {
       날짜: date,
-      제품명: `[${cat}] ${i.title}`,
+      제품명: itemSheetName(i),
       /* 교환 한 건에는 돌려받은 책(음수)과 새로 준 책(양수)이 같이 들어 있어
          거래 종류로 한꺼번에 정할 수 없다. 줄의 부호가 정한다 —
          시트 현재재고가 SUMIFS(입고) − SUMIFS(출고*) 라서 이게 어긋나면 재고가 틀어진다. */
@@ -4213,10 +4277,29 @@ function queueSheetEdit(key, set) {
 function dropQueuedFor(bookId) {
   const mine = k => k === `book:${bookId}` ||
                     k.startsWith(`adj:${bookId}:`) || k.startsWith(`stock:${bookId}:`);
-  const gone = sheetQueue().filter(x => mine(x.key)).map(x => x.key);
-  if (!gone.length) return;
-  dropQ(gone);
+  const gone = sheetQueue().filter(x => mine(x.key));
+  if (!gone.length) return [];
+  dropQ(gone.map(x => x.key));
   renderSheetBadge();
+  return gone;   // 뺀 줄 — 지우는 쪽이 '시트에 실제로 남을 재고' 를 셀 때 쓴다
+}
+
+/* 책을 지울 때 시트에 남을 그 책의 재고를 0으로 만드는 재고조정 줄.
+   예전에는 재고관리 줄만 치우려 했고(queueUnbook), 그 이름으로 판매 줄이 있으면 스크립트가
+   아무것도 안 지우고 두므로 **지운 책의 재고가 시트 현재재고에 그대로 남았다.**
+   (2026-11-09 에 라스텔라 지갑식 2종을 다시 등록하고 옛 책을 지우자 시트가 1 · 6권 많아졌다)
+   - 키는 adj:<책id>: 이다 — 스크립트가 그 책 줄을 다 치우는 경우엔 이 줄도 '앱이 만든 줄' 로 같이 지워져 0이 된다.
+   - 아직 못 보내 큐에서 뺀 줄(dropped)은 시트에 안 갔으니 그만큼 덜 뺀다.
+   - 재고관리 줄(book:)이 아직 안 간 책은 시트에 이름이 없다 — 이 줄을 보내면 거절되므로 안 만든다.
+   - 택배비는 같은 시트 이름을 여러 상품이 같이 쓸 수 있어 건드리지 않는다. */
+function zeroSheetStockFor(b, dropped) {
+  if (isShipping(b)) return;
+  if (dropped.some(x => x.key === `book:${b.id}`)) return;
+  const name = sheetTitle(b);
+  const unsent = dropped.flatMap(x => x.records || []).filter(r => String(r.제품명).trim() === name)
+    .reduce((s, r) => s + (r.구분 === '입고' ? 1 : -1) * (Number(r.수량) || 0), 0);
+  const left = (b.stock || 0) - unsent;
+  if (left) queueAdjust(b.id, { title: b.title, category: catOf(b), delta: -left, note: '책 삭제' });
 }
 
 /* 앱에서 지운 책의 기준정보 줄(재고관리·안전재고관리)도 시트에서 뺀다.
@@ -4931,7 +5014,7 @@ function deleteBook(b) {
     <p class="desc"><b>${esc(b.title)}</b> 을(를) 목록에서 삭제할까요?<br>
       이미 기록된 매출 내역과 변동 이력은 그대로 유지됩니다.<br>
       시트의 재고관리·안전재고관리 줄과 등록할 때 적은 입고·조정 줄은 함께 정리됩니다.
-      (판매 기록이 있으면 시트 줄은 그대로 둡니다)</p>
+      (판매 기록이 있으면 시트 줄은 그대로 두고${b.stock && !isShipping(b) ? `, 남은 재고 ${b.stock}권은 재고조정 줄로 시트에서도 0이 됩니다` : ''})</p>
     <div class="modal-actions">
       <button class="btn ghost" id="mCancel">취소</button>
       <button class="btn solid-danger" id="mSave">삭제</button>
@@ -4939,7 +5022,7 @@ function deleteBook(b) {
   $('mCancel').onclick = closeModal;
   $('mSave').onclick = () => {
     cart = cart.filter(c => c.id !== b.id);
-    dropQueuedFor(b.id);
+    zeroSheetStockFor(b, dropQueuedFor(b.id));   // 줄은 unbook 보다 먼저 — 스크립트도 기록 → 치우기 순서다
     queueUnbook(b);
     deleteDoc(doc(booksCol, b.id))
       .catch(e => { console.error(e); toast('삭제 실패 · 연결 확인', 'bad'); });
@@ -5166,6 +5249,7 @@ function processReturn(t) {
     if (q <= 0) return;
     const orig = t.items[idx];
     items.push({
+      ...backItemRef(bookForItem(t, orig), orig),
       title: orig.title, category: orig.category || catForTitle(orig.title),
       qty: -q, price: orig.price, amount: -(orig.price * q),
       // 원가도 원래 줄에서 이어받는다 — 반품이면 순수익에서 원가만큼 되돌아간다
@@ -5185,7 +5269,7 @@ function processReturn(t) {
   const logs = [];
   items.forEach(i => {
     const q = -i.qty;
-    const b = findBook(i.title, i.category);
+    const b = bookForItem(t, i);
     if (b) {
       batch.update(doc(booksCol, b.id), { stock: increment(q), sold: increment(-q) });
       logs.push({ bookId: b.id, title: b.title, reason: '반품', before: b.stock, after: b.stock + q, txId: retRef.id });
@@ -5367,6 +5451,7 @@ function buildExchange(t, picks, cartLines, paid, method) {
   const backItems = picks.map(({ idx, qty }) => {
     const orig = t.items[idx];
     return {
+      ...backItemRef(bookForItem(t, orig), orig),
       title: orig.title, category: orig.category || catForTitle(orig.title),
       qty: -qty, price: orig.price, amount: -(orig.price * qty),
       // 원가도 원래 줄에서 이어받는다 — 순수익에서 그만큼 되돌아가야 한다
@@ -5374,7 +5459,7 @@ function buildExchange(t, picks, cartLines, paid, method) {
     };
   });
   const outItems = cartLines.map(l => ({
-    title: l.book.title, category: catOf(l.book),
+    bookId: l.book.id, title: l.book.title, category: catOf(l.book),
     qty: l.qty, price: l.price, amount: l.price * l.qty,
     cost: Number.isFinite(l.book.cost) ? l.book.cost : null,
   }));
@@ -5421,7 +5506,7 @@ function processExchange(t) {
   const logs = [];
   playDrawerSound();          // 누른 그 자리에서 — 저장을 기다리면 소리가 늦다
   exData.items.forEach(i => {
-    const b = findBook(i.title, i.category);
+    const b = bookForItem(exData, i);
     if (!b) return;
     // 돌려받은 책은 재고가 늘고(qty 음수), 새로 준 책은 줄어든다 — 한 규칙으로 둘 다 맞는다
     batch.update(doc(booksCol, b.id), { stock: increment(-i.qty), sold: increment(i.qty) });
@@ -5448,6 +5533,90 @@ function processExchange(t) {
 
 /* ================= 설정 ================= */
 let deferredInstall = null;
+
+/* ================= 할인 책 관리 =================
+   책을 검색해 골라서 할인율을 붙이거나 뗀다. 고른 것은 검색어를 바꿔도 남아 있어서
+   '개역한글' 로 찾아 다 고르고, 다른 이름으로 찾아 몇 권 더 고른 뒤 한 번에 적용할 수 있다. */
+let saleDraw = null;   // 할인 책 관리 창이 열려 있으면 책 목록이 바뀔 때 다시 그린다 (renderAll)
+function saleModal() {
+  const picked = new Set();
+  openModal(`
+    <h3>할인 책 관리</h3>
+    <p class="desc">고른 책은 장바구니에 담을 때부터 할인된 값으로 계산됩니다. 모든 기기에 바로 적용됩니다.<br>
+      이미 판 기록과 결제대기에 세워 둔 값은 바뀌지 않습니다.</p>
+    <div class="field"><input id="slQ" type="search" placeholder="책 이름으로 찾기 (예: 개역한글)" autocomplete="off"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="slOnly"> 할인 중인 책만</label>
+      <button class="mini-btn" id="slAll">보이는 책 모두 고르기</button>
+      <button class="mini-btn" id="slNone">고른 것 비우기</button>
+      <span id="slCount" class="dim"></span>
+    </div>
+    <div class="log-list" id="slList"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
+      <input id="slPct" type="text" inputmode="numeric" value="50" style="width:72px"> <span>%</span>
+      <button class="btn primary" id="slApply" style="flex:1">고른 책에 할인 적용</button>
+      <button class="btn ghost" id="slRemove" style="flex:1">고른 책 할인 빼기</button>
+    </div>
+    <div class="modal-actions"><button class="btn ghost" id="mCancel">닫기</button></div>`, true);
+  $('mCancel').onclick = closeModal;
+
+  const visible = () => {
+    const q = $('slQ').value.trim().toLowerCase();
+    // 분류 이름으로도 찾는다 — '개역한글' 갈래 성경은 제목에 그 말이 없는 것도 있다
+    return books.filter(b => !isShipping(b) && matchTitle(`${b.title} ${catOf(b)}`, q) && (!$('slOnly').checked || promoPct(b)))
+                .sort((a, b) => (promoPct(b) - promoPct(a)) || a.title.localeCompare(b.title, 'ko'));
+  };
+  const draw = () => {
+    const list = visible();
+    $('slList').innerHTML = list.slice(0, 300).map(b => {
+      const p = promoPct(b);
+      return `<label class="log-row" style="cursor:pointer">
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="checkbox" data-id="${b.id}" ${picked.has(b.id) ? 'checked' : ''}>
+          <div><div>${catBadge(b)}${esc(shownTitle(b))}${b.discontinued ? ' <span class="dim">(절판)</span>' : ''}</div>
+            <div class="log-when">${p ? `<s>${won(b.price)}</s> → <b>${won(salePrice(b))}</b> · 할인 ${p}%` : `${won(b.price)} · 할인 없음`}</div></div>
+        </div>
+      </label>`;
+    }).join('') || '<div class="cart-empty">맞는 책이 없습니다.</div>';
+    $('slList').querySelectorAll('input[data-id]').forEach(el => {
+      el.onchange = () => { el.checked ? picked.add(el.dataset.id) : picked.delete(el.dataset.id); count(); };
+    });
+    count();
+  };
+  const count = () => { $('slCount').textContent = picked.size ? `${picked.size}권 고름` : ''; };
+  $('slQ').oninput = draw;
+  $('slOnly').onchange = draw;
+  $('slAll').onclick = () => { visible().forEach(b => picked.add(b.id)); draw(); };
+  $('slNone').onclick = () => { picked.clear(); draw(); };
+
+  const save = async pct => {
+    const ids = [...picked].filter(id => bookById(id));
+    if (!ids.length) { toast('책을 먼저 고르세요.', 'bad'); return; }
+    $('slApply').disabled = $('slRemove').disabled = true;
+    try {
+      await runBatched(ids, (batch, id) => batch.update(doc(booksCol, id), { salePct: pct }));
+      writeLogs(ids.map(id => {
+        const b = bookById(id);
+        return { bookId: id, title: b.title, reason: '할인', field: 'salePct', note: pct ? `할인 ${pct}%` : '할인 뺌' };
+      }));
+      toast(pct ? `${ids.length}권에 ${pct}% 할인을 넣었습니다.` : `${ids.length}권의 할인을 뺐습니다.`, 'good');
+      picked.clear();
+    } catch (e) {
+      console.error(e); toast('저장 실패 · 연결 확인', 'bad');
+    } finally {
+      if ($('slApply')) { $('slApply').disabled = $('slRemove').disabled = false; draw(); }
+    }
+  };
+  $('slApply').onclick = () => {
+    const raw = digits($('slPct').value);
+    const pct = raw === '' ? 0 : parseInt(raw, 10);
+    if (!(pct > 0 && pct <= 100)) { toast('할인율은 1 ~ 100 사이로 적어 주세요.', 'bad'); return; }
+    save(pct);
+  };
+  $('slRemove').onclick = () => save(0);
+  saleDraw = draw;
+  draw();
+}
 
 function settingsModal() {
   const last = localStorage.getItem('lastBackup');
@@ -5480,6 +5649,11 @@ function settingsModal() {
         <button class="btn ghost" id="sBiz" style="flex:1">${bizOpen() ? ic('lock') + '마감하기' : ic('lock-open') + '개업하기'}</button>
         <button class="btn ghost" id="sClosings" style="flex:1">${ic('calendar')}지난 마감 내역</button>
       </div>
+    </div>
+
+    <div class="field">
+      <label>할인 책 · 지금 ${books.filter(promoPct).length}종</label>
+      <button class="btn ghost" id="sSale" style="width:100%">${ic('tag')}할인 책 관리 (넣기 · 빼기)</button>
     </div>
 
     <div class="field">
@@ -5549,6 +5723,7 @@ function settingsModal() {
   $('sSheetPull').onclick = importSalesModal;
   $('sSheetBuy').onclick = importBuysModal;
   $('sSheetStock').onclick = syncStockModal;
+  $('sSale').onclick = saleModal;
   pingSheetMirror();   // 설정을 열 때마다 시트 쪽 버전을 다시 확인한다
   checkSheetStock();   // 시트와 앱 재고도 다시 대조한다
   $('sReset').onclick = resetAll;
@@ -6600,6 +6775,8 @@ function renderAll() {
   $('hdrRevenue').textContent = won(sessionRevenue());
   renderBiz();
   renderActionBar();     // 바닥 바는 어느 화면을 보고 있든 그 화면의 숫자를 든다
+  // 할인을 넣고 나면 저장 완료보다 책 목록 갱신이 늦게 온다 — 그때 열린 할인 창도 새 값으로
+  if (saleDraw) { if ($('slList')) saleDraw(); else saleDraw = null; }
 }
 
 /* ================= 로그인 / 초기화 ================= */
@@ -6649,17 +6826,16 @@ onAuthStateChanged(auth, async user => {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(reg => {
+      swReg = reg;   // 이미 기다리는 새 워커가 있어도 applyUpdate 가 켤 수 있게
       reg.addEventListener('updatefound', () => {
         const nw = reg.installing;
         if (!nw) return;
         nw.addEventListener('statechange', () => {
           // 기존 버전이 떠 있는 상태에서 새 버전이 준비된 경우에만 안내
           if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            swReg = reg;
             $('updateBar').classList.add('show');
-            $('updateNow').onclick = () => {
-              nw.postMessage('SKIP_WAITING');
-              reg.waiting && reg.waiting.postMessage('SKIP_WAITING');
-            };
+            $('updateNow').onclick = applyUpdate;
           }
         });
       });
@@ -6673,6 +6849,64 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+
+/* ================= 새 버전 알림 =================
+   위의 서비스워커 알림은 sw.js 가 바뀔 때만 뜬다. 그런데 배포는 거의 index.html 만 바꾸고,
+   설치한 앱(홈 화면 아이콘)은 닫지 않고 며칠씩 떠 있어서 **처음 연 그 화면이 그대로 남는다.**
+   그래서 웹으로 연 쪽은 새 화면인데 앱은 옛 화면인 일이 생겼다 (2026-11-17 운영자 제보).
+   데이터(Firestore)는 어느 쪽이든 같은 곳을 본다 — 다른 건 화면 코드뿐이다.
+
+   처음 뜰 때 서버의 index.html 지문을 적어 두고, 앱으로 돌아올 때 · 인터넷이 다시 될 때 ·
+   10분마다 서버 것과 비교한다. 다르면 위 띠에 '업데이트' 버튼을 띄운다.
+   (처음 뜰 때 인터넷이 안 됐으면 지문을 못 적는다 — 그때는 다음에 처음 받은 것을 기준으로 삼는다) */
+let bootPageHash = null, newVersionShown = false, swReg = null;
+async function serverPage() {
+  const res = await fetch('./index.html', { cache: 'no-store' });
+  if (!res.ok) return null;
+  const buf = await crypto.subtle.digest('SHA-256', await res.arrayBuffer());
+  return {
+    hash: [...new Uint8Array(buf).slice(0, 12)].map(x => x.toString(16).padStart(2, '0')).join(''),
+    modified: Date.parse(res.headers.get('last-modified') || '') || null,
+  };
+}
+/* 띠의 버튼 하나로 두 알림(서비스워커 · 지문)을 같이 처리한다.
+   장바구니는 메모리에만 있어 새로고침하면 사라진다 — 결제하거나 결제대기로 돌린 뒤에 하게 한다. */
+function applyUpdate() {
+  if (cart.length) { toast('장바구니를 결제하거나 결제대기로 옮긴 뒤 업데이트해 주세요.', 'bad'); return; }
+  // 새 서비스워커가 기다리고 있으면 그걸 먼저 켠다 — 켜지면 controllerchange 가 새로고침한다
+  if (swReg && swReg.waiting) { swReg.waiting.postMessage('SKIP_WAITING'); setTimeout(() => location.reload(), 3000); return; }
+  location.reload();
+}
+function showNewVersion() {
+  if (newVersionShown) return;
+  newVersionShown = true;
+  $('updateMsg').textContent = '새 버전이 나왔어요. 최신 버전으로 업데이트해 주세요.';
+  $('updateNow').textContent = '업데이트';
+  $('updateBar').classList.add('show');
+  $('updateNow').onclick = applyUpdate;
+}
+let checkingVersion = false;
+async function checkNewVersion() {
+  if (checkingVersion || newVersionShown || !navigator.onLine || !(window.crypto && crypto.subtle)) return;
+  checkingVersion = true;
+  try {
+    const p = await serverPage();
+    if (!p) return;
+    if (!bootPageHash) {
+      bootPageHash = p.hash;
+      /* 지금 화면이 캐시본(느린 망 · 오프라인으로 떴던 것)이면 첫 지문이 이미 새 파일 것이라
+         비교로는 못 잡는다. 지금 화면의 Last-Modified(document.lastModified)가 서버 것보다
+         이르면 옛 화면이다. 헤더가 없으면 document.lastModified 가 '지금' 이 되어 이르지 않으니 잘못 뜨지 않는다. */
+      const mine = Date.parse(document.lastModified);
+      if (p.modified && mine && mine < p.modified - 1000) showNewVersion();
+    } else if (p.hash !== bootPageHash) showNewVersion();
+  } catch (e) { /* 오프라인·느린 망 — 다음 번에 다시 본다 */ }
+  finally { checkingVersion = false; }
+}
+checkNewVersion();
+setInterval(checkNewVersion, 10 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkNewVersion(); });
+window.addEventListener('online', checkNewVersion);
 
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();

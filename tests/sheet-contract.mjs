@@ -58,7 +58,7 @@ function grab(name) {
 const NAMES = ['CATS', 'BIBLE_SUBS', 'SHEET_CATS', 'knownCat', 'bibleSub', 'catOf', 'sheetCat', 'sheetTitle',
   'catForTitle', 'isSplitTx', 'splitParts', '_splitCache', 'payParts', 'isFreeTx', 'ymd',
   'SHEET_DISC_LABELS', 'discLabelOf', 'sheetMethod', 'sheetCustomer', 'SHEET_PAY_RE', 'sheetSafeRecord',
-  'spreadCut', 'netAmounts', 'sheetRecords', 'stockRecord', 'adjustRecord'];
+  'spreadCut', 'netAmounts', 'itemSheetName', 'sheetRecords', 'stockRecord', 'adjustRecord'];
 const ctx = vm.createContext({ books: [], console });
 vm.runInContext(NAMES.map(grab).join('\n') +
   '\n;globalThis.__api = { sheetRecords, stockRecord, adjustRecord, sheetSafeRecord, sheetTitle };', ctx);
@@ -134,6 +134,11 @@ items.push({ key: `test:${run}:${++n}`, label: '이름 바꾸기 (재고 옮김)
   api.adjustRecord({ ...BOOK, delta: -3, note: '시험 이름 바꿈', time: T }),
   api.adjustRecord({ title: NEW.replace('[일반] ', ''), category: '일반', delta: 3, note: '시험 이름 바꿈', time: T }),
 ] });
+// 이름을 바꾼 뒤 옛 판매를 반품 — 돌려받은 권수는 지금 이름 줄로 가야 한다 (2026-11-14 훼밀리 → 훼미리)
+items.push({ key: `test:${run}:${++n}`, label: '이름 바꾼 책 반품 (지금 이름으로)', records: api.sheetRecords(
+  tx({ type: 'return', items: [{ ...it(BOOK, -1, 15000), bookId: 'x', sheetName: NEW }], total: -15000, payable: -15000, received: -15000, method: '계좌이체' })) });
+// 책 삭제 — 남은 재고를 0으로 만드는 재고조정 줄
+items.push({ key: `test:${run}:${++n}`, label: '책 삭제 (남은 재고 0으로)', records: [api.adjustRecord({ ...BOOK, delta: -1, note: '책 삭제', time: T })] });
 // 일부러 틀린 것 — 거절돼야 하고, 반쪽 줄을 남기면 안 되고, 옆 거래를 막으면 안 된다
 const bad = [
   { key: `test:${run}:bad1`, label: '(거절돼야 함) 결제방식 목록 밖 — 보내기 직전 고치기 없이',

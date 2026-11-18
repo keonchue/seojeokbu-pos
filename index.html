@@ -2027,8 +2027,8 @@ function catalogKey(items) {
 }
 /* 오프라인이던 기기가 옛 캐시로 덮어쓰지 않게: 서버에서 온 목록이고 보낼 쓰기가 없을 때만.
    lastKey 가 null 이면 공개 문서를 아직 못 읽은 것이라 기다린다 ('' 은 문서가 없음) */
-function shouldPublish(meta, lastKey, key) {
-  return !meta.fromCache && !meta.hasPendingWrites && lastKey !== null && key !== lastKey;
+function shouldPublish(meta, lastKey, key, failedKey = null) {
+  return !meta.fromCache && !meta.hasPendingWrites && lastKey !== null && key !== lastKey && key !== failedKey;
 }
 /* 카탈로그 books.csv → [{ no, name, color, cat }] (따옴표 · BOM 처리) */
 function parseCatalogRows(text) {
@@ -2062,14 +2062,17 @@ function suggestCatalogMatch(row, list) {
    보안 규칙을 콘솔에 올리기 전에는 쓰기가 거절되는 게 정상이라 알림은 띄우지 않는다. */
 let catalogLastKey = null;
 let catalogBooksMeta = null;   // 마지막 책 목록 스냅샷의 metadata (가격표가 나중에 도착해도 다시 판단하려고)
+let catalogFailedKey = null;   // 마지막으로 거절당한 내용
 function publishCatalog(meta) {
   catalogBooksMeta = meta;
   const items = catalogItems(books), key = catalogKey(items);
-  if (!shouldPublish(meta, catalogLastKey, key)) return;
+  if (!shouldPublish(meta, catalogLastKey, key, catalogFailedKey)) return;
   const prev = catalogLastKey;
   catalogLastKey = key;   // 응답을 기다리는 동안 같은 내용을 또 쓰지 않게
   setDoc(doc(db, 'public', 'catalog'), { items, updatedAt: serverTimestamp() })
-    .catch(e => { console.warn('카탈로그 가격표', e); catalogLastKey = prev; });   // 다음 변경 때 다시 쓴다
+    .then(() => { catalogFailedKey = null; })
+    // 거절되면(규칙의 가게 이메일이 다르거나 등) 같은 내용은 책이 바뀔 때까지 다시 쓰지 않는다 — 쓰기 폭주 막기
+    .catch(e => { console.warn('카탈로그 가격표', e); catalogLastKey = prev; catalogFailedKey = key; });
 }
 
 /* 판매 화면 카드의 값 — 할인이 걸린 책은 정가를 긋고 할인값을 보인다 */

@@ -51,6 +51,8 @@ eq('shouldPublish: 보낼 쓰기가 남았으면 안 씀', shouldPublish({ fromC
 eq('shouldPublish: 공개 문서를 아직 못 읽었으면 안 씀', shouldPublish(server, null, 'y'), false);
 eq('shouldPublish: 같으면 안 씀', shouldPublish(server, 'y', 'y'), false);
 eq('shouldPublish: 서버 · 바뀜 → 씀', shouldPublish(server, 'x', 'y'), true);
+eq('shouldPublish: 거절당한 내용 그대로면 다시 안 씀 (쓰기 폭주 막기)', shouldPublish(server, 'x', 'y', 'y'), false);
+eq('shouldPublish: 거절 뒤 책이 바뀌면 다시 씀', shouldPublish(server, 'x', 'z', 'y'), true);
 eq('shouldPublish: 공개 문서가 없음("") · 바뀜 → 씀', shouldPublish(server, '', 'y'), true);
 
 // parseCatalogRows — 카탈로그 books.csv (BOM · 따옴표 속 쉼표)

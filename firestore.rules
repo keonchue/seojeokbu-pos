@@ -41,6 +41,13 @@ service cloud.firestore {
       allow read, write: if isStore();
     }
 
+    // 카탈로그 웹사이트(손님용)가 읽는 가격표 — 번호별 정가·할인율만 들어 있다
+    // (재고·원가·매출은 이 문서에 넣지 않는다. 앱 index.html 의 catalogItems 참고)
+    match /public/catalog {
+      allow read: if true;
+      allow write: if isStore();
+    }
+
     // 그 외 경로는 전부 차단
     match /{document=**} {
       allow read, write: if false;

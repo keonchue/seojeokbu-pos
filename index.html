@@ -1514,7 +1514,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs, setDoc,
-  onSnapshot, query, orderBy, limit, writeBatch, increment, arrayUnion, runTransaction }
+  onSnapshot, query, orderBy, limit, writeBatch, increment, arrayUnion, runTransaction, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig, STORE_EMAIL } from "./firebase-config.js";
 
@@ -1752,7 +1752,16 @@ function startListeners() {
     syncMeta.books = readMeta(snap);
     renderSync(); renderAll();
     if (!snap.metadata.fromCache && !snap.metadata.hasPendingWrites) mergeShippingBooks();
+    publishCatalog(snap.metadata);
   }, e => console.error('books listener', e));
+
+  // 손님용 카탈로그가 읽는 가격표 — 지금 올라가 있는 내용을 알아야 바뀐 때만 다시 쓴다
+  onSnapshot(doc(db, 'public', 'catalog'), snap => {
+    // 문서가 없으면 '빈 가격표' 와 같게 본다 — 이어진 책이 하나도 없을 때 빈 문서를 만들지 않게
+    catalogLastKey = catalogKey(snap.exists() ? (snap.data().items || {}) : {});
+    // 책 목록이 먼저 와서 건너뛰었거나, 다른 기기가 옛 가격표를 써 두었으면 지금 책 목록으로 다시 맞춘다
+    if (catalogBooksMeta) publishCatalog(catalogBooksMeta);
+  }, e => console.error('catalog listener', e));
 
   onSnapshot(query(txCol, orderBy('time', 'desc')), { includeMetadataChanges: true }, snap => {
     transactions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1992,6 +2001,77 @@ function salePrice(b) {
   const p = promoPct(b);
   return p ? Math.round(b.price * (100 - p) / 100) : b.price;
 }
+
+/* ---------- 카탈로그 연동 ----------
+   손님용 카탈로그(keonchue.github.io/seojeokbu-catalog)는 책마다 번호가 있다. 앱 책에 그 번호(catalogNo)를
+   이어 두면, 이어진 책들의 정가 · 할인율만 Firestore public/catalog 에 써 두고 카탈로그가 그걸 읽는다.
+   이 문서는 누구나 읽을 수 있으므로 재고 · 원가 · 제목 같은 건 절대 넣지 않는다. */
+const CATALOG_CSV = 'https://keonchue.github.io/seojeokbu-catalog/books.csv';
+function catNoOf(b) {
+  const s = String(b && b.catalogNo != null ? b.catalogNo : '').trim();
+  return /^\d+$/.test(s) && +s > 0 ? +s : 0;
+}
+/* books 는 만든 순서라 같은 번호가 둘이면 먼저 만든 책이 이긴다 (수정 · 연결 창에서 겹치지 않게 막는다) */
+function catalogItems(list) {
+  const out = {};
+  list.forEach(b => {
+    const no = catNoOf(b);
+    if (!no || isShipping(b) || out[no]) return;
+    out[no] = { price: b.price || 0, salePct: promoPct(b) };
+  });
+  return out;
+}
+function catalogKey(items) {
+  return JSON.stringify(Object.keys(items || {}).map(Number).sort((a, b) => a - b)
+    .map(no => [no, items[no].price, items[no].salePct]));
+}
+/* 오프라인이던 기기가 옛 캐시로 덮어쓰지 않게: 서버에서 온 목록이고 보낼 쓰기가 없을 때만.
+   lastKey 가 null 이면 공개 문서를 아직 못 읽은 것이라 기다린다 ('' 은 문서가 없음) */
+function shouldPublish(meta, lastKey, key) {
+  return !meta.fromCache && !meta.hasPendingWrites && lastKey !== null && key !== lastKey;
+}
+/* 카탈로그 books.csv → [{ no, name, color, cat }] (따옴표 · BOM 처리) */
+function parseCatalogRows(text) {
+  const rows = []; let row = [], cell = '', inQ = false;
+  const t = String(text || '').replace(/^﻿/, '');
+  for (let k = 0; k < t.length; k++) {
+    const c = t[k];
+    if (inQ) { if (c === '"') { if (t[k + 1] === '"') { cell += '"'; k++; } else inQ = false; } else cell += c; continue; }
+    if (c === '"') inQ = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && t[k + 1] === '\n') k++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  const head = (rows.shift() || []).map(h => h.trim());
+  const at = (r, n) => { const i = head.indexOf(n); return i < 0 ? '' : (r[i] || '').trim(); };
+  return rows.map(r => ({ no: parseInt(at(r, '번호'), 10), name: at(r, '이름'), color: at(r, '색상'), cat: at(r, '분류') }))
+    .filter(r => r.no > 0 && r.name);
+}
+/* 이름 · 색상을 띄어쓰기 없이 비교해 앱 제목이 둘 다 품은 책. 여럿이면 제목이 가장 짧은 것 */
+function suggestCatalogMatch(row, list) {
+  const flat = s => String(s || '').replace(/\s+/g, '').toLowerCase();
+  const name = flat(row.name), color = flat(row.color);
+  if (!name) return null;
+  const hits = list.filter(b => !isShipping(b) && flat(b.title).includes(name) && (!color || flat(b.title).includes(color)));
+  hits.sort((a, b) => flat(a.title).length - flat(b.title).length);
+  return hits.length ? hits[0].id : null;
+}
+
+/* 책 목록이 바뀔 때마다 부른다. 여러 기기가 같이 써도 내용이 같아서 괜찮다.
+   보안 규칙을 콘솔에 올리기 전에는 쓰기가 거절되는 게 정상이라 알림은 띄우지 않는다. */
+let catalogLastKey = null;
+let catalogBooksMeta = null;   // 마지막 책 목록 스냅샷의 metadata (가격표가 나중에 도착해도 다시 판단하려고)
+function publishCatalog(meta) {
+  catalogBooksMeta = meta;
+  const items = catalogItems(books), key = catalogKey(items);
+  if (!shouldPublish(meta, catalogLastKey, key)) return;
+  const prev = catalogLastKey;
+  catalogLastKey = key;   // 응답을 기다리는 동안 같은 내용을 또 쓰지 않게
+  setDoc(doc(db, 'public', 'catalog'), { items, updatedAt: serverTimestamp() })
+    .catch(e => { console.warn('카탈로그 가격표', e); catalogLastKey = prev; });   // 다음 변경 때 다시 쓴다
+}
+
 /* 판매 화면 카드의 값 — 할인이 걸린 책은 정가를 긋고 할인값을 보인다 */
 function priceHtml(b) {
   const p = promoPct(b);
@@ -4931,6 +5011,8 @@ function editBookModal(b) {
       <div class="field"><label>안전재고 (권)</label><input id="mSafety" inputmode="numeric" value="${safetyOf(b)}"></div>
     </div>
     <div class="field"><label>거래처 (선택)</label><input id="mSupplier" value="${esc(b.supplier || '')}" placeholder="예) 성서원"></div>
+    ${ship ? '' : `<div class="field"><label>카탈로그 번호 (선택)</label><input id="mCatNo" inputmode="numeric" value="${catNoOf(b) || ''}" placeholder="손님용 카탈로그의 책 번호">
+      <p class="desc" style="margin:4px 0 0">적어 두면 이 책의 가격·할인이 손님용 카탈로그에 바로 보입니다.</p></div>`}
     <label class="chkline"><input type="checkbox" id="mDead"${b.discontinued ? ' checked' : ''}>
       절판 — 더 이상 들이지 않는 책</label>
     <p class="desc" style="margin:-4px 0 14px">판매 화면에서 빠지고, 재고 탭에는 회색으로 남습니다.
@@ -4953,6 +5035,10 @@ function editBookModal(b) {
     const category = $('mCat').value;
     const supplier = $('mSupplier').value.trim() || null;
     const dead = $('mDead').checked;
+    const catNo = $('mCatNo') ? (catNoOf({ catalogNo: $('mCatNo').value }) || null) : (catNoOf(b) || null);
+    if ($('mCatNo') && $('mCatNo').value.trim() && !catNo) { toast('카탈로그 번호는 1 이상의 숫자로 적어 주세요.', 'bad'); return; }
+    const catOwner = catNo && books.find(o => o.id !== b.id && catNoOf(o) === catNo);
+    if (catOwner) { toast(`카탈로그 ${catNo}번은 이미 「${catOwner.title}」에 이어져 있습니다.`, 'bad'); return; }
     const oldName = sheetTitle(b), newName = `[${sheetCat(category)}] ${title}`;
     /* 이미 있는 이름으로 바꾸면 시트에서 두 책이 한 줄을 나눠 쓰게 된다(재고가 합쳐지고 판매가
        어느 책 것인지 모름). 다른 책이 그 이름을 쓰고 있거나, 시트에만 그 이름이 남아 있으면 막는다. */
@@ -4967,6 +5053,7 @@ function editBookModal(b) {
       cost: isNaN(cost) ? null : cost,
       safety: isNaN(safety) ? 0 : safety,
       discontinued: dead,
+      catalogNo: catNo,
     }).catch(e => { console.error(e); toast('저장 실패 · 연결 확인', 'bad'); });
 
     /* 이름이나 분류가 바뀌면 시트에 적힐 제품명('[분류] 제목')이 바뀐다. 원장 제품명 칸은
@@ -4998,6 +5085,7 @@ function editBookModal(b) {
     if (price !== b.price) logs.push({ bookId: b.id, title, reason: '가격변경', field: 'price', before: b.price, after: price, note });
     if (title !== b.title) logs.push({ bookId: b.id, title, reason: '이름변경', field: 'title', note: `${b.title} → ${title}` });
     if (category !== catOf(b)) logs.push({ bookId: b.id, title, reason: '분류변경', field: 'category', note: `${catOf(b)} → ${category}` });
+    if ((catNo || 0) !== catNoOf(b)) logs.push({ bookId: b.id, title, reason: '카탈로그 연결', field: 'catalogNo', note: `${catNoOf(b) || '없음'} → ${catNo || '없음'}` });
     // 절판은 되돌릴 수 있는 표시지만, 언제 누가 내렸는지는 이력에 남아야 한다
     if (dead !== !!b.discontinued) {
       logs.push({ bookId: b.id, title, reason: dead ? '절판' : '절판 해제', field: 'discontinued', note });
@@ -5618,6 +5706,100 @@ function saleModal() {
   draw();
 }
 
+/* ================= 카탈로그 연결 =================
+   손님용 카탈로그의 books.csv 를 읽어 줄마다 앱 책을 고른다. 처음엔 이미 이어진 책, 없으면 이름 · 색상이
+   비슷한 책을 '추천' 으로 골라 둔다. 저장하면 바뀐 책의 catalogNo 만 고친다 — 가격표(public/catalog)는
+   책 목록이 바뀌면 publishCatalog 가 알아서 다시 쓴다. */
+async function catalogLinkModal() {
+  openModal(`
+    <h3>카탈로그 연결</h3>
+    <p class="desc">손님용 카탈로그의 책 번호마다 앱의 책을 고르세요. 이어진 책은 가격·할인이 카탈로그에 바로 보입니다.<br>
+      <b>추천</b>은 이름·색상이 비슷해서 미리 골라 둔 것이니 맞는지 확인해 주세요.</p>
+    <div class="field"><input id="clQ" type="search" placeholder="번호나 이름으로 찾기" autocomplete="off"></div>
+    <label style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="checkbox" id="clTodo"> 연결 안 된 줄 · 추천 줄만</label>
+    <div class="log-list" id="clList"><div class="cart-empty">카탈로그 목록을 읽는 중…</div></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">닫기</button>
+      <button class="btn primary" id="clSave" disabled>연결 저장</button>
+    </div>`, true);
+  $('mCancel').onclick = closeModal;
+
+  let rows;
+  try {
+    const r = await fetch(CATALOG_CSV, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    rows = parseCatalogRows(await r.text());
+  } catch (e) {
+    console.error('catalog csv', e);
+    if ($('clList')) $('clList').innerHTML = '<div class="cart-empty">카탈로그 목록을 못 읽었습니다. 인터넷 연결을 확인해 주세요.</div>';
+    return;
+  }
+  if (!$('clList')) return;   // 읽는 사이에 창을 닫음
+
+  const pool = books.filter(b => !isShipping(b)).sort((a, b) => a.title.localeCompare(b.title, 'ko'));
+  const linked = new Map(pool.filter(catNoOf).map(b => [catNoOf(b), b.id]));
+  const choice = new Map(), suggested = new Set();
+  rows.forEach(r => {
+    if (linked.has(r.no)) { choice.set(r.no, linked.get(r.no)); return; }
+    const id = suggestCatalogMatch(r, pool.filter(b => !catNoOf(b)));
+    if (id && ![...choice.values()].includes(id)) { choice.set(r.no, id); suggested.add(r.no); }
+    else choice.set(r.no, '');
+  });
+  const opts = pool.map(b => `<option value="${b.id}">${esc(shownTitle(b))}</option>`).join('');
+
+  const draw = () => {
+    const q = $('clQ').value.trim().toLowerCase(), todo = $('clTodo').checked;
+    const list = rows.filter(r => (!q || String(r.no) === q || `${r.name} ${r.color}`.toLowerCase().includes(q))
+      && (!todo || !choice.get(r.no) || suggested.has(r.no)));
+    $('clList').innerHTML = list.map(r => `
+      <div class="log-row" style="align-items:center">
+        <div style="min-width:0"><b>${r.no}번</b> ${esc(r.name)}${r.color ? ` <span class="dim">(${esc(r.color)})</span>` : ''}
+          ${suggested.has(r.no) ? ' <em class="promo">추천</em>' : ''}<div class="log-when">${esc(r.cat)}</div></div>
+        <select data-no="${r.no}" style="max-width:52%"><option value="">연결 안 함</option>${opts}</select>
+      </div>`).join('') || '<div class="cart-empty">맞는 줄이 없습니다.</div>';
+    $('clList').querySelectorAll('select[data-no]').forEach(el => {
+      const no = +el.dataset.no;
+      el.value = choice.get(no) || '';
+      el.onchange = () => { choice.set(no, el.value); suggested.delete(no); };
+    });
+  };
+  $('clQ').oninput = draw;
+  $('clTodo').onchange = draw;
+  $('clSave').disabled = false;
+
+  $('clSave').onclick = async () => {
+    // 한 책을 두 번호에 고르면 막는다 (번호 하나 ↔ 책 하나)
+    const want = new Map();   // bookId → 번호
+    for (const [no, id] of choice) {
+      if (!id) continue;
+      if (want.has(id)) {
+        toast(`「${shownTitle(bookById(id))}」을(를) ${want.get(id)}번과 ${no}번에 같이 골랐습니다. 하나만 남겨 주세요.`, 'bad');
+        return;
+      }
+      want.set(id, no);
+    }
+    // 이 목록에 있는 번호에 이어져 있다가 빠진 책은 연결을 뗀다. 목록에 없는 번호는 건드리지 않는다
+    const shown = new Set(rows.map(r => r.no));
+    const changes = books.filter(b => !isShipping(b)).map(b => {
+      const now = catNoOf(b), next = want.has(b.id) ? want.get(b.id) : (shown.has(now) ? 0 : now);
+      return now === next ? null : { b, now, next };
+    }).filter(Boolean);
+    if (!changes.length) { toast('바뀐 연결이 없습니다.'); return; }
+    $('clSave').disabled = true;
+    try {
+      await runBatched(changes, (batch, c) => batch.update(doc(booksCol, c.b.id), { catalogNo: c.next || null }));
+      writeLogs(changes.map(c => ({ bookId: c.b.id, title: c.b.title, reason: '카탈로그 연결', field: 'catalogNo',
+        note: `${c.now || '없음'} → ${c.next || '없음'}` })));
+      toast(`${changes.length}권의 카탈로그 연결을 저장했습니다.`, 'good');
+      closeModal();
+    } catch (e) {
+      console.error(e); toast('저장 실패 · 연결 확인', 'bad');
+      if ($('clSave')) $('clSave').disabled = false;
+    }
+  };
+  draw();
+}
+
 function settingsModal() {
   const last = localStorage.getItem('lastBackup');
   const days = last ? Math.floor((Date.now() - new Date(last)) / 864e5) : null;
@@ -5654,6 +5836,11 @@ function settingsModal() {
     <div class="field">
       <label>할인 책 · 지금 ${books.filter(promoPct).length}종</label>
       <button class="btn ghost" id="sSale" style="width:100%">${ic('tag')}할인 책 관리 (넣기 · 빼기)</button>
+    </div>
+
+    <div class="field">
+      <label>손님용 카탈로그 · 연결 ${books.filter(b => catNoOf(b) && !isShipping(b)).length}종</label>
+      <button class="btn ghost" id="sCatalog" style="width:100%">${ic('link')}카탈로그 연결 (책 번호 잇기)</button>
     </div>
 
     <div class="field">
@@ -5724,6 +5911,7 @@ function settingsModal() {
   $('sSheetBuy').onclick = importBuysModal;
   $('sSheetStock').onclick = syncStockModal;
   $('sSale').onclick = saleModal;
+  $('sCatalog').onclick = catalogLinkModal;
   pingSheetMirror();   // 설정을 열 때마다 시트 쪽 버전을 다시 확인한다
   checkSheetStock();   // 시트와 앱 재고도 다시 대조한다
   $('sReset').onclick = resetAll;

@@ -38,6 +38,7 @@ export const orderBy = (field, dir = 'asc') => ({ t: 'order', field, dir });
 export const limit = n => ({ t: 'limit', n });
 export const query = (col, ...cs) => ({ kind: 'query', path: col.path, cs });
 
+export const serverTimestamp = () => new Date().toISOString();   // 미리보기에선 그냥 지금 시각
 export const increment = n => ({ __op: 'inc', n });
 export const arrayUnion = (...v) => ({ __op: 'union', v });
 
